@@ -14,6 +14,7 @@ from typing import Any, Callable
 import numpy as np
 
 from ..capture.audit import media_bytes_on_disk
+from ..compiler.episodes import episode_extent
 from ..embed import embed
 from ..llm.base import LLMClient, LLMUnavailable
 from .export import export_memories
@@ -87,11 +88,22 @@ def graph_support(conn: sqlite3.Connection, removed_entity_ids: list[str]) -> Pr
         " (SELECT 1 FROM claims d WHERE d.claim_id = c.superseded_by)").fetchone()[0]
     entities = {r["entity_id"] for r in conn.execute("SELECT entity_id FROM entities")}
     leftover = len(entities & set(removed_entity_ids))
-    total = unsupported + dead_src + dead_prem + dangling + leftover
-    return _result(1, "Graph: no claim rests on removed support", total, claims=len(claims),
+    stale_episodes = 0
+    for e in conn.execute("SELECT attrs FROM entities WHERE type='episode'"):
+        a = json.loads(e["attrs"] or "{}")
+        contrib = a.get("contrib")
+        if not contrib:
+            stale_episodes += 1                  # no record of where its time and place came from
+            continue
+        stale = any(c["source_id"] is not None and c["source_id"] not in live for c in contrib)
+        stale = stale or any(a.get(k) != v for k, v in episode_extent(contrib).items())
+        stale_episodes += bool(stale)
+    total = unsupported + dead_src + dead_prem + dangling + leftover + stale_episodes
+    return _result(1, "Graph: no claim or episode rests on removed support", total, claims=len(claims),
                    unsupported_claims=unsupported, justifications_on_revoked_sources=dead_src,
                    premises_missing=dead_prem, dangling_supersession=dangling,
-                   removed_entities_still_present=leftover, live_sources=len(live))
+                   removed_entities_still_present=leftover,
+                   episode_metadata_from_removed_sources=stale_episodes, live_sources=len(live))
 
 
 # 2 ---------------------------------------------------------------------------------------------
@@ -151,14 +163,17 @@ def caches_and_chat(conn: sqlite3.Connection, terms: list[str], cache_dir: str |
     for r in conn.execute("SELECT text, claim_ids FROM chat_messages"):
         ids = json.loads(r["claim_ids"])
         chat += (any(i not in valid for i in ids) or bool(contains(r["text"], terms)))
-    files, checked = 0, 0
+    files, remaining = 0, 0
     if cache_dir and Path(cache_dir).is_dir():
         for p in Path(cache_dir).glob("*.json"):
-            checked += 1
+            remaining += 1                      # the whole runtime cache is cleared, so any file is a leak
             files += bool(contains(p.read_text(), terms))
-    return _result(4, "Caches: answer cache, chat log and model-response cache are clean",
-                   stale + chat + files, answer_cache_rows=int(stale), chat_rows=int(chat),
-                   model_cache_files_with_removed_text=files, model_cache_files_checked=checked,
+    receipts = sum(bool(contains(r["report_json"], terms) or '"text"' in r["report_json"].replace(" ", ""))
+                   for r in conn.execute("SELECT report_json FROM forgetting_receipts"))
+    return _result(4, "Caches: answer cache, chat log, receipts and model-response cache are clean",
+                   stale + chat + remaining + receipts, answer_cache_rows=int(stale), chat_rows=int(chat),
+                   model_cache_files_with_removed_text=files, model_cache_files_remaining=remaining,
+                   receipts_holding_text=receipts,
                    model_cache="runtime directory" if cache_dir else "none configured")
 
 

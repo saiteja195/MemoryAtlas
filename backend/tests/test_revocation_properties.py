@@ -10,6 +10,9 @@ so cycles (A supports B, B supports A) are common. After revoking a random set o
  (d) revoking again changes nothing, and
  (e) the order in which grants are revoked does not matter;
  plus: other people's sources are untouched and no leak probe fails.
+
+A source may depend on several grants (a recorded conversation needs every participant's), and it
+dies as soon as ANY of them is revoked. A grant a source does not depend on never affects it.
 """
 import hypothesis.strategies as st
 from hypothesis import HealthCheck, example, given, settings
@@ -28,6 +31,8 @@ def graphs(draw):
     n_sources = draw(st.integers(1, 6))
     n_claims = draw(st.integers(1, 10))
     source_grant = [draw(st.integers(0, n_grants - 1)) for _ in range(n_sources)]
+    # extra grants some sources also depend on (other participants of a recording)
+    source_extra = [draw(st.lists(st.integers(0, n_grants - 1), max_size=2, unique=True)) for _ in range(n_sources)]
     justs = []
     for _ in range(n_claims):
         k = draw(st.integers(1, 2))
@@ -40,7 +45,18 @@ def graphs(draw):
                                                         min_size=1, max_size=3, unique=True)))))
         justs.append(js)
     revoked = draw(st.lists(st.integers(0, n_grants - 1), unique=True, max_size=n_grants))
-    return {"n_grants": n_grants, "source_grant": source_grant, "justs": justs, "revoked": revoked}
+    return {"n_grants": n_grants, "source_grant": source_grant, "source_extra": source_extra,
+            "justs": justs, "revoked": revoked}
+
+
+def needs(g, i):
+    """Every grant source i depends on."""
+    extra = g.get("source_extra") or [[]] * len(g["source_grant"])
+    return {g["source_grant"][i], *extra[i]}
+
+
+def source_live(g, i):
+    return not (needs(g, i) & set(g["revoked"]))
 
 
 def build(g):
@@ -54,6 +70,8 @@ def build(g):
                      " ingested_at, text, content_hash) VALUES (?,?,?,?,?,?,?,?)",
                      (f"S{i}", "frame_observation", f"sess{gi}", f"G{gi}", "2026-10-29T10:00:00",
                       "t", f"source number zebra{i}", f"h{i}"))
+        conn.executemany("INSERT INTO source_consents(source_id, grant_id) VALUES (?,?)",
+                         [(f"S{i}", f"G{n}") for n in sorted(needs(g, i))])
     for c, js in enumerate(g["justs"]):
         text = f"claim wording qux{c}"
         conn.execute("INSERT INTO claims VALUES (?,?,?,NULL,?,NULL,NULL,NULL,'direct_observation',"
@@ -119,7 +137,7 @@ def revoke_all(conn, tokens, order):
 @given(graphs().filter(lambda g: initially_valid(g)))
 def test_revocation_is_exactly_well_founded_support(g):
     conn, tokens = build(g)
-    live = {i for i, gi in enumerate(g["source_grant"]) if gi not in g["revoked"]}
+    live = {i for i in range(len(g["source_grant"])) if source_live(g, i)}
     receipts = revoke_all(conn, tokens, g["revoked"])
 
     left = survivors(conn)
@@ -143,11 +161,12 @@ def test_revocation_is_exactly_well_founded_support(g):
         else:
             assert all(int(p[1:]) in left for p in prem[r["justification_id"]])
 
-    # sources of grants that were not revoked are untouched; revoked ones are blank
-    for i, gi in enumerate(g["source_grant"]):
+    # a source is untouched unless a grant it depends on was revoked; then it is blank. A grant a
+    # source never depended on never affects it, whatever it names.
+    for i in range(len(g["source_grant"])):
         text, status = conn.execute("SELECT text, status FROM sources WHERE source_id=?",
                                     (f"S{i}",)).fetchone()
-        assert (text is None, status) == ((True, "revoked") if gi in g["revoked"] else (False, "active"))
+        assert (text is None, status) == ((False, "active") if source_live(g, i) else (True, "revoked"))
 
     # no leak probe ever fails (the red-team probe is skipped here: no model)
     for r in receipts:

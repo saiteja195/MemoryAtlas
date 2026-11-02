@@ -17,11 +17,18 @@ HISTORY = ("active", "disputed", "superseded")
 
 
 def valid_source_ids(conn: sqlite3.Connection, purpose: str = PURPOSE) -> set[str]:
+    """Sources that may be used: active, and every grant they depend on is unrevoked and covers
+    the purpose. (Rows written before `source_consents` existed depend on their own grant only.)"""
+    good = {r["grant_id"] for r in conn.execute(
+        "SELECT grant_id, purposes FROM consent_grants WHERE revoked_at IS NULL")
+            if purpose in json.loads(r["purposes"])}
+    needs: dict[str, set[str]] = {}
+    for r in conn.execute("SELECT source_id, grant_id FROM source_consents"):
+        needs.setdefault(r["source_id"], set()).add(r["grant_id"])
     out = set()
-    for r in conn.execute(
-            "SELECT s.source_id, g.purposes FROM sources s JOIN consent_grants g"
-            " ON g.grant_id = s.grant_id WHERE s.status='active' AND g.revoked_at IS NULL"):
-        if purpose in json.loads(r["purposes"]):
+    for r in conn.execute("SELECT source_id, grant_id FROM sources WHERE status='active'"):
+        required = needs.get(r["source_id"]) or ({r["grant_id"]} if r["grant_id"] else set())
+        if required and required <= good:
             out.add(r["source_id"])
     return out
 

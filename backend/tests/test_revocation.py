@@ -281,8 +281,8 @@ def test_cached_answers_and_chat_that_used_forgotten_claims_are_removed(full_day
     assert conn.execute("SELECT COUNT(*) FROM answer_cache").fetchone()[0] == 2
     gid, token = alex(full_day)
     receipt = engine(full_day).revoke(gid, token, run_red_team=False)
-    assert receipt["removed"]["answer_cache_rows"] == 1
-    assert conn.execute("SELECT COUNT(*) FROM answer_cache").fetchone()[0] == 1
+    assert receipt["removed"]["answer_cache_rows"] == 2           # derived copies: all of them go
+    assert conn.execute("SELECT COUNT(*) FROM answer_cache").fetchone()[0] == 0
     msgs = conn.execute("SELECT role, text, claim_ids, redacted FROM chat_messages").fetchall()
     redacted = [m for m in msgs if m["redacted"]]
     # the whole exchange goes: the answer relied on a forgotten claim, and the question itself
@@ -315,7 +315,7 @@ def test_the_database_file_itself_forgets(tmp_path):
     assert disk["status"] == "pass" and "m.db" in disk["detail"]["files_scanned"]
 
 
-def test_only_the_runtime_model_cache_is_purged_never_the_seed(full_day, tmp_path):
+def test_the_whole_runtime_model_cache_is_cleared_and_the_seed_is_never_touched(full_day, tmp_path):
     runtime, seed = tmp_path / "runtime", tmp_path / "seed"
     runtime.mkdir(); seed.mkdir()
     (runtime / "a.json").write_text(json.dumps({"claims": [{"text": "Alex said try the al pastor"}]}))
@@ -323,11 +323,11 @@ def test_only_the_runtime_model_cache_is_purged_never_the_seed(full_day, tmp_pat
     (seed / "c.json").write_text(json.dumps({"claims": [{"text": "Alex said try the al pastor"}]}))
     gid, token = alex(full_day)
     receipt = engine(full_day, cache_dir=str(runtime)).revoke(gid, token, run_red_team=False)
-    assert not (runtime / "a.json").exists() and (runtime / "b.json").exists()
-    assert (seed / "c.json").exists()                     # read-only fixtures are never touched
-    assert receipt["removed"]["model_cache_files"] == 1
+    assert list(runtime.glob("*.json")) == []                 # nothing is kept: dependence is not recorded
+    assert (seed / "c.json").exists()                         # read-only fixtures are never touched
+    assert receipt["removed"]["model_cache_files"] == 2
     p4 = next(p for p in receipt["probes"] if p["id"] == 4)
-    assert p4["status"] == "pass" and p4["detail"]["model_cache_files_checked"] == 1
+    assert p4["status"] == "pass" and p4["detail"]["model_cache_files_remaining"] == 0
 
 
 # -- the probes can actually fail -------------------------------------------------------------

@@ -48,6 +48,11 @@ def _first_seen(conn: sqlite3.Connection, live: set[str]) -> tuple[dict, dict]:
     return seen, support
 
 
+def _public(attrs: dict[str, Any]) -> dict[str, Any]:
+    """Entity attributes as shown to a client. `contrib` is internal provenance (source ids)."""
+    return {k: v for k, v in attrs.items() if k != "contrib"}
+
+
 def build_graph(conn: sqlite3.Connection, at: str | None = None,
                 include_history: bool = False) -> dict[str, Any]:
     """`at` limits the graph to what had been captured by that time (for the timeline).
@@ -79,5 +84,5 @@ def build_graph(conn: sqlite3.Connection, at: str | None = None,
     for e in conn.execute("SELECT * FROM entities ORDER BY type, name"):
         if e["entity_id"] in used:
             nodes.append({"id": e["entity_id"], "type": e["type"], "name": e["name"],
-                          "attrs": json.loads(e["attrs"]) if e["attrs"] else None})
+                          "attrs": _public(json.loads(e["attrs"])) if e["attrs"] else None})
     return {"at": at, "include_history": include_history, "nodes": nodes, "edges": edges}

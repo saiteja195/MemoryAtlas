@@ -77,7 +77,7 @@ class Gateway:
             text = f"Calendar event: {cap.text}{where}, {when}.{who}"
         else:
             text = cap.text or ""
-        return self._store(cap, _KIND[cap.kind], text, cap.captured_at, grant)
+        return self._store(cap, _KIND[cap.kind], text, cap.captured_at, grant, consents=[grant])
 
     def _audio(self, cap: RawCapture) -> list[IngestResult]:
         people = list(dict.fromkeys([self.owner, *cap.participants]))
@@ -103,7 +103,7 @@ class Gateway:
             grant = grants.get(who) or fallback
             at = (start + timedelta(milliseconds=int(t.get("start_ms", 0)))).isoformat()
             res = self._store(cap, "transcript_segment", f"{label}: {t.get('text', '').strip()}",
-                              at, grant, speaker=who,
+                              at, grant, speaker=who, consents=sorted(set(grants.values())),
                               participants=[self.display(p) for p in people])
             results.append(res)
         return results
@@ -111,7 +111,8 @@ class Gateway:
     # -- storage ------------------------------------------------------------------------------
 
     def _store(self, cap: RawCapture, kind: str, text: str, captured_at: str, grant_id: str,
-               speaker: str | None = None, participants: list[str] | None = None) -> IngestResult:
+               speaker: str | None = None, participants: list[str] | None = None,
+               consents: list[str] | None = None) -> IngestResult:
         text, _counts = redact(text)
         text = text.strip()
         if not text:
@@ -129,6 +130,8 @@ class Gateway:
             " VALUES (?,?,?,?,?,?,?,?,?,?,0,'active')",
             (source_id, kind, cap.session_id, grant_id, captured_at,
              datetime.now().isoformat(timespec="seconds"), cap.lat, cap.lon, text, chash))
+        self.conn.executemany("INSERT INTO source_consents(source_id, grant_id) VALUES (?,?)",
+                              [(source_id, g) for g in (consents or [grant_id])])
         self.conn.commit()
         obs = Observation(source_id, kind, text, captured_at, cap.session_id, grant_id,
                           cap.lat, cap.lon, cap.ends_at if kind == "calendar_event" else None,
