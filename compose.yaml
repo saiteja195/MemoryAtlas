@@ -1,0 +1,69 @@
+# MemoryAtlas as separate services on one private network.
+#
+#   docker compose up --build        then open http://localhost:8080
+#
+# web      nginx: serves the built UI and proxies /api to the backend (the only published port)
+# backend  FastAPI + SQLite; reachable only inside the network; data lives in the "data" volume
+# eval     optional: `docker compose --profile eval run --rm eval` runs the evaluation (needs MODEL_API_KEY)
+name: memoryatlas
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: memoryatlas-backend
+    environment:
+      # replay (default) answers from recorded model responses and needs no key. live needs MODEL_API_KEY.
+      MEMORYATLAS_LLM_MODE: ${MEMORYATLAS_LLM_MODE:-replay}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      META_API_BASE_URL: ${META_API_BASE_URL:-https://api.meta.ai}
+      META_MODEL: ${META_MODEL:-muse-spark-1.3}
+      # Keys the HMAC of consent revocation tokens. Change it for anything that is not a demo.
+      MEMORYATLAS_SECRET: ${MEMORYATLAS_SECRET:-dev-only-secret}
+    volumes:
+      - data:/data
+    networks: [memoryatlas]
+    expose: ["8000"]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  web:
+    build:
+      context: frontend
+    image: memoryatlas-web
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Bound to localhost: the demo endpoints hand out revocation tokens and must not face a network.
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    networks: [memoryatlas]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+
+  eval:
+    profiles: ["eval"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: memoryatlas-backend
+    command: ["python", "scripts/run_eval.py", "--label", "${EVAL_LABEL:-docker-run}", "--runs", "${EVAL_RUNS:-3}"]
+    environment:
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      META_API_BASE_URL: ${META_API_BASE_URL:-https://api.meta.ai}
+      META_MODEL: ${META_MODEL:-muse-spark-1.3}
+    # Results are written to ./eval/results on the host. Run as yourself so the files are yours:
+    #   HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose --profile eval run --rm eval
+    user: "${HOST_UID:-10001}:${HOST_GID:-10001}"
+    volumes:
+      - ./eval/results:/app/eval/results
+    networks: [memoryatlas]
+
+networks:
+  memoryatlas:
+    name: memoryatlas
+
+volumes:
+  data:

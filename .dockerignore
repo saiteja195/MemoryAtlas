@@ -1,0 +1,20 @@
+# Context for backend/Dockerfile (the repository root): send only what the image needs.
+.git
+.github
+frontend
+docs
+ios
+eval/results
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.hypothesis
+backend/tests
+backend/*.egg-info
+*.db
+*.db-wal
+*.db-shm
+*.llmcache
+.env
