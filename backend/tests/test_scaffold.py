@@ -49,12 +49,12 @@ def test_replay_miss_raises_instead_of_guessing(tmp_path):
         RecordReplayClient(str(tmp_path), "replay").complete_json("s", "unseen", {})
 
 
-def test_health_reports_llm_mode(monkeypatch, tmp_path):
-    monkeypatch.setenv("MEMORYATLAS_DB", ":memory:")
-    monkeypatch.setenv("MEMORYATLAS_CACHE_DIR", str(tmp_path))
-    from app.main import app
-    body = TestClient(app).get("/health").json()
-    assert body == {"status": "ok", "llm_mode": "replay"}
+def test_health_reports_llm_mode(tmp_path):
+    # Built explicitly: importing app.main would create a database file in the working directory.
+    from app.api import create_app
+    from app.config import Settings
+    app = create_app(Settings(db_path=":memory:", llm_mode="replay", cache_dir=str(tmp_path)))
+    assert TestClient(app).get("/health").json() == {"status": "ok", "llm_mode": "replay"}
 
 
 def test_record_mode_returns_exactly_what_replay_will(tmp_path):

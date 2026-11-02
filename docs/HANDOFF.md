@@ -58,7 +58,8 @@ Branches on `origin` (both authored only by `saiteja195`):
 | `feature/meta-api-verified` | Docs updated with the live smoke-test results |
 | `feature/capture-compiler` (branched from the one above) | **Phase 1**: gateway, compiler, `/graph`, demo fixtures, recorded model output |
 | `feature/recall` (branched from the one above) | **Phase 2**: derivation rules, privacy filter, recall tools, investigator, `/recall/ask` |
-| `feature/revocation` (branched from `main` after Phases 0 to 2 were merged) | **Phase 3**: revocation engine, purge, 7 leak probes, receipt, property tests |
+| `feature/revocation` (branched from `main` after Phases 0 to 2 were merged) | **Phase 3**: revocation engine, purge, 7 leak probes, receipt, property tests (merged, PR #20) |
+| `feature/atlas-ui` (branched from `main` after PR #20) | **Phase 4a**: the Atlas UI (`frontend/`), plus the small backend additions it needed |
 
 `main` holds only the initial commit. A stale remote branch `claude/recallos-hackathon-plan-su6eaz` still exists; the owner should delete it (`git push origin --delete claude/recallos-hackathon-plan-su6eaz`). No pull requests exist yet.
 
@@ -100,7 +101,18 @@ Branches on `origin` (both authored only by `saiteja195`):
 
 **Limits, stated plainly:** anything already sent to Meta is covered by Meta's terms, not the receipt; the committed demo script and recorded model responses are staged seed data outside the app's stores and are not modified; probes look for distinctive phrases, so a leak made only of everyday words is caught by the structural checks (probes 1 and 5) and not by phrase search; the receipt lists the kind and time of removed sources and a blocked-hash list remains so replays are refused; survivors' confidence numbers are not recomputed; filesystem snapshots and backups are out of reach; the red-team probe needs the model (live, or recorded), and shows as skipped otherwise; the investigator has no clock, so "today" questions may be refused.
 
-**Not built yet:** Atlas UI, eval, baseline; the "correct a claim" flow (`POST /claims/{id}/correct`); WebSocket deltas.
+**Phase 4a built (`feature/atlas-ui`, 175 backend + 24 web tests, plus a browser check):**
+- `frontend/` is now the Atlas UI (React + Cytoscape, no other runtime dependencies). `src/utils/graph.ts` holds all the logic as pure functions, unit tested against real payloads captured from the backend (`src/utils/__fixtures__/`, before and after a forgetting); `src/components/` are the screens; `src/hooks/useAtlas.ts` owns the server state; `src/api/` is the typed client.
+- What it does: the graph in two views (**Episodes**, the default, one box per episode in time order; **Details**, people/places/things with fact chips); the timeline scrubber and "Watch it build"; the ask panel with status chips and cited facts that light up their path; the non-modal "Why do we believe this?" drawer (the provenance tree down to the quoted sources); the consent panel; the simulated phone (in a dialog, or in a second tab at `/?as=device&grant=ID`, PIN `4242`); the forgetting receipt dialog; demo controls (play next, play the day, upload the live photo, reset); header with the model mode and "Raw media kept". Removed facts fade out and survivors pulse before the receipt covers the graph.
+- Encoding: line style = how a claim is known (dashed inferred), colour = source, shape = kind of thing, opacity plus a clock = replaced by newer evidence. Colour is never the only signal.
+- Decisions: the timeline filters the full graph **in the browser** (each claim's first-seen time = its earliest support), not with `GET /graph?at=`, because a claim's status is only final-state on the server and a replaced sighting must still look current earlier in the day. Episodes are linked only through people and things (never places: two unrelated "street"s must not join). An unnamed referent such as "taco place" is hidden from episode labels once it is an alias of a named place. Fact chips default to "related": only the facts on the cited path or of the selected entity are drawn, which keeps the graph readable.
+- Accessibility and preferences (checked with axe-core on six states, 0 violations): native `<dialog>` for the receipt and phone, a non-modal dialog for the drawer, light-dark() tokens with the canvas re-coloured on theme change, a labelled native range input, reduced motion honoured, a facts table as the text alternative to the canvas, one polite live region, 24px+ targets (44px on touch), keyboard tabs.
+- Backend additions: `/demo/status` lists every event with played flags; `/consent/grants` includes `receipt_id`, which is how a withdrawal in the second tab reaches the first (the UI polls every 2.5 s).
+- Bug found by driving the UI and fixed: `/demo/reset` left the compiler's in-memory "already asked the model about this binding" memo behind, so a second playthrough after Reset derived no `recommended` fact and could not replay. It now resets (`Deriver.reset`), with a regression test.
+- `make test` now also runs the web type-check and tests (`make check-web`). `npm run e2e` in `frontend/` drives the whole demo in a real browser and asserts 22 things; it needs Playwright, which is deliberately not a project dependency.
+- Known limits: the demo's PIN is theatre and `/demo/grants` hands over the revocation token (demo only); the "Facts" and "Tidy up" controls exist because force layouts of about 20 fact chips can overlap; the bundle is about 700 KB (the graph library is most of it); not tested in Safari or Firefox (Chromium only).
+
+**Not built yet:** eval, baseline; the "correct a claim" flow (`POST /claims/{id}/correct`); WebSocket deltas (the UI polls); the Phase 4b eval harness.
 
 ## 6. Next steps
 
@@ -127,7 +139,7 @@ Branches on `origin` (both authored only by `saiteja195`):
    - UI: `GET /demo/grants` gives Alex's demo token for the simulated "scan the QR code" step; `POST /consent/grants/{id}/revoke` returns the whole receipt (counts, retained-with-reason list, 7 probe results), so the receipt modal needs no further call. With a live model the red-team probe makes about 25 model calls, so expect tens of seconds; pass `?red_team=false` for a fast revoke and show that probe as skipped.
    - Refetch `/graph?include=history` after a revoke: deleted claims are gone (not greyed out), and an older sighting may have become active again.
    - Eval: the revocation categories can use `acts.yaml` (`act4_must_forget`, `act4_must_keep`) and `scripts/revoke_demo.py` as a starting point.
-5. **Phase 4, `feature/atlas-ui` and `feature/eval`:** graph UI and a fair baseline (same text, same model, plain retrieval).
+5. **Phase 4**: ~~`feature/atlas-ui`~~ Done (see section 5). **`feature/eval`** is next: the fair baseline (same text, same model, plain retrieval) and the metrics table. The UI is ready to be recorded for the 3-minute video: Act 4 with the second tab is the strongest take.
 6. **Phase 5, `feature/submission`:** README, results, 3-minute video, submission form. Feature freeze noon ET Wed.
 
 **Cut list if time runs short:** SAM 3.1 and glasses support first, then held-out day size, then UI polish. Never cut the revocation probes or the baseline comparison.

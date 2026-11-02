@@ -1,4 +1,4 @@
-.PHONY: setup dev test api web
+.PHONY: setup dev test api web check-web
 
 setup:
 	cd backend && python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
@@ -13,5 +13,9 @@ web:
 dev:
 	$(MAKE) -j2 api web
 
-test:
+test: check-web
 	cd backend && . .venv/bin/activate && python -m pytest -q
+
+# Type-check and unit-test the web UI (fast; no browser needed).
+check-web:
+	cd frontend && npm run check

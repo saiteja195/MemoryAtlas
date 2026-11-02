@@ -1,0 +1,223 @@
+{
+ "receipt_id": "rcpt-c71df44b9015",
+ "grant_id": "grant-566b5acd14",
+ "grantor": "alex",
+ "created_at": "2026-11-02T05:40:09.927894+00:00",
+ "already_revoked": false,
+ "removed": {
+  "sources_blanked": 3,
+  "claims_deleted": 14,
+  "claims_deleted_by_kind": {
+   "across_from": 1,
+   "committed_to": 1,
+   "has_attribute": 1,
+   "part_of_episode": 1,
+   "recommended": 1,
+   "said": 3,
+   "same_as": 1,
+   "summary_of": 5
+  },
+  "entities_deleted": 1,
+  "answer_cache_rows": 0,
+  "chat_messages_redacted": 0,
+  "model_cache_files": 0
+ },
+ "kept": {
+  "claims_surviving": 36,
+  "claims_that_lost_a_source_but_survive": 4,
+  "claims_unaffected": 32,
+  "survivors_reworded": 4
+ },
+ "retained": [
+  {
+   "claim_id": "clm-52c98b2a65ea",
+   "text": "Alex part of episode Episode 12:30-13:20",
+   "predicate": "part_of_episode",
+   "lost_support": [
+    "transcript_segment at 12:35",
+    "transcript_segment at 12:40"
+   ],
+   "still_supported_by": [
+    "calendar_event at 12:30"
+   ]
+  },
+  {
+   "claim_id": "clm-6b6d175c7e86",
+   "text": "Office part of episode Episode 12:30-13:20",
+   "predicate": "part_of_episode",
+   "lost_support": [
+    "transcript_segment at 12:35"
+   ],
+   "still_supported_by": [
+    "calendar_event at 12:30"
+   ]
+  },
+  {
+   "claim_id": "clm-a11c064887b5",
+   "text": "Me met with Alex",
+   "predicate": "met_with",
+   "lost_support": [
+    "transcript_segment at 12:35",
+    "transcript_segment at 12:40"
+   ],
+   "still_supported_by": [
+    "calendar_event at 12:30"
+   ]
+  },
+  {
+   "claim_id": "clm-b0aef6a5eabc",
+   "text": "Me part of episode Episode 12:30-13:20",
+   "predicate": "part_of_episode",
+   "lost_support": [
+    "transcript_segment at 12:35",
+    "transcript_segment at 12:40"
+   ],
+   "still_supported_by": [
+    "calendar_event at 12:30"
+   ]
+  }
+ ],
+ "digests": {
+  "removed_claim_ids_sha256": "e74de2205fc7fe6478b534e4371109bb70aa3db4c1b5499086e23bfa5e104dac",
+  "probe_terms": [
+   "ffbfabc54ca8a26e",
+   "1a79668eac4051a9",
+   "87765da6ccf06682",
+   "e2e48a7c67924730",
+   "ecd1378bc9dc1300",
+   "395d4c382804699f",
+   "a6a2729cbf6bcadc",
+   "52f3325c65b03c26",
+   "047999108e48910e",
+   "f99be977fbd0f313",
+   "218934d934e510cc",
+   "c4cf8b6c9121f162",
+   "deba77922f5fc4f0",
+   "a7caed59e8ab330f",
+   "b0f273a9eeaa3e8f",
+   "5104f00ef220a2dd",
+   "31b1dcbc2677815c",
+   "3f9940084ff7e087",
+   "28c0a806829e4406",
+   "7008760bcb66ccf2",
+   "c327573fd81bdf40",
+   "bd977a325459a48a",
+   "771ec2cbb317974c",
+   "9e42d9527c92dca5",
+   "203b7459c035e0b7",
+   "8d04f2539b36194f",
+   "5846f80fabe5602c",
+   "8fa0c637bcf5b80e",
+   "acebc77a7b865ba2",
+   "780102ab00be9f0f",
+   "8c4d4891c4f38f34",
+   "b38fa517cc34964e",
+   "002914fe704d3695"
+  ]
+ },
+ "probes": [
+  {
+   "id": 1,
+   "name": "Graph: no claim rests on removed support",
+   "status": "pass",
+   "detail": {
+    "hits": 0,
+    "claims": 36,
+    "unsupported_claims": 0,
+    "justifications_on_revoked_sources": 0,
+    "premises_missing": 0,
+    "dangling_supersession": 0,
+    "removed_entities_still_present": 0,
+    "live_sources": 5
+   }
+  },
+  {
+   "id": 2,
+   "name": "Search index: removed phrases return nothing",
+   "status": "pass",
+   "detail": {
+    "hits": 0,
+    "terms": 33,
+    "fts_hits": 0,
+    "text_scan_hits": 0,
+    "index_row_mismatch": 0
+   }
+  },
+  {
+   "id": 3,
+   "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+   "status": "pass",
+   "detail": {
+    "hits": 0,
+    "orphan_vectors": 0,
+    "leaking_neighbours": 0,
+    "queries": 29
+   }
+  },
+  {
+   "id": 4,
+   "name": "Caches: answer cache, chat log and model-response cache are clean",
+   "status": "pass",
+   "detail": {
+    "hits": 0,
+    "answer_cache_rows": 0,
+    "chat_rows": 0,
+    "model_cache_files_with_removed_text": 0,
+    "model_cache_files_checked": 0,
+    "model_cache": "runtime directory"
+   }
+  },
+  {
+   "id": 5,
+   "name": "Export: a regenerated export mentions nothing removed",
+   "status": "pass",
+   "detail": {
+    "hits": 0,
+    "export_bytes": 19867
+   }
+  },
+  {
+   "id": 6,
+   "name": "Red team: adversarial questions leak nothing",
+   "status": "pass",
+   "detail": {
+    "hits": 0,
+    "questions": 5,
+    "statuses": [
+     "abstained",
+     "abstained",
+     "abstained",
+     "abstained",
+     "answered"
+    ]
+   }
+  },
+  {
+   "id": 7,
+   "name": "Disk: no media files, and the database file holds no removed text",
+   "status": "pass",
+   "detail": {
+    "hits": 0,
+    "media_bytes": 0,
+    "raw_term_hits": 0,
+    "files_scanned": [
+     "m.db",
+     "m.db-wal",
+     "m.db-shm"
+    ]
+   }
+  }
+ ],
+ "summary": {
+  "probes_passed": 7,
+  "probes_failed": 0,
+  "probes_skipped": 0,
+  "probes_total": 7,
+  "all_passed": true
+ },
+ "notes": [
+  "Removed claims are deleted outright, not hidden, and the database file was rebuilt (index rebuild, log checkpoint, VACUUM).",
+  "Anything already sent to Meta's hosted models is covered by Meta's terms, not by this receipt.",
+  "Committed demo fixtures (recorded model responses and the staged script) are read-only seed data outside the app's own stores and are not modified."
+ ]
+}

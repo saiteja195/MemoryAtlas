@@ -103,9 +103,13 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
 
     @app.get("/consent/grants")
     def grants() -> list[dict]:
+        # receipt_id lets another browser tab (the person withdrawing consent) tell this one
+        # which receipt to show, without the two pages talking to each other directly.
         return [dict(r) for r in conn.execute(
-            "SELECT grant_id, grantor, scope, scope_ref, granted_at, revoked_at FROM"
-            " consent_grants ORDER BY granted_at, grant_id")]
+            "SELECT g.grant_id, g.grantor, g.scope, g.scope_ref, g.granted_at, g.revoked_at,"
+            " (SELECT r.receipt_id FROM forgetting_receipts r WHERE r.grant_id = g.grant_id"
+            "  ORDER BY r.created_at LIMIT 1) AS receipt_id"
+            " FROM consent_grants g ORDER BY g.granted_at, g.grant_id")]
 
     @app.post("/consent/grants/{grant_id}/revoke")
     def revoke(grant_id: str, body: RevokeBody, red_team: bool = True) -> dict:

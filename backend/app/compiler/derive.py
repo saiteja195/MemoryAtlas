@@ -87,6 +87,11 @@ class Deriver:
         self.writer = ClaimWriter(conn)
         self._decided: set[tuple] = set()
 
+    def reset(self) -> None:
+        """Forget what has been decided. Needed whenever the database is emptied: the memo says
+        "the model was already asked about this binding", which is false for a fresh graph."""
+        self._decided.clear()
+
     # -- entry point --------------------------------------------------------------------------
 
     def run(self, episode_id: str, subject_ids: set[str]) -> DeriveResult:

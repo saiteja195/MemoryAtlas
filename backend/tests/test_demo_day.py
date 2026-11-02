@@ -127,3 +127,36 @@ def test_capture_endpoint_enforces_consent(tmp_path):
     out = client.post("/capture/note", json=body).json()["results"][0]
     assert out["status"] == "ingested"
     assert client.post("/capture/video", json=body).status_code == 404
+
+
+def test_demo_status_lists_every_event_and_what_has_been_played(tmp_path):
+    s = Settings(db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path))
+    client = TestClient(create_app(s, FakeLLM()))
+    st = client.get("/demo/status").json()
+    assert [e["id"] for e in st["events"]] == ["F1", "F2", "C1", "A1", "F3", "F4"]
+    assert not any(e["played"] for e in st["events"])
+    assert {e["id"]: e["live_upload"] for e in st["events"]}["F4"] is True
+    assert st["events"][3]["label"] == "Conversation (3 lines)" and st["events"][2]["label"] == "Sync with Alex"
+    client.post("/demo/advance", params={"steps": 2})
+    assert [e["id"] for e in client.get("/demo/status").json()["events"] if e["played"]] == ["F1", "F2"]
+    client.post("/demo/advance", params={"steps": 10})
+    client.post("/demo/live/F4")
+    assert all(e["played"] for e in client.get("/demo/status").json()["events"])
+    client.post("/demo/reset")
+    assert not any(e["played"] for e in client.get("/demo/status").json()["events"])
+
+
+def test_resetting_and_replaying_the_day_gives_the_same_graph(demo, fake):
+    """The reset button must start from a truly clean state: the compiler remembers which
+    bindings it already asked the model about, and that memory has to go with the data."""
+    demo.advance(50)
+    first = build_graph(demo.conn, include_history=True)
+    asked = len(fake.bind_requests)
+    assert asked == 1 and any(e["predicate"] == "recommended" for e in first["edges"])
+    demo.reset()
+    assert demo.conn.execute("SELECT COUNT(*) FROM claims").fetchone()[0] == 0
+    demo.advance(50)
+    second = build_graph(demo.conn, include_history=True)
+    assert len(fake.bind_requests) == asked + 1            # the model was asked again
+    assert [(e["predicate"], e["source"], e["target"]) for e in second["edges"]] == \
+        [(e["predicate"], e["source"], e["target"]) for e in first["edges"]]
