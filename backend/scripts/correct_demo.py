@@ -24,6 +24,7 @@ from app.recall.service import RecallService  # noqa: E402
 
 QUESTION = "What did Alex promise me?"
 CORRECTION = "Actually, Alex said he would send the proposal by Monday, not Friday."
+AT = "2026-10-29T18:30:00"      # fixed: the time is part of the request, so a replay needs it pinned
 
 
 def main() -> int:
@@ -42,7 +43,7 @@ def main() -> int:
     before = recall.ask(QUESTION)
     print("BEFORE:", before["answer"])
     target = before["cited_claim_ids"][0]
-    out = correct_claim(demo.engine, target, CORRECTION)
+    out = correct_claim(demo.engine, target, CORRECTION, at=AT)
     print("CORRECTION:", out)
     after = recall.ask(QUESTION)
     print("AFTER :", after["answer"])

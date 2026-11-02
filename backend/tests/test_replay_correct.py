@@ -16,6 +16,7 @@ from app.recall.service import RecallService
 SEED = ROOT / "fixtures" / "llm_cache"
 QUESTION = "What did Alex promise me?"
 CORRECTION = "Actually, Alex said he would send the proposal by Monday, not Friday."
+AT = "2026-10-29T18:30:00"      # fixed: the time is part of the request, so a replay needs it pinned
 
 
 @pytest.fixture(scope="module")
@@ -30,7 +31,7 @@ def corrected(tmp_path_factory):
     demo.advance(50)
     demo.play("F4")
     before = recall.ask(QUESTION)
-    result = correct_claim(demo.engine, before["cited_claim_ids"][0], CORRECTION)
+    result = correct_claim(demo.engine, before["cited_claim_ids"][0], CORRECTION, at=AT)
     after = recall.ask(QUESTION)
     return {"conn": conn, "before": before, "result": result, "after": after}
 

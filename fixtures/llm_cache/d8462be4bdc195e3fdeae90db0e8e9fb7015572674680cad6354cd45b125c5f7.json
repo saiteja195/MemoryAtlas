@@ -2,7 +2,8 @@
   "action": "final",
   "answer": "Alex promised to send the proposal by Friday.",
   "cited_claim_ids": [
-    "clm-4ef2fcb6078a"
+    "clm-4ef2fcb6078a",
+    "clm-6826fb51741a"
   ],
   "status": "answered"
 }

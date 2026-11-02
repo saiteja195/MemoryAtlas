@@ -1,0 +1,12 @@
+{
+  "claims": [
+    {
+      "confidence": 0.9,
+      "predicate": "committed_to",
+      "subject": "Alex",
+      "subject_type": "person",
+      "text": "Alex committed to send the proposal by Monday.",
+      "value": "send the proposal by Monday"
+    }
+  ]
+}
