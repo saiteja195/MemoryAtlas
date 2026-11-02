@@ -26,6 +26,14 @@ make dev
 
 Full guide, including the copy-and-paste demo and live mode: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
 
+## Capture from Oakley HSTN with an iPhone
+
+The native app in `ios/MemoryAtlasPhone.xcodeproj` connects through Meta Wearables DAT 1.0.1,
+captures a photo from the glasses, lets you review it and sends it to a token-protected phone
+gateway (`make mobile-api`). Real photos need live model mode and a backend API key.
+Follow [`docs/IPHONE_GLASSES_SETUP.md`](docs/IPHONE_GLASSES_SETUP.md) for signing, pairing,
+network setup and the first-photo acceptance check. Physical-device verification is still required.
+
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch naming, commit conventions and the authorship rule.

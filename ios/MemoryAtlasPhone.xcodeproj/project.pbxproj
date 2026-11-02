@@ -1,0 +1,36 @@
+// !$*UTF8*$!
+{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+4CE3AB122EB0AF5808DE1928 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryAtlasPhoneApp.swift; sourceTree = "<group>"; };
+4D5FE175F63EF9C9738A0496 = { isa = PBXBuildFile; fileRef = 4CE3AB122EB0AF5808DE1928; };
+0AEA1D9E5409F051B5FEF580 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
+A14278F7CA0EE749279C83B2 = { isa = PBXBuildFile; fileRef = 0AEA1D9E5409F051B5FEF580; };
+838973A2485685F5482CEA12 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassesCapture.swift; sourceTree = "<group>"; };
+33564245F2E973BC7928F88B = { isa = PBXBuildFile; fileRef = 838973A2485685F5482CEA12; };
+4C69C503CAB0147C9E0305A6 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStore.swift; sourceTree = "<group>"; };
+269697BAC88DDDE728CC9496 = { isa = PBXBuildFile; fileRef = 4C69C503CAB0147C9E0305A6; };
+59BD0A3FF43B32849B319E64 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+C797828D0B76B7245881A2BF = { isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+7D1043473D55BFA90E8530D3 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = MemoryAtlasPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
+34A07C32AC70E961063E79CD = { isa = XCSwiftPackageProductDependency; package = 03F1E2AA7FB049F4C1D2F339; productName = MWDATCore; };
+F595CE4803B1188BD0797A92 = { isa = PBXBuildFile; productRef = 34A07C32AC70E961063E79CD; };
+48625631A91BC46FEACFFC92 = { isa = XCSwiftPackageProductDependency; package = 03F1E2AA7FB049F4C1D2F339; productName = MWDATCamera; };
+143D1D4DEF3D7F53250C251A = { isa = PBXBuildFile; productRef = 48625631A91BC46FEACFFC92; };
+F8BAF9C97B96701F6CC80AC3 = { isa = XCSwiftPackageProductDependency; package = 5896047EEAE44FC0E9857DDD; productName = MemoryAtlasCore; };
+900D5F126F3C770ABCF43CB1 = { isa = PBXBuildFile; productRef = F8BAF9C97B96701F6CC80AC3; };
+03F1E2AA7FB049F4C1D2F339 = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/facebook/meta-wearables-dat-ios"; requirement = {kind = exactVersion; version = 1.0.1;}; };
+5896047EEAE44FC0E9857DDD = { isa = XCLocalSwiftPackageReference; relativePath = MemoryAtlasCore; };
+BCE16DD0260827ECF338C787 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (4D5FE175F63EF9C9738A0496,A14278F7CA0EE749279C83B2,33564245F2E973BC7928F88B,269697BAC88DDDE728CC9496); runOnlyForDeploymentPostprocessing = 0; };
+7561BFB015D8F536760CB671 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (F595CE4803B1188BD0797A92,143D1D4DEF3D7F53250C251A,900D5F126F3C770ABCF43CB1); runOnlyForDeploymentPostprocessing = 0; };
+0189424A5A60FED329FA868E = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+482182478A3ECD4745BEA917 = { isa = PBXGroup; path = MemoryAtlasPhone; sourceTree = "<group>"; children = (4CE3AB122EB0AF5808DE1928,0AEA1D9E5409F051B5FEF580,838973A2485685F5482CEA12,4C69C503CAB0147C9E0305A6,59BD0A3FF43B32849B319E64); };
+1EE63A94BAD0DF0FCB0E7B8C = { isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (7D1043473D55BFA90E8530D3); };
+325F10A6957A34D66CB8C0E4 = { isa = PBXGroup; sourceTree = "<group>"; children = (482182478A3ECD4745BEA917,C797828D0B76B7245881A2BF,1EE63A94BAD0DF0FCB0E7B8C); };
+89E1FD6268CC0F221A2BE178 = { isa = XCBuildConfiguration; baseConfigurationReference = C797828D0B76B7245881A2BF; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.2; SWIFT_VERSION = 6.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; DEBUG_INFORMATION_FORMAT = dwarf;}; name = Debug; };
+E6DE6C99132752C914FEF632 = { isa = XCBuildConfiguration; baseConfigurationReference = C797828D0B76B7245881A2BF; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.2; SWIFT_VERSION = 6.0; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";}; name = Release; };
+862894B703A6DEDF96A9DD6C = { isa = XCConfigurationList; buildConfigurations = (89E1FD6268CC0F221A2BE178,E6DE6C99132752C914FEF632); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+7082CC0B6FC1282FCEABD07A = { isa = XCBuildConfiguration; baseConfigurationReference = C797828D0B76B7245881A2BF; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.2; SWIFT_VERSION = 6.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; DEBUG_INFORMATION_FORMAT = dwarf; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = dev.memoryatlas.capture; INFOPLIST_FILE = MemoryAtlasPhone/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_STYLE = Automatic; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; MARKETING_VERSION = 0.1.0; CURRENT_PROJECT_VERSION = 1; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";}; name = Debug; };
+639A7CA24D39909E713B47F7 = { isa = XCBuildConfiguration; baseConfigurationReference = C797828D0B76B7245881A2BF; buildSettings = {CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.2; SWIFT_VERSION = 6.0; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = dev.memoryatlas.capture; INFOPLIST_FILE = MemoryAtlasPhone/Info.plist; GENERATE_INFOPLIST_FILE = NO; CODE_SIGN_STYLE = Automatic; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; MARKETING_VERSION = 0.1.0; CURRENT_PROJECT_VERSION = 1; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";}; name = Release; };
+C57128001CE614BF8549D6BB = { isa = XCConfigurationList; buildConfigurations = (7082CC0B6FC1282FCEABD07A,639A7CA24D39909E713B47F7); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+0E8A3AD980EC179856012B7E = { isa = PBXNativeTarget; buildConfigurationList = C57128001CE614BF8549D6BB; buildPhases = (BCE16DD0260827ECF338C787,7561BFB015D8F536760CB671,0189424A5A60FED329FA868E); buildRules = (); dependencies = (); name = MemoryAtlasPhone; productName = MemoryAtlasPhone; productReference = 7D1043473D55BFA90E8530D3; productType = "com.apple.product-type.application"; packageProductDependencies = (34A07C32AC70E961063E79CD,48625631A91BC46FEACFFC92,F8BAF9C97B96701F6CC80AC3); };
+98F54143AB4E86B28C3AFEE0 = { isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2640;}; buildConfigurationList = 862894B703A6DEDF96A9DD6C; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; knownRegions = (en,Base); mainGroup = 325F10A6957A34D66CB8C0E4; productRefGroup = 1EE63A94BAD0DF0FCB0E7B8C; projectDirPath = ""; projectRoot = ""; targets = (0E8A3AD980EC179856012B7E); packageReferences = (03F1E2AA7FB049F4C1D2F339,5896047EEAE44FC0E9857DDD); };
+}; rootObject = 98F54143AB4E86B28C3AFEE0; }

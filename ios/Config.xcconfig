@@ -1,0 +1,4 @@
+// Optional local signing/Meta configuration. Never commit developer credentials.
+META_APP_ID =
+CLIENT_TOKEN =
+#include? "Local.xcconfig"

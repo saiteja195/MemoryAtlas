@@ -229,3 +229,9 @@ node_modules/
 
 # runtime model-response cache (a forgetting purge cleans it)
 *.llmcache/
+
+# Native iPhone builds and personal signing settings
+ios/Local.xcconfig
+**/xcuserdata/
+ios/**/.build/
+ios/DerivedData/
