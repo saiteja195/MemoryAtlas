@@ -103,14 +103,15 @@ class Gateway:
             grant = grants.get(who) or fallback
             at = (start + timedelta(milliseconds=int(t.get("start_ms", 0)))).isoformat()
             res = self._store(cap, "transcript_segment", f"{label}: {t.get('text', '').strip()}",
-                              at, grant, speaker=who)
+                              at, grant, speaker=who,
+                              participants=[self.display(p) for p in people])
             results.append(res)
         return results
 
     # -- storage ------------------------------------------------------------------------------
 
     def _store(self, cap: RawCapture, kind: str, text: str, captured_at: str, grant_id: str,
-               speaker: str | None = None) -> IngestResult:
+               speaker: str | None = None, participants: list[str] | None = None) -> IngestResult:
         text, _counts = redact(text)
         text = text.strip()
         if not text:
@@ -131,6 +132,6 @@ class Gateway:
         self.conn.commit()
         obs = Observation(source_id, kind, text, captured_at, cap.session_id, grant_id,
                           cap.lat, cap.lon, cap.ends_at if kind == "calendar_event" else None,
-                          speaker, cap.place_name)
+                          speaker, participants or [], cap.place_name)
         return IngestResult("ingested", observation=obs, ref=cap.ref)
 

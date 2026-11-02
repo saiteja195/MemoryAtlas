@@ -67,6 +67,8 @@ def test_both_wallet_sightings_are_recorded_in_time_order(day):
     sightings = [(e["event_time"], o) for s, o, e in edges(day, "located_at") if s == "wallet"]
     assert len(sightings) == 2
     assert sightings == sorted(sightings)
+    statuses = [e["status"] for s, o, e in edges(day, "located_at") if s == "wallet"]
+    assert statuses == ["superseded", "active"]          # the café is history, the car is latest
     assert sightings[0][1] == "Blue Door Café" and sightings[0][0].startswith("2026-10-29T09:10")
 
 

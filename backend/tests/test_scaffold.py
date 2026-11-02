@@ -1,3 +1,4 @@
+import json
 import pytest
 from fastapi.testclient import TestClient
 
@@ -54,3 +55,41 @@ def test_health_reports_llm_mode(monkeypatch, tmp_path):
     from app.main import app
     body = TestClient(app).get("/health").json()
     assert body == {"status": "ok", "llm_mode": "replay"}
+
+
+def test_record_mode_returns_exactly_what_replay_will(tmp_path):
+    """Key order must not differ between modes: callers serialise results into later prompts."""
+    class Unordered:
+        mode = "live"
+
+        def complete_json(self, system, user, schema):
+            return {"z": 1, "a": {"y": 2, "b": 3}}
+
+    rec = RecordReplayClient(str(tmp_path), "record", Unordered())
+    out = rec.complete_json("s", "u", {})
+    replayed = RecordReplayClient(str(tmp_path), "replay").complete_json("s", "u", {})
+    assert out == replayed
+    assert list(out) == list(replayed) == ["a", "z"]
+    assert json.dumps(out) == json.dumps(replayed)
+
+
+def test_unusable_model_replies_are_recorded_and_replayed_but_outages_are_not(tmp_path):
+    class Flaky:
+        mode = "live"
+
+        def complete_json(self, system, user, schema):
+            if user == "bad":
+                raise LLMUnavailable("model did not return valid JSON: nope")
+            raise LLMUnavailable("/v1/responses returned 503: down")
+
+    rec = RecordReplayClient(str(tmp_path), "record", Flaky())
+    with pytest.raises(LLMUnavailable, match="valid JSON"):
+        rec.complete_json("s", "bad", {})
+    with pytest.raises(LLMUnavailable, match="503"):
+        rec.complete_json("s", "outage", {})
+    assert len(list(tmp_path.glob("*.json"))) == 1              # only the content failure
+    rep = RecordReplayClient(str(tmp_path), "replay")
+    with pytest.raises(LLMUnavailable, match="valid JSON"):     # same failure, no live call
+        rep.complete_json("s", "bad", {})
+    with pytest.raises(LLMUnavailable, match="no recorded response"):
+        rep.complete_json("s", "outage", {})

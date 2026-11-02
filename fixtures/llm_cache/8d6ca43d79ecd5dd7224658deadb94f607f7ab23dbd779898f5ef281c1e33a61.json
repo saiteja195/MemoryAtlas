@@ -1,0 +1,10 @@
+{
+  "action": "final",
+  "answer": "Alex recommended Luna Taqueria.",
+  "cited_claim_ids": [
+    "clm-f74560568239",
+    "clm-b8f2fe746e8a"
+  ],
+  "status": "answered",
+  "uncertainty_note": ""
+}

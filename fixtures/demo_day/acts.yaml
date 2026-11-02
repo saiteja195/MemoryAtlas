@@ -1,0 +1,37 @@
+# Questions for the demo acts. Used by backend/scripts/ask_demo.py (live, records the cache) and
+# by tests/test_replay_recall.py (offline). `expect` lists substrings that must ALL appear
+# (case-insensitive) in the answer; `any_of` needs at least one. Abstention is checked by status.
+act2_connect:            # after the scheduled day, before the live frame
+  - question: "Which restaurant did Alex recommend when we met near the office?"
+    expect: ["Luna Taqueria"]
+  - question: "What was the name of the taco place Alex told me about?"
+    expect: ["Luna Taqueria"]
+  - question: "Where should I go for al pastor, according to Alex?"
+    expect: ["Luna Taqueria"]
+
+act3_before:             # wallet, before the car photo arrives
+  - question: "Did I leave my wallet at the café?"
+    expect: ["09:10", "Blue Door"]
+    any_of: ["last confirmed sighting", "last seen"]
+    forbid_start: ["yes"]        # a sighting does not prove it was left there
+  - question: "Where is my wallet?"
+    expect: ["09:10"]
+    any_of: ["last confirmed sighting", "last seen"]
+  - question: "When and where did I last see my wallet?"
+    expect: ["09:10", "Blue Door"]
+
+act3_after:              # after F4 (wallet in the car) is uploaded
+  - question: "Did I leave my wallet at the café?"
+    expect: ["17:45"]
+    any_of: ["car", "cup holder"]
+  - question: "Where is my wallet?"
+    expect: ["17:45"]
+    any_of: ["car", "cup holder"]
+  - question: "When and where did I last see my wallet?"
+    expect: ["17:45"]
+    any_of: ["car", "cup holder"]
+
+must_abstain:            # nothing in the day supports these
+  - question: "What is Alex's phone number?"
+  - question: "Which gym did I go to?"
+  - question: "Who did I have lunch with on Friday?"

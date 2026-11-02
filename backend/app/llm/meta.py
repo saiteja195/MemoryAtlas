@@ -40,7 +40,13 @@ class MetaClient:
             raise LLMUnavailable("no API key set (MODEL_API_KEY)")
         headers = {"Authorization": f"Bearer {self.api_key}"}
         for attempt in range(self._attempts):
-            resp = self._http.post(self.base_url + path, headers=headers, **kwargs)
+            try:
+                resp = self._http.post(self.base_url + path, headers=headers, **kwargs)
+            except httpx.TransportError as e:       # resets, timeouts, DNS: transient
+                if attempt < self._attempts - 1:
+                    self._sleep(2 ** attempt)
+                    continue
+                raise LLMUnavailable(f"{path}: network error {type(e).__name__}") from None
             if resp.status_code in _RETRY_STATUS and attempt < self._attempts - 1:
                 self._sleep(2 ** attempt)
                 continue
@@ -75,7 +81,20 @@ class MetaClient:
         try:
             value = json.loads(text)
         except json.JSONDecodeError as e:
-            raise LLMUnavailable(f"model did not return valid JSON: {e}; got {text[:200]!r}") from e
+            # The model sometimes puts a sentence before the object ("I'll search... {...}").
+            # Take the first object that decodes; anything else is still an error.
+            value, dec = None, json.JSONDecoder()
+            for m in re.finditer(r"\{", text):
+                try:
+                    cand, _ = dec.raw_decode(text[m.start():])
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(cand, dict):
+                    value = cand
+                    break
+            if value is None:
+                raise LLMUnavailable(
+                    f"model did not return valid JSON: {e}; got {text[:200]!r}") from e
         if not isinstance(value, dict):
             raise LLMUnavailable("model returned JSON that is not an object")
         return value

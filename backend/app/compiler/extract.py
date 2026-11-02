@@ -72,7 +72,13 @@ Rules:
   when the speaker recommends something by NAME, otherwise use said; committed_to(person,
   value=the promise); has_attribute(entity, value="key: value", e.g. "awning: green");
   near(a, b) and across_from(a, b) only when stated or visible.
+- A transcript segment has `session_participants`: the people in that conversation. A
+  conversation means the speaker met with each other participant, so also emit
+  met_with(Me, <other person>) with the owner "Me" as the subject, whoever is speaking.
 - Use `object` for another entity and `value` for literal text, not both.
+- Parts and properties of a place (its awning, sign, colour, kind of business, name on the
+  door) are attributes OF that place: has_attribute(<the place>, value="awning: green"). Do not
+  make the awning or the sign a separate entity.
 - Allowed entity types: person, place, object, org, item. A business or shop is a place.
 - event_time is ISO 8601; omit it to mean the observation's captured_at.
 - confidence is 0 to 1: how sure the observation makes this claim.
@@ -83,12 +89,15 @@ Return JSON: {{"claims": [{{"subject","subject_type","predicate","object","objec
 
 
 def build_user(obs: Observation, episode: dict[str, Any], known: list[str]) -> str:
-    return json.dumps({
+    payload: dict[str, Any] = {
         "observation": {"kind": obs.kind, "captured_at": obs.captured_at, "text": obs.text,
                         "lat": obs.lat, "lon": obs.lon},
         "episode": episode,
         "known_entities": known,
-    }, ensure_ascii=False)
+    }
+    if obs.participants:
+        payload["session_participants"] = obs.participants
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def extract_claims(llm: LLMClient, obs: Observation, episode: dict[str, Any],

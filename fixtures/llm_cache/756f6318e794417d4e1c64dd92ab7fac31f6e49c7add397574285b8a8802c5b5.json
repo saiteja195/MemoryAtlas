@@ -1,0 +1,34 @@
+{
+  "claims": [
+    {
+      "confidence": 1.0,
+      "object": "Alex",
+      "object_type": "person",
+      "predicate": "met_with",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me met with Alex.",
+      "value": null
+    },
+    {
+      "confidence": 1.0,
+      "object": null,
+      "object_type": null,
+      "predicate": "said",
+      "subject": "Alex",
+      "subject_type": "person",
+      "text": "Alex said he will send the proposal by Friday.",
+      "value": "will send proposal by Friday"
+    },
+    {
+      "confidence": 0.95,
+      "object": null,
+      "object_type": null,
+      "predicate": "committed_to",
+      "subject": "Alex",
+      "subject_type": "person",
+      "text": "Alex committed to send the proposal by Friday.",
+      "value": "send the proposal by Friday"
+    }
+  ]
+}

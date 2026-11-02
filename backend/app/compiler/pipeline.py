@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from ..capture.models import Observation
 from ..llm.base import LLMClient, LLMUnavailable
 from .contradiction import contradiction_pass
+from .derive import Deriver
 from .episodes import bind_episode
 from .extract import ExtractedClaim, ExtractionRejected, extract_claims
 from .resolve import EntityResolver
@@ -24,6 +25,8 @@ class CompileResult:
     episode_id: str | None = None
     claim_ids: list[str] = field(default_factory=list)
     disputed: list[tuple[str, str]] = field(default_factory=list)
+    derived_errors: list[str] = field(default_factory=list)
+    bindings: list[tuple[str, str]] = field(default_factory=list)
     rejected: str | None = None
 
 
@@ -32,6 +35,7 @@ class Compiler:
         self.conn, self.llm, self.owner = conn, llm, owner
         self.resolver = EntityResolver(conn, llm, owner)
         self.writer = ClaimWriter(conn)
+        self.deriver = Deriver(conn, llm, owner)
 
     def compile(self, obs: Observation) -> CompileResult:
         res = CompileResult(obs.source_id)
@@ -41,8 +45,7 @@ class Compiler:
                                (res.episode_id,)).fetchone()
         attrs = json.loads(ep["attrs"])
         episode_ctx = {"start": attrs["start"], "end": attrs["end"]}
-        known = [r["name"] for r in self.conn.execute(
-            "SELECT name FROM entities WHERE type != 'episode' ORDER BY name LIMIT 60")]
+        known = self._known_entities(obs)
         try:
             extracted = extract_claims(self.llm, obs, episode_ctx, known)
         except (ExtractionRejected, LLMUnavailable) as e:
@@ -67,10 +70,27 @@ class Compiler:
         for eid, conf in mentioned.items():
             res.claim_ids.append(self._part_of_episode(obs, res.episode_id, ep["name"], eid, conf))
         res.disputed = contradiction_pass(self.conn, subjects)
+        derived = self.deriver.run(res.episode_id, subjects)
+        res.derived_errors, res.bindings = derived.errors, derived.bindings
         self.conn.commit()
         return res
 
     # -- helpers ------------------------------------------------------------------------------
+
+    def _known_entities(self, obs: Observation) -> list[str]:
+        """Names offered to the extractor for reuse. A photo must not absorb something that was
+        only ever described in conversation (an unverified "the taco place"): that merge is the
+        job of the spatial-referent rule, which checks attributes and distance first."""
+        sql = "SELECT e.name FROM entities e WHERE e.type != 'episode'"
+        if obs.kind == "frame_observation":
+            sql += (" AND (e.entity_id = ? OR EXISTS (SELECT 1 FROM claims c JOIN justifications j"
+                    " ON j.claim_id = c.claim_id JOIN sources s ON s.source_id = j.source_id"
+                    " WHERE (c.subject_id = e.entity_id OR c.object_id = e.entity_id)"
+                    " AND s.kind != 'transcript_segment'))")
+            args: tuple = (self.owner,)
+        else:
+            args = ()
+        return [r["name"] for r in self.conn.execute(sql + " ORDER BY e.name LIMIT 60", args)]
 
     def _write(self, obs: Observation, episode_id: str, c: ExtractedClaim
                ) -> tuple[str, str, str | None] | None:

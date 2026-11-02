@@ -42,6 +42,7 @@ class Observation:
     lon: float | None = None
     ends_at: str | None = None             # calendar only; used for episode extent
     speaker: str | None = None             # person id for transcript segments
+    participants: list[str] = field(default_factory=list)   # names in the conversation
     place_name: str | None = None
 
 

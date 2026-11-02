@@ -16,6 +16,7 @@ from .graph import build_graph
 from .llm.base import LLMClient, LLMUnavailable
 from .llm.factory import build_client
 from .privacy.consent import create_grant
+from .recall.service import RecallService
 
 
 class CaptureBody(BaseModel):
@@ -36,6 +37,10 @@ class CaptureBody(BaseModel):
     turns: list[dict[str, Any]] | None = None
 
 
+class AskBody(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+
+
 class GrantBody(BaseModel):
     grantor: str
     session_id: str
@@ -49,6 +54,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     adapter = MockDayAdapter(settings.demo_script)
     engine = MemoryEngine(conn, llm, adapter.owner, adapter.names)
     demo = DemoRunner(engine, adapter, settings.revocation_secret)
+    recall = RecallService(conn, llm)
     data_dir = None if settings.db_path == ":memory:" else os.path.dirname(os.path.abspath(
         settings.db_path))
 
@@ -99,6 +105,20 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
                              "claims": len(r.compiled.claim_ids) if r.compiled else 0,
                              "compile_rejected": r.compiled.rejected if r.compiled else None}
                             for r in results]}
+
+    @app.post("/recall/ask")
+    def ask(body: AskBody) -> dict:
+        try:
+            return recall.ask(body.question)
+        except LLMUnavailable as e:
+            raise HTTPException(503, str(e)) from e
+
+    @app.get("/claims/{claim_id}/provenance")
+    def provenance(claim_id: str) -> dict:
+        out = recall.provenance(claim_id)
+        if "error" in out:
+            raise HTTPException(404, out["error"])
+        return out
 
     @app.get("/demo/status")
     def demo_status() -> dict:

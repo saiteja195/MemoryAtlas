@@ -1,0 +1,38 @@
+{
+  "claims": [
+    {
+      "confidence": 0.7,
+      "object": "street",
+      "object_type": "place",
+      "predicate": "observed_at",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "I was at the street."
+    },
+    {
+      "confidence": 0.85,
+      "object": "street",
+      "object_type": "place",
+      "predicate": "located_at",
+      "subject": "billboard",
+      "subject_type": "object",
+      "text": "The billboard was located at the street."
+    },
+    {
+      "confidence": 0.95,
+      "predicate": "has_attribute",
+      "subject": "billboard",
+      "subject_type": "object",
+      "text": "The billboard displayed the text 'Orbit Fitness: first month free'.",
+      "value": "text: Orbit Fitness: first month free"
+    },
+    {
+      "confidence": 0.9,
+      "predicate": "has_attribute",
+      "subject": "Orbit Fitness",
+      "subject_type": "place",
+      "text": "Orbit Fitness is a gym.",
+      "value": "kind of business: gym"
+    }
+  ]
+}

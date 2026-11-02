@@ -1,0 +1,8 @@
+{
+  "action": "tool",
+  "args": {
+    "predicate": "observed_at",
+    "query": "visited gym workout at Orbit Fitness"
+  },
+  "tool": "search_claims"
+}

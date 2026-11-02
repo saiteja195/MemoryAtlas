@@ -52,3 +52,34 @@ class ClaimWriter:
                 "INSERT INTO justifications(justification_id, claim_id, kind, source_id, rule)"
                 " VALUES (?,?,'source',?,NULL)", (jid, cid, source_id))
         return cid, created
+
+    def write_derived(self, *, subject_id: str, predicate: str, object_id: str | None,
+                      object_value: str | None, event_time: str | None, confidence: float,
+                      episode_id: str | None, text: str, rule: str,
+                      premises: list[str]) -> tuple[str, bool]:
+        """Insert an inferred claim justified by `rule` over `premises` (all required).
+        The same claim re-derived from a different premise set gets another justification."""
+        premises = sorted(set(premises))
+        cid = self.claim_key(subject_id, predicate, object_id, object_value, episode_id)
+        exists = self.conn.execute("SELECT 1 FROM claims WHERE claim_id=?", (cid,)).fetchone()
+        if not exists:
+            self.conn.execute(
+                "INSERT INTO claims(claim_id, subject_id, predicate, object_id, object_value,"
+                " event_time, valid_from, valid_to, evidence_type, confidence, episode_id, text,"
+                " status, superseded_by, created_at) VALUES (?,?,?,?,?,?,NULL,NULL,'inference',"
+                "?,?,?,'active',NULL,?)",
+                (cid, subject_id, predicate, object_id, object_value, event_time, confidence,
+                 episode_id, text, now_iso()))
+            self.conn.execute("INSERT INTO claim_index(claim_id, text) VALUES (?,?)", (cid, text))
+            self.conn.execute("INSERT INTO claim_vectors(claim_id, vec) VALUES (?,?)",
+                              (cid, embed(text).tobytes()))
+        jid = "jst-" + hashlib.sha1(f"{cid}|{rule}|{'|'.join(premises)}".encode()).hexdigest()[:12]
+        if not self.conn.execute("SELECT 1 FROM justifications WHERE justification_id=?",
+                                 (jid,)).fetchone():
+            self.conn.execute("INSERT INTO justifications(justification_id, claim_id, kind,"
+                              " source_id, rule) VALUES (?,?,'derivation',NULL,?)",
+                              (jid, cid, rule))
+            self.conn.executemany(
+                "INSERT INTO justification_premises(justification_id, premise_claim_id)"
+                " VALUES (?,?)", [(jid, p) for p in premises])
+        return cid, not exists

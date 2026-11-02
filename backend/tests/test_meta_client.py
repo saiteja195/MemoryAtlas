@@ -34,6 +34,18 @@ def test_complete_json_request_shape_and_fence_stripping():
     assert seen["body"]["input"][1]["content"] == [{"type": "input_text", "text": "user text"}]
 
 
+def test_json_after_leading_prose_is_accepted():
+    text = 'I\'ll look that up. {"action": "tool", "args": {"q": "a {b} c"}} Done.'
+    c = client(lambda r: httpx.Response(200, json=responses_body(text)))
+    assert c.complete_json("s", "u", {}) == {"action": "tool", "args": {"q": "a {b} c"}}
+
+
+def test_prose_with_braces_but_no_object_still_raises():
+    c = client(lambda r: httpx.Response(200, json=responses_body("use {curly} braces")))
+    with pytest.raises(LLMUnavailable):
+        c.complete_json("s", "u", {})
+
+
 def test_invalid_json_raises_unavailable():
     c = client(lambda r: httpx.Response(200, json=responses_body("not json")))
     with pytest.raises(LLMUnavailable):
@@ -102,3 +114,23 @@ def test_missing_key_fails_before_any_request():
 def test_local_embedding_ranks_similar_text_higher():
     q = embed("which restaurant did Alex recommend")
     assert cosine(q, embed("Alex recommended Luna Taqueria")) > cosine(q, embed("orbit fitness billboard"))
+
+
+def test_transient_network_errors_are_retried_then_surface_as_unavailable():
+    calls = {"n": 0}
+
+    def flaky(req):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise httpx.ReadError("Connection reset by peer", request=req)
+        return httpx.Response(200, json=responses_body('{"ok": true}'))
+
+    assert client(flaky).complete_json("s", "u", {}) == {"ok": True}
+    assert calls["n"] == 3
+
+    def down(req):
+        raise httpx.ConnectError("sk-secret refused", request=req)
+
+    with pytest.raises(LLMUnavailable) as e:
+        client(down).complete_json("s", "u", {})
+    assert "ConnectError" in str(e.value) and "sk-secret" not in str(e.value)

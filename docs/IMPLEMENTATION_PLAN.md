@@ -222,6 +222,8 @@ A tool-calling loop on Muse Spark, capped at 6 steps. Every tool goes through th
 | `provenance(claim_id)` | Justification tree down to sources |
 
 Final output schema: `{status: answered|partial|abstained, answer, cited_claim_ids[], uncertainty_note}`.
+
+*As built:* the loop is a bounded series of JSON actions over `complete_json` (one tool call or a final answer per step), not native tool calling. Citations may be superseded claims when a tool returned them as history (the greyed-out café sighting); revoked or unauthorized claims are always refused. The present-tense-location check applies when the question names the object the cited `located_at` claim is about.
 **Post-checks (deterministic):**
 - *Citation integrity:* every cited claim id must have been returned by a tool in this run and still be active. Otherwise retry once, then abstain. This blocks invented evidence.
 - *No present-tense location:* answers about object location must be phrased as "last confirmed sighting at T". Enforced by the prompt and checked by a regex.

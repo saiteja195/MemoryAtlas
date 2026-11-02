@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "wallet"
+  },
+  "tool": "search_claims"
+}

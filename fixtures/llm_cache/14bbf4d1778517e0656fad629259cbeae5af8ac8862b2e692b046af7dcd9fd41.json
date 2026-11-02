@@ -3,12 +3,12 @@
     {
       "confidence": 0.9,
       "event_time": "2026-10-29T12:30:00",
-      "object": "Office, 400 Market St",
+      "object": "Office",
       "object_type": "place",
       "predicate": "observed_at",
       "subject": "Me",
       "subject_type": "person",
-      "text": "Me was at Office, 400 Market St for Sync with Alex."
+      "text": "Me was at Office for Sync with Alex."
     },
     {
       "confidence": 0.85,
@@ -18,7 +18,17 @@
       "predicate": "met_with",
       "subject": "Me",
       "subject_type": "person",
-      "text": "Me met with Alex at Sync with Alex."
+      "text": "Me met with Alex."
+    },
+    {
+      "confidence": 0.95,
+      "object": null,
+      "object_type": null,
+      "predicate": "has_attribute",
+      "subject": "Office",
+      "subject_type": "place",
+      "text": "Office has address 400 Market St.",
+      "value": "address: 400 Market St"
     }
   ]
 }

@@ -7,6 +7,7 @@ import unicodedata
 from typing import Any
 
 from ..llm.base import LLMClient, LLMUnavailable
+from ..privacy.filter import authorized_claim_ids
 
 # Types the model may use interchangeably for the same real thing.
 _GROUPS = {"person": "person", "place": "site", "org": "site", "object": "thing", "item": "thing"}
@@ -45,13 +46,20 @@ class EntityResolver:
         self.conn.execute("INSERT OR IGNORE INTO entities(entity_id, type, name, attrs)"
                           " VALUES (?, 'person', ?, NULL)", (self.owner, name))
 
-    def _names_of(self, entity_id: str, name: str) -> set[str]:
+    def _same_as(self) -> list[sqlite3.Row]:
+        """Active, still-authorized alias claims (revoked support means the alias is gone)."""
+        auth = authorized_claim_ids(self.conn)
+        return [r for r in self.conn.execute(
+            "SELECT claim_id, subject_id, object_value FROM claims WHERE predicate='same_as'"
+            " AND status='active' AND object_value IS NOT NULL") if r["claim_id"] in auth]
+
+    def _names_of(self, entity_id: str, name: str, aliases: list[sqlite3.Row] | None = None
+                  ) -> set[str]:
         """Names an entity answers to: its own, plus surface forms from active same_as claims."""
         names = {norm(name)}
-        for r in self.conn.execute(
-                "SELECT object_value FROM claims WHERE subject_id=? AND predicate='same_as'"
-                " AND status='active' AND object_value IS NOT NULL", (entity_id,)):
-            names.add(norm(r["object_value"]))
+        for r in (aliases if aliases is not None else self._same_as()):
+            if r["subject_id"] == entity_id:
+                names.add(norm(r["object_value"]))
         return names
 
     def _candidates(self, etype: str) -> list[sqlite3.Row]:
@@ -69,8 +77,16 @@ class EntityResolver:
             self.ensure_owner()
             return self.owner, False
         cands = self._candidates(etype)
+        aliases = self._same_as()
+        for a in aliases:                     # a name bound to another entity resolves to it
+            if norm(a["object_value"]) == key and any(c["entity_id"] == a["subject_id"]
+                                                      for c in cands):
+                return a["subject_id"], False
+        for r in cands:                       # an entity's own name wins over anyone's alias
+            if key == norm(r["name"]):
+                return r["entity_id"], False
         for r in cands:
-            if key in self._names_of(r["entity_id"], r["name"]):
+            if key in self._names_of(r["entity_id"], r["name"], aliases):
                 return r["entity_id"], False
         scored = sorted(
             ((difflib.SequenceMatcher(None, key, norm(r["name"])).ratio(), r) for r in cands),
