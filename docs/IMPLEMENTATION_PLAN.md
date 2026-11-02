@@ -2,7 +2,7 @@
 
 **Meta AI Developer Hackathon, Indie Developer track · "Build for Your World"**
 **Submission deadline: Wed Nov 4, 2026, 9:00 PM ET.** Internal target: submitted by **6:00 PM ET** (3-hour buffer).
-**Plan date: Fri Oct 30, 2026.** That leaves 5.5 working days. The original schedule assumed Oct 28, so this one is re-baselined.
+**Re-baselined Mon Nov 2, 2026.** The first plan (Oct 30) assumed a Fri start; two days were lost, so §8 is now a 3-day, 6-phase plan (Mon → Wed).
 
 > **One line:** MemoryAtlas turns temporary, consented observations into a memory graph where every memory records its evidence. It can piece together what happened, correct itself when new evidence arrives, and *prove* that it forgot something once consent is withdrawn.
 
@@ -359,20 +359,20 @@ Leak detection: string match against a protected-fact list, plus an LLM judge as
 
 ---
 
-## 8. Schedule (Fri Oct 30 → Wed Nov 4)
+## 8. Phases (Mon Nov 2 → Wed Nov 4)
 
-Each row is one short-lived branch merged into `main` (see `CONTRIBUTING.md`). **The exit criterion is a gate:** don't start the next day's P0 until it passes.
+Each phase is one short-lived branch, merged into `main` by pull request when its exit gate passes (see `CONTRIBUTING.md`). Branch prefixes are only `feature/` and `bug/`. **Don't start the next phase until the gate passes.**
 
-| Day | Branches | P0 deliverables | Exit criterion (must be demonstrable) |
-|---|---|---|---|
-| **D0 Fri 10/30** (evening) | `chore/project-scaffold`, `docs/hackathon-facts`, `feat/demo-day-fixtures` | §0 checklist. FastAPI + Vite skeletons. `schema.sql`. `LLMClient` + `MetaClient` hello-world (text, image, transcribe). Script and **record** the demo day | `make dev` runs both apps. One real Muse Spark image call and one transcription succeed. Fixtures committed |
-| **D1 Sat 10/31** | `feat/capture-gateway`, `feat/compiler-claims`, `feat/graph-view-basic` | Gateway with consent gate + ephemeral buffer. Compiler steps 1–4, 6–7. Episode binding. Bare Cytoscape view over `/graph` | Replaying the demo day produces a graph with episodes, Alex, the wallet, and Luna Taqueria. 0 media bytes on disk |
-| **D2 Sun 11/1** | `feat/compiler-derivations`, `feat/recall-investigator`, `feat/temporal-correction` | Derivation rules (spatial referent, last-seen, summary). Investigator tools + post-checks. Supersession and disputes | Acts 2 and 3 work live, with citations, on 3 phrasings each |
-| **D3 Mon 11/2** | `feat/privacy-revocation`, `feat/leak-probes`, `test/revocation-properties` | Consent grants + HMAC revoke. Fixpoint recompute. Purge across FTS/vectors/cache/chat/export. Receipt. Property tests | Act 4 works. All 7 probes green. Property tests pass on 1,000 random graphs |
-| **D4 Tue 11/3** | `feat/atlas-ui-polish`, `eval/baseline-and-benchmark`, `feat/consent-qr-flow` (P1) | Evidence styling, provenance drawer, receipt modal, timeline scrubber. Baseline + eval runner + results. Held-out day | Full demo dry-run ×3 without touching code. Metrics table filled. **Backup video recorded** |
-| **D5 Wed 11/4** | `docs/submission`, `fix/*` only | **Feature freeze 12:00 ET.** README, architecture diagram, results, limitations. Final video. Submission form | **Submitted by 18:00 ET.** Tag `v1.0-submission` |
+| Phase | When | Branch | Deliverables | Exit gate (must be demonstrable) |
+|---|---|---|---|---|
+| **0 · Scaffold** | Mon morning | `feature/scaffold` | §0 checklist → `docs/HACKATHON_FACTS.md`. FastAPI + Vite skeletons. `schema.sql` + DB layer. `LLMClient` interface, `MetaClient`, `RecordReplayClient`. `Makefile`. CI-free `pytest` smoke test | `make dev` runs both apps. `make test` green. One real model call works (or `replay` mode is on and the UI says so) |
+| **1 · Remember** | Mon | `feature/capture-compiler` | Demo-day fixtures. Capture gateway (consent gate, redaction, ephemeral buffer, blocked hashes). Compiler: perceive, episode binding, claim extraction, entity resolution, contradiction pass. `/graph` endpoint | Replaying the demo day builds a graph with the episodes, Alex, the wallet and Luna Taqueria. 0 media bytes on disk |
+| **2 · Recall** | Mon night | `feature/recall` | Derivation rules (spatial referent, last-seen, summary). Investigator tools + citation-integrity post-checks. Supersession and disputes | Acts 2 and 3 work, with citations, on 3 phrasings each |
+| **3 · Forget** | Tue morning | `feature/revocation` | Consent grants + HMAC revoke. Fixpoint recompute. Purge across FTS / vectors / cache / chat / export. Leak probes. Receipt. Property tests | Act 4 works. All probes green. Property tests pass on 1,000 random graphs |
+| **4 · Show + prove** | Tue | `feature/atlas-ui`, `feature/eval` | Cytoscape atlas (evidence styling, provenance drawer, receipt modal, timeline). Baseline + eval runner + results | Full demo dry-run ×3 without touching code. Metrics table filled. **Backup video recorded** |
+| **5 · Ship** | Wed | `feature/submission`, `bug/*` only | **Feature freeze 12:00 ET.** README, diagram, results, limitations, final video, submission form | **Submitted by 18:00 ET.** Tag `v1.0-submission` |
 
-Rough daily budget: 10–12 focused hours. If a day slips by more than 3 hours, apply the cut list below. Don't borrow from D4.
+Budget: about 12 hours per day. If a phase slips by more than 3 hours, apply the cut list below. Never borrow time from Phase 5.
 
 ### Priority tiers / cut list
 - **P0 (no submission without these):** scripted day, gateway, compiler, claim/justification store, investigator with citations, last-seen correction, revocation with fixpoint plus probes 1–5, basic graph view, eval on the demo day, video.

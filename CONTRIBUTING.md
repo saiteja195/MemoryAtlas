@@ -24,18 +24,14 @@ git log --format=%B | grep -i 'co-authored' || echo "clean"
 
 ## Branch naming
 
-`<type>/<short-kebab-description>`, branched from `main`, kept short-lived, merged back via pull request.
+Only two prefixes are allowed, followed by a short kebab-case name, with no tool or agent prefixes (never `claude/...`):
 
-| Type | Use for | Example |
+| Prefix | Use for | Examples |
 |---|---|---|
-| `feat/` | New capability | `feat/privacy-revocation` |
-| `fix/` | Bug fix | `fix/last-seen-ordering` |
-| `test/` | Tests only | `test/revocation-properties` |
-| `eval/` | Benchmark and baseline work | `eval/baseline-and-benchmark` |
-| `docs/` | Documentation | `docs/submission` |
-| `chore/` | Tooling, scaffolding, deps | `chore/project-scaffold` |
+| `feature/` | Anything new, including docs, tests and tooling | `feature/scaffold`, `feature/revocation`, `feature/atlas-ui` |
+| `bug/` | Fixing something broken | `bug/last-seen-ordering` |
 
-The planned branches for each day are listed in `docs/IMPLEMENTATION_PLAN.md` §8.
+Branch from `main`, keep branches short-lived, and merge by pull request. The phase branches are listed in `docs/IMPLEMENTATION_PLAN.md` §8.
 
 ## Commit messages
 
@@ -46,7 +42,7 @@ feat(privacy): recompute claim support with least fixpoint on revoke
 fix(recall): reject answers citing claims not returned by tools
 ```
 
-Scopes: `capture`, `compiler`, `graph`, `recall`, `privacy`, `llm`, `ui`, `eval`, `fixtures`, `docs`.
+Scopes: `scaffold`, `capture`, `compiler`, `graph`, `recall`, `privacy`, `llm`, `ui`, `eval`, `fixtures`, `docs`.
 
 ## Releases
 
