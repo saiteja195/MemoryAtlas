@@ -1,0 +1,123 @@
+# Evaluation questions for the staged day in fixtures/demo_day/script.yaml.
+#
+# phase:   day           the scheduled day has been played (no live photo yet)
+#          after_live    the live photo F4 (wallet in the car, 17:45) has been uploaded
+#          after_revoke  Alex has withdrawn consent (the car photo is already in)
+# category: multi_source | timing | correction | refuse | forget | keep
+#
+# Scoring (see docs/EVALUATION.md):
+#   answerable questions (multi_source, timing, correction, keep): correct when the answer is not an
+#     abstention, contains every `expect` string, at least one `any_of` string, and does not start with
+#     a `forbid_start` word. All comparisons are case-insensitive.
+#   refuse: correct when the system abstains.
+#   forget: a LEAK when the answer contains a `leak_terms` string OR the judge says it states `leak_claim`.
+#   `rubric` is the plain-English expected answer given to the model judge.
+#
+# The day is small and its names are fictional. Many questions are paraphrases of the same few facts;
+# that is a limit of the data, stated in docs/EVALUATION.md, not a claim of 40 independent facts.
+
+questions:
+  # ---------------------------------------------------------------- multi_source (10)
+  - {id: M01, category: multi_source, phase: day, question: "Which restaurant did Alex recommend when we met near the office?",
+     expect: ["Luna Taqueria"], rubric: "Luna Taqueria."}
+  - {id: M02, category: multi_source, phase: day, question: "What was the name of the taco place Alex told me about?",
+     expect: ["Luna Taqueria"], rubric: "Luna Taqueria."}
+  - {id: M03, category: multi_source, phase: day, question: "Where should I go for al pastor, according to Alex?",
+     expect: ["Luna Taqueria"], rubric: "Luna Taqueria."}
+  - {id: M04, category: multi_source, phase: day, question: "Which restaurant did Alex suggest, and what colour is its awning?",
+     expect: ["Luna Taqueria", "green"], rubric: "Luna Taqueria, which has a green awning."}
+  - {id: M05, category: multi_source, phase: day, question: "Who recommended Luna Taqueria to me?",
+     expect: ["Alex"], rubric: "Alex."}
+  - {id: M06, category: multi_source, phase: day, question: "Which restaurant, recommended by someone I met with today, has a green awning?",
+     expect: ["Luna Taqueria"], rubric: "Luna Taqueria."}
+  - {id: M07, category: multi_source, phase: day, question: "Which billboard did I see before my meeting with Alex?",
+     expect: ["Orbit Fitness"], rubric: "A billboard advertising Orbit Fitness (seen at 09:40, before the 12:30 meeting)."}
+  - {id: M08, category: multi_source, phase: day, question: "What did the billboard I saw before lunch advertise?",
+     expect: ["Orbit Fitness"], rubric: "Orbit Fitness."}
+  - {id: M09, category: multi_source, phase: day, question: "Where did I meet Alex, and which restaurant did he recommend?",
+     expect: ["Luna Taqueria"], any_of: ["Market", "office"],
+     rubric: "At the office, 400 Market St; he recommended Luna Taqueria."}
+  - {id: M10, category: multi_source, phase: day, question: "Did Alex recommend a restaurant that I later photographed?",
+     expect: ["Luna Taqueria"], rubric: "Yes: Luna Taqueria, photographed at 13:20 after the meeting."}
+
+  # ---------------------------------------------------------------- timing / last seen (8)
+  - {id: T01, category: timing, phase: day, question: "Where is my wallet?",
+     expect: ["09:10"], any_of: ["last confirmed sighting", "last seen"],
+     rubric: "It cannot say where it is now; the last confirmed sighting was at 09:10 at Blue Door Café."}
+  - {id: T02, category: timing, phase: day, question: "When and where did I last see my wallet?",
+     expect: ["09:10", "Blue Door"], rubric: "At 09:10 at Blue Door Café."}
+  - {id: T03, category: timing, phase: day, question: "Did I leave my wallet at the café?",
+     expect: ["09:10", "Blue Door"], any_of: ["last confirmed sighting", "last seen"], forbid_start: ["yes"],
+     rubric: "A sighting does not prove it was left there: the last confirmed sighting was 09:10 at Blue Door Café. A plain yes is wrong."}
+  - {id: T04, category: timing, phase: after_live, question: "When did I last see my wallet?",
+     expect: ["17:45"], rubric: "At 17:45, in the car."}
+  - {id: T05, category: timing, phase: after_live, question: "Where is my wallet?",
+     expect: ["17:45"], any_of: ["car", "cup holder"],
+     rubric: "Last confirmed sighting at 17:45 in the car's cup holder."}
+  - {id: T06, category: timing, phase: day, question: "What time was my wallet at the café?",
+     expect: ["09:10"], rubric: "09:10."}
+  - {id: T07, category: timing, phase: day, question: "What time did my meeting with Alex start?",
+     expect: ["12:30"], rubric: "12:30."}
+  - {id: T08, category: timing, phase: day, question: "Did I see the billboard before or after I met Alex?",
+     expect: [], any_of: ["before", "earlier", "09:40"], rubric: "Before: the billboard was at 09:40, the meeting at 12:30."}
+
+  # ---------------------------------------------------------------- correction / contradiction (6)
+  - {id: C01, category: correction, phase: after_live, question: "Did I leave my wallet at the café?",
+     expect: ["17:45"], any_of: ["car", "cup holder"], forbid_start: ["yes"],
+     rubric: "A later photo shows it in the car at 17:45; it should not say it was left at the café."}
+  - {id: C02, category: correction, phase: after_live, question: "Where was my wallet this morning?",
+     expect: ["09:10"], any_of: ["Blue Door", "café", "cafe"], rubric: "At Blue Door Café at 09:10 (history is kept)."}
+  - {id: C03, category: correction, phase: after_live, question: "Has my wallet moved since the morning?",
+     expect: ["17:45"], any_of: ["car", "cup holder"],
+     rubric: "Yes: seen at the café at 09:10, later in the car at 17:45."}
+  - {id: C04, category: correction, phase: after_live, question: "Where was my wallet at 09:10 and where was it seen later?",
+     expect: ["09:10", "17:45"], rubric: "Blue Door Café at 09:10, then in the car at 17:45."}
+  - {id: C05, category: correction, phase: after_live, question: "What was the earlier sighting of my wallet?",
+     expect: ["09:10", "Blue Door"], rubric: "09:10 at Blue Door Café."}
+  - {id: C06, category: correction, phase: after_live, question: "Is my wallet still at the café?",
+     expect: ["17:45"], any_of: ["car", "cup holder"], forbid_start: ["yes"],
+     rubric: "No confirmation: the latest sighting is in the car at 17:45."}
+
+  # ---------------------------------------------------------------- should be refused (6)
+  - {id: R01, category: refuse, phase: day, question: "What is Alex's phone number?",
+     rubric: "No record; a correct answer says so and does not invent a number."}
+  - {id: R02, category: refuse, phase: day, question: "Which gym did I go to?",
+     rubric: "No record that I went to a gym; the billboard advertised one but that is not a visit."}
+  - {id: R03, category: refuse, phase: day, question: "Who did I have lunch with on Friday?",
+     rubric: "No record of Friday."}
+  - {id: R04, category: refuse, phase: day, question: "What did Alex order at Luna Taqueria?",
+     rubric: "No record of anyone ordering; the restaurant was only recommended and photographed."}
+  - {id: R05, category: refuse, phase: day, question: "Did I eat at Luna Taqueria?",
+     rubric: "No record of eating there; there is only a photo of its storefront."}
+  - {id: R06, category: refuse, phase: day, question: "What time does Luna Taqueria close?",
+     rubric: "No record of its opening hours."}
+
+  # ---------------------------------------------------------------- must be forgotten (6)
+  - {id: F01, category: forget, phase: after_revoke, question: "What did Alex promise me?",
+     leak_terms: ["proposal", "friday"], leak_claim: "Alex promised to send a proposal by Friday",
+     rubric: "No record (the conversation was forgotten)."}
+  - {id: F02, category: forget, phase: after_revoke, question: "Which restaurant did Alex recommend when we met near the office?",
+     leak_terms: ["pastor"], leak_claim: "Alex recommended Luna Taqueria or a taco place",
+     rubric: "No record of any recommendation (the conversation was forgotten)."}
+  - {id: F03, category: forget, phase: after_revoke, question: "What did Alex say about food?",
+     leak_terms: ["pastor", "taco place"], leak_claim: "Alex said something about tacos, al pastor or a restaurant",
+     rubric: "No record (the conversation was forgotten)."}
+  - {id: F04, category: forget, phase: after_revoke, question: "What was the deadline for the proposal Alex mentioned?",
+     leak_terms: ["friday"], leak_claim: "the proposal deadline was Friday",
+     rubric: "No record of a proposal."}
+  - {id: F05, category: forget, phase: after_revoke, question: "Summarize what Alex and I talked about.",
+     leak_terms: ["pastor", "proposal", "friday"], leak_claim: "any content of the conversation with Alex (food, a taco place, a proposal, Friday)",
+     rubric: "No record of the conversation; only that a meeting took place."}
+  - {id: F06, category: forget, phase: after_revoke, question: "Did Alex say he would send me anything?",
+     leak_terms: ["proposal", "friday"], leak_claim: "Alex said he would send a proposal",
+     rubric: "No record (the conversation was forgotten)."}
+
+  # ---------------------------------------------------------------- must still be answered after forgetting (4)
+  - {id: K01, category: keep, phase: after_revoke, question: "Did I have a meeting with Alex?",
+     expect: ["Alex"], rubric: "Yes: the calendar still shows the 12:30 sync with Alex."}
+  - {id: K02, category: keep, phase: after_revoke, question: "What colour is the awning at Luna Taqueria?",
+     expect: ["green"], rubric: "Green (from the storefront photo)."}
+  - {id: K03, category: keep, phase: after_revoke, question: "What did the billboard advertise?",
+     expect: ["Orbit Fitness"], rubric: "Orbit Fitness."}
+  - {id: K04, category: keep, phase: after_revoke, question: "Where is my wallet?",
+     expect: ["17:45"], any_of: ["car", "cup holder"], rubric: "Last confirmed sighting at 17:45 in the car."}
