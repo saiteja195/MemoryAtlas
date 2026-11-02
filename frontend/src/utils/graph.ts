@@ -231,7 +231,81 @@ function entityElements(view: Graph, opts: ViewOptions): ElementDefinition[] {
       data: { id, label: n.name, type: n.type },
     };
   });
-  return [...nodes, ...facts, ...edges];
+  const labels = layoutInLanes(view, nodes, facts, edges);
+  return [...labels, ...nodes, ...facts, ...edges];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Lane layout: the same picture every time
+// ---------------------------------------------------------------------------------------------
+
+export type Lane = "person" | "place" | "thing";
+const LANES: { id: Lane; title: string; x: number }[] = [
+  { id: "person", title: "People", x: 0 },
+  { id: "place", title: "Places", x: 440 },
+  { id: "thing", title: "Things", x: 880 },
+];
+const ROW = 96;        // vertical space for one node and its label
+const FACT_ROW = 36;   // one fact chip under the same owner
+const FACT_INDENT = 96; // where a fact chip starts, measured from its owner
+
+export const laneOf = (type: string): Lane => (type === "person" ? "person" : type === "place" || type === "org" ? "place" : "thing");
+
+/**
+ * Put people, places and things in three columns, each oldest first, with an owner's detail
+ * chips stacked beside it. No physics, so the map is identical on every load and nothing
+ * moves when you select something. Returns the column headings as non-interactive nodes.
+ * Mutates the `position` of the nodes and facts it is given.
+ */
+function layoutInLanes(
+  view: Graph, nodes: ElementDefinition[], facts: ElementDefinition[], edges: ElementDefinition[],
+): ElementDefinition[] {
+  const claims = new Map(view.edges.map((e) => [e.id, e]));
+  const firstTouch = new Map<string, string>();
+  for (const e of view.edges) {
+    const t = firstSeen(e) ?? "~";
+    for (const id of [e.source, e.target]) {
+      if (id && (firstTouch.get(id) ?? "~~") > t) firstTouch.set(id, t);
+    }
+  }
+  const factsOf = new Map<string, ElementDefinition[]>();
+  for (const f of facts) {
+    const owner = claims.get(f.data.claimId as string)?.source;
+    if (owner) factsOf.set(owner, [...(factsOf.get(owner) ?? []), f]);
+  }
+
+  const present = new Set<Lane>();
+  for (const lane of LANES) {
+    const members = nodes
+      .filter((n) => laneOf(n.data.type as string) === lane.id)
+      .sort((a, b) =>
+        Number(b.data.id === OWNER_ID) - Number(a.data.id === OWNER_ID)
+        || (firstTouch.get(a.data.id as string) ?? "~").localeCompare(firstTouch.get(b.data.id as string) ?? "~")
+        || String(a.data.label).localeCompare(String(b.data.label)));
+    let y = 0;
+    for (const n of members) {
+      present.add(lane.id);
+      n.position = { x: lane.x, y };
+      const mine = factsOf.get(n.data.id as string) ?? [];
+      mine.forEach((f, i) => {
+        // People's details go on the outer (left) side so lines to places never run through them.
+        const dx = FACT_INDENT + (f.data.w as number) / 2;
+        f.position = { x: lane.id === "person" ? lane.x - dx : lane.x + dx, y: y + (i - (mine.length - 1) / 2) * FACT_ROW };
+      });
+      y += ROW + Math.max(0, mine.length - 1) * FACT_ROW;
+    }
+  }
+
+  // Edges inside one column would run straight through the nodes between them: bow them out.
+  const laneById = new Map(nodes.map((n) => [n.data.id as string, laneOf(n.data.type as string)]));
+  for (const e of edges) {
+    const a = laneById.get(e.data.source as string);
+    if (a && a === laneById.get(e.data.target as string)) e.classes = `${e.classes} same-lane`;
+  }
+  return LANES.filter((l) => present.has(l.id)).map((l) => ({
+    group: "nodes" as const, classes: "lane-label", selectable: false, grabbable: false,
+    data: { id: `lane:${l.id}`, label: l.title.toUpperCase() }, position: { x: l.x, y: -80 },
+  }));
 }
 
 /** Only things that travel with you tie episodes together. Two places that merely share a generic
@@ -323,8 +397,66 @@ export function relatedFactClaims(view: Graph, focusClaims: string[] | null, ent
 
 export type FactRow = {
   id: string; subject: string; relation: string; object: string; evidence: string;
-  status: ClaimStatus; when: string; sources: string;
+  status: ClaimStatus; when: string; sources: string; predicate: string; inferred: boolean;
 };
+
+export type FactCategory = "people" | "places" | "details" | "inferred";
+export const CATEGORY_INFO: Record<FactCategory, { title: string; hint: string }> = {
+  people: { title: "People & conversations", hint: "Who you met, what was said and promised" },
+  places: { title: "Places & locations", hint: "Where you and your things were" },
+  details: { title: "Descriptions", hint: "Colours, signs and other details" },
+  inferred: { title: "Worked out from other facts", hint: "Not seen directly: the app connected the dots" },
+};
+export const CATEGORY_ORDER: FactCategory[] = ["people", "places", "details", "inferred"];
+
+const PEOPLE_PREDICATES = new Set(["met_with", "attended", "said", "recommended", "committed_to"]);
+const PLACE_PREDICATES = new Set(["observed_at", "located_at", "near", "across_from"]);
+
+/** Which group a fact belongs to, by what it is about. Inferred facts get their own group. */
+export function factCategory(r: Pick<FactRow, "predicate" | "inferred">): FactCategory {
+  if (r.inferred) return "inferred";
+  if (PEOPLE_PREDICATES.has(r.predicate)) return "people";
+  if (PLACE_PREDICATES.has(r.predicate)) return "places";
+  return "details";
+}
+
+export function groupFacts(rows: FactRow[]): { category: FactCategory; rows: FactRow[] }[] {
+  return CATEGORY_ORDER
+    .map((category) => ({ category, rows: rows.filter((r) => factCategory(r) === category) }))
+    .filter((g) => g.rows.length > 0);
+}
+
+export type DayCard = {
+  id: string; time: string; title: string; summary: string | null;
+  people: GraphNode[]; places: GraphNode[]; things: GraphNode[];
+  facts: number; sources: string[];
+};
+
+/** One card per episode, oldest first: the day as a list of moments, in plain words. */
+export function dayCards(view: Graph): DayCard[] {
+  const members = episodeMembers(view);
+  const alias = aliasNames(view);
+  return view.nodes
+    .filter((n) => n.type === "episode" && members.has(n.id))
+    .sort((a, b) => (a.attrs?.start ?? "").localeCompare(b.attrs?.start ?? ""))
+    .map((ep) => {
+      const ms = (members.get(ep.id) ?? []).filter((m) => m.id !== OWNER_ID && !alias.has(m.name.toLowerCase()));
+      const claims = view.edges.filter((e) => e.episode_id === ep.id && e.predicate !== "part_of_episode" && e.predicate !== "summary_of");
+      const summary = view.edges.find((e) => e.predicate === "summary_of" && e.source === ep.id && e.status !== "superseded");
+      const sources = [...new Set(claims.flatMap((c) => c.support.map((s) => sourceLabel(s.kind))))];
+      const places = ms.filter((m) => m.type === "place");
+      const people = ms.filter((m) => m.type === "person");
+      const where = places[0]?.name;
+      const title = people.length && where ? `${where} with ${people.map((p) => p.name).join(" and ")}`
+        : people.length ? `With ${people.map((p) => p.name).join(" and ")}`
+        : where ? `At ${where}` : "A moment from your day";
+      return {
+        id: ep.id, time: episodeTimeLabel(ep), title, summary: summary?.value ?? null,
+        people, places, things: ms.filter((m) => m.type !== "place" && m.type !== "person"),
+        facts: claims.length, sources,
+      };
+    });
+}
 
 export function factRows(view: Graph): FactRow[] {
   const name = new Map(view.nodes.map((n) => [n.id, n.name]));
@@ -339,6 +471,8 @@ export function factRows(view: Graph): FactRow[] {
       status: e.status,
       when: clock(e.event_time),
       sources: [...new Set(e.support.map((s) => sourceLabel(s.kind)))].join(" + "),
+      predicate: e.predicate,
+      inferred: e.evidence_type === "inference",
     }))
     .sort((a, b) => a.when.localeCompare(b.when) || a.subject.localeCompare(b.subject));
 }
