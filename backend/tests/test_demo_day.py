@@ -55,7 +55,9 @@ def test_the_taco_place_is_not_named_by_the_conversation(played):
 def test_wallet_sightings_are_both_kept_in_order(full_day):
     rows = claim_rows(full_day.conn, "located_at")
     assert [r["object_id"] for r in rows] == ["place:blue-door-cafe", "place:car"]
-    assert all(r["status"] == "active" for r in rows)      # supersession is Phase 2
+    cafe, car = rows
+    assert cafe["status"] == "superseded" and cafe["superseded_by"] == car["claim_id"]
+    assert car["status"] == "active"                        # the latest sighting by event time
 
 
 def test_zero_media_bytes_retained(played):
@@ -69,6 +71,23 @@ def test_graph_respects_timeline_and_history(played):
     full = build_graph(played.conn)
     assert len(full["edges"]) > len(early["edges"])
     assert all(e["support"] for e in full["edges"])
+
+
+def test_derived_claims_appear_in_the_graph_with_their_derivation(played):
+    g = build_graph(played.conn)
+    (rec,) = [e for e in g["edges"] if e["predicate"] == "recommended"]
+    (sup,) = rec["support"]
+    assert sup["kind"] == "derivation" and sup["rule"] == "spatial_referent_resolution"
+    assert len(sup["premises"]) >= 4
+    early = build_graph(played.conn, at="2026-10-29T12:50:00")      # before the sign photo
+    assert not [e for e in early["edges"] if e["predicate"] == "recommended"]
+
+
+def test_graph_hides_claims_whose_consent_was_withdrawn(played):
+    played.conn.execute("UPDATE consent_grants SET revoked_at='x' WHERE grantor='alex'")
+    g = build_graph(played.conn)
+    assert not [e for e in g["edges"] if e["predicate"] in ("recommended", "said")]
+    assert [e for e in g["edges"] if e["predicate"] == "met_with"]    # the calendar still supports it
 
 
 def test_replaying_the_day_changes_nothing(played):
