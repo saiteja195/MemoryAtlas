@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import full from "./__fixtures__/graph-full.json";
 import after from "./__fixtures__/graph-after-revoke.json";
 import type { Graph, GraphEdge } from "../api/types";
+import { summarize } from "./dashboard";
+import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "./suggest";
 import {
-  atTime, buildElements, claimIdOfFact, clock, describeGraph, episodeOptions, factNodeId, factRows,
+  atTime, buildElements, claimIdOfFact, clock, dayCards, describeGraph, factCategory, groupFacts, episodeOptions, factNodeId, factRows,
   firstSeen, formatBytes, humanPredicate, moments, pathElementIds, relatedFactClaims, sourceClass, truncate,
   type ViewOptions,
 } from "./graph";
@@ -256,5 +258,99 @@ describe("text alternative", () => {
     const text = describeGraph(FULL);
     expect(text).toMatch(/^Memory graph: \d+ people, places and things across 4 episodes/);
     expect(text).toMatch(/inferred/);
+  });
+});
+
+describe("grouping facts and the day overview", () => {
+  it("puts every fact in exactly one group, with inferred facts kept apart", () => {
+    const rows = factRows(FULL);
+    const groups = groupFacts(rows);
+    expect(groups.reduce((n, g) => n + g.rows.length, 0)).toBe(rows.length);
+    expect(groups.every((g) => g.rows.every((r) => factCategory(r) === g.category))).toBe(true);
+    expect(groups.find((g) => g.category === "inferred")?.rows.every((r) => r.inferred)).toBe(true);
+  });
+
+  it("describes each episode as a card in time order", () => {
+    const cards = dayCards(FULL);
+    expect(cards.length).toBeGreaterThan(1);
+    expect([...cards].map((c) => c.time)).toEqual(cards.map((c) => c.time).sort());
+    expect(cards.every((c) => c.title.length > 0 && c.facts >= 0)).toBe(true);
+  });
+});
+
+describe("dashboard summary", () => {
+  it("counts every fact once and splits them by how they are known", () => {
+    const s = summarize(FULL);
+    expect(s.facts).toBe(factRows(FULL).length);
+    expect(s.current + s.replaced + s.disputed).toBe(s.facts);
+    expect(s.evidence.observed + s.evidence.confirmed + s.evidence.inferred).toBe(s.facts);
+    expect(s.categories.reduce((n, c) => n + c.count, 0)).toBe(s.facts);
+    expect(s.avgConfidence).toBeGreaterThan(0);
+  });
+
+  it("is empty and safe with no data", () => {
+    const s = summarize({ nodes: [], edges: [] });
+    expect(s.facts).toBe(0);
+    expect(s.avgConfidence).toBeNull();
+  });
+
+  it("shows fewer facts after a forgetting", () => {
+    expect(summarize(AFTER).facts).toBeLessThan(summarize(FULL).facts);
+  });
+});
+
+describe("lane layout of the map", () => {
+  const els = (o = opts()) => buildElements(FULL, o);
+  const pos = (es: ReturnType<typeof els>) => es.filter((e) => e.position).map((e) => [e.data.id, e.position]);
+
+  it("is identical on every call, so the map never reshuffles", () => {
+    expect(JSON.stringify(pos(els()))).toBe(JSON.stringify(pos(els())));
+  });
+
+  it("puts people, places and things in their own columns, owner first", () => {
+    const es = els();
+    const x = (id: string) => es.find((e) => e.data.id === id)!.position!.x;
+    const first = es.filter((e) => e.classes?.toString().includes("type-person")).sort((a, b) => a.position!.y - b.position!.y)[0];
+    expect(first.data.id).toBe("me");
+    const col = (type: string) => new Set(es.filter((e) => e.classes?.toString().includes(`type-${type}`)).map((e) => e.position!.x));
+    expect([...col("person")]).toEqual([0]);
+    expect([...col("place")]).toEqual([440]);
+    expect(x("lane:person")).toBe(0);
+  });
+
+  it("never stacks two nodes on the same spot", () => {
+    const seen = new Set<string>();
+    for (const e of els().filter((e) => e.position)) {
+      const key = `${e.position!.x},${e.position!.y}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it("bows out edges that stay inside one column", () => {
+    const same = els().filter((e) => e.group === "edges" && String(e.classes).includes("same-lane"));
+    expect(same.length).toBeGreaterThan(0);
+  });
+});
+
+describe("suggesting recorded questions", () => {
+  it("finds the closest known question to a free-form one", () => {
+    expect(suggest("which place did alex suggest for tacos", BEFORE_GROUPS)[0]).toMatch(/taco place|restaurant|al pastor/);
+    expect(suggest("where did I put my wallet", BEFORE_GROUPS)[0]).toMatch(/wallet/);
+  });
+
+  it("does not call two questions alike for sharing only a name", () => {
+    expect(suggest("what is alex favourite colour", BEFORE_GROUPS)).toEqual([]);
+  });
+
+  it("suggests nothing for a query with no meaningful words", () => {
+    expect(suggest("the of a", BEFORE_GROUPS)).toEqual([]);
+    expect(suggest("", AFTER_GROUPS)).toEqual([]);
+  });
+
+  it("recognises an exact known question and caps the list", () => {
+    expect(isKnown("  where is my wallet? ", BEFORE_GROUPS)).toBe(true);
+    expect(isKnown("what is the weather", BEFORE_GROUPS)).toBe(false);
+    expect(suggest("alex wallet restaurant", BEFORE_GROUPS, 2).length).toBeLessThanOrEqual(2);
   });
 });

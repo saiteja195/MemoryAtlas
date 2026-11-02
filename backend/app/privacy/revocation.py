@@ -32,7 +32,7 @@ from typing import Any, Iterable
 
 from ..compiler.contradiction import contradiction_pass
 from ..compiler.derive import Deriver
-from ..compiler.episodes import _label as episode_label, episode_extent, episode_id_for
+from ..compiler.episodes import _label as episode_label, episode_extent, episode_id_for, reconstruct_contrib
 from ..embed import counts, to_blob
 from ..llm.base import LLMClient
 from .consent import verify_token
@@ -333,17 +333,22 @@ class RevocationEngine:
         for ep in self.conn.execute("SELECT entity_id, attrs FROM entities WHERE type='episode'").fetchall():
             a = json.loads(ep["attrs"])
             contrib = a.get("contrib")
-            if contrib is None:
-                continue                       # written before provenance was kept
+            if contrib is None:                # written before provenance was kept: trace it now
+                contrib = reconstruct_contrib(self.conn, ep["entity_id"], a)
             keep = [x for x in contrib if x["source_id"] is None or x["source_id"] in valid]
-            if len(keep) == len(contrib):
-                continue
             if not keep:
-                times = [r[0] for r in self.conn.execute(
-                    "SELECT event_time FROM claims WHERE episode_id=? AND event_time IS NOT NULL", (ep["entity_id"],))]
-                if not times:
-                    continue                   # nothing refers to it: removed as an orphan already
-                keep = [{"source_id": None, "start": min(times), "end": max(times), "lat": None, "lon": None}]
+                keep = [x for x in reconstruct_contrib(self.conn, ep["entity_id"], a, fallback=False)
+                        if x["source_id"] is None or x["source_id"] in valid]
+                if not keep:                   # nothing stands behind it any more
+                    if not self.conn.execute(
+                            "SELECT 1 FROM claims WHERE episode_id=?1 OR subject_id=?1 OR object_id=?1",
+                            (ep["entity_id"],)).fetchone():
+                        self.conn.execute("DELETE FROM entities WHERE entity_id=?", (ep["entity_id"],))
+                        changed.append(ep["entity_id"])
+                    continue
+            extent = episode_extent(keep)
+            if len(keep) == len(contrib) and "contrib" in a and all(a.get(k) == v for k, v in extent.items()):
+                continue                       # already exactly what the remaining sources give
             new = {**episode_extent(keep), "contrib": [x for x in keep if x["source_id"] is not None]}
             start = datetime.fromisoformat(new["start"])
             end = datetime.fromisoformat(new["end"])

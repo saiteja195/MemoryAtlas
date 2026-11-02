@@ -32,21 +32,28 @@ async function audit(page, label) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
   const problems = [];
-  page.on("console", (m) => { if (["error", "warning"].includes(m.type())) problems.push(m.text()); });
+  // The browser logs the 503 for the deliberately unrecorded question; the app handles it, so it is expected.
+  let expect503 = false;
+  page.on("console", (m) => {
+    if (!["error", "warning"].includes(m.type())) return;
+    if (expect503 && /status of 503/.test(m.text())) return;
+    problems.push(m.text());
+  });
   page.on("pageerror", (e) => problems.push(e.message));
 
   await page.request.post(`${BASE}/api/demo/reset`);
   await page.goto(BASE);
   await page.waitForSelector("text=Replay mode");
+  await page.getByRole("button", { name: "Atlas", exact: true }).click(); // the app opens on the Dashboard
   check(await page.locator("text=Raw media kept: 0 B").isVisible(), "header shows the model mode and 'Raw media kept: 0 B'");
 
   // Build the day.
   await page.getByRole("button", { name: "Play the day", exact: true }).click();
   await page.waitForSelector("text=Day played");
   check((await page.locator(".events .event:not(.future)").count()) === 5, "five scheduled events played; the live photo is still upcoming");
-  await page.getByRole("button", { name: "Details" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.waitForTimeout(1200);
-  await audit(page, "details view");
+  await audit(page, "map view");
 
   // Act 2: a question no single source can answer, with its evidence.
   await page.locator(".examples button").first().click();
@@ -61,6 +68,15 @@ async function audit(page, label) {
   await audit(page, "evidence drawer open");
   await page.locator("dialog.drawer").getByRole("button", { name: "Close" }).click();
 
+  // A question that was never recorded gets a friendly explanation and nearby questions, not a raw error.
+  expect503 = true;
+  await page.locator("#question").fill("Which gym membership did I buy last week?");
+  await page.locator("#question").press("Enter");
+  await page.waitForSelector("text=No recording for that question.");
+  check((await page.locator(".not-recorded .examples button").count()) >= 1, "an unrecorded question explains itself and offers recorded ones");
+  check((await page.locator(".qa .notice.error").count()) === 0, "...and shows no raw error");
+  expect503 = false;
+
   // The timeline.
   await page.locator("#scrub").focus();
   await page.keyboard.press("Home");
@@ -71,7 +87,7 @@ async function audit(page, label) {
   // Act 3: a later photo corrects the wallet.
   await page.getByRole("button", { name: /Upload live photo/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
-  await page.getByRole("button", { name: "Where is my wallet?" }).click();
+  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "Where is my wallet?" }).click();
   await page.waitForSelector('.qa .a:has-text("17:45")');
   const wallet = await page.locator(".qa .a").first().innerText();
   check(/Last confirmed sighting at 17:45/.test(wallet) && /09:10/.test(wallet), "wallet answer says 'Last confirmed sighting at 17:45' and keeps the café as history");
@@ -105,20 +121,25 @@ async function audit(page, label) {
 
   // After forgetting.
   await page.getByRole("tab", { name: "Ask" }).click();
-  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a');
   check(/no record/i.test(await page.locator(".qa:has-text('What did Alex promise me?') .a").innerText()), "'What did Alex promise me?' now answers that there is no record");
-  await page.getByRole("button", { name: "What colour is the awning at Luna Taqueria?" }).click();
+  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "What colour is the awning at Luna Taqueria?" }).click();
   await page.waitForSelector('.qa:has-text("awning") .a:has-text("green")');
   check(true, "the awning (supported by the sign photo) is still answered");
-  await page.locator("details.facts summary").click();
-  const table = await page.locator("details.facts table").innerText();
-  check(!/recommended|committed to|said/.test(table) && /met with/.test(table), "facts table: no conversation facts left, 'met with' remains");
+  await page.getByRole("tab", { name: "Facts" }).click();
+  const table = await page.locator("#panel-facts .fact-list").allInnerTexts().then((t) => t.join(" "));
+  check(!/recommended|committed to|said/.test(table) && /met with/.test(table), "facts tab: no conversation facts left, 'met with' remains");
 
   // Theme.
-  await page.emulateMedia({ colorScheme: "dark" });
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
   await page.waitForTimeout(600);
+  check(await page.evaluate(() => document.documentElement.getAttribute("data-theme")) === "dark", "the Dark switch sets the dark appearance");
   await audit(page, "dark theme");
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+  await page.waitForSelector("text=Your memory at a glance");
+  await page.waitForSelector("text=Latest forgetting", { timeout: 10000 });
+  check(await page.locator("text=7/7").isVisible(), "dashboard shows the latest forgetting with 7/7 leak checks");
 
   check(problems.length === 0, `no console errors or warnings${problems.length ? ": " + problems.join(" | ") : ""}`);
   await browser.close();

@@ -292,6 +292,7 @@ cd backend && . .venv/bin/activate && python -m pytest -q                       
 | `Address already in use` on 8000 or 5173 | Another server holds the port. Stop it, or run on another port: `uvicorn app.main:app --port 8001` (and update the proxy in `frontend/vite.config.ts`). |
 | `python3 -m venv` fails | On Debian/Ubuntu: `sudo apt install python3-venv`. |
 | Web UI says backend "unreachable" | `make api` is not running, or it is on another port. |
+| `tests/test_replay_recall.py` errors on a different OS or CPU (`no recorded response`) | Known: the recordings replay only where search ranking matches the machine they were recorded on. Fix on branch `bug/replay-portability` (needs a re-recording with a key); see `docs/HANDOFF.md` section 8. |
 | The UI says "That question isn't in the recording" | Replay mode only answers recorded questions: use an example chip, or switch to live mode. |
 | The graph looks crowded | Set **Facts** to "related", or press **Tidy up**; the "All facts as a table" section lists everything. |
 | `make test` fails right after you edited a prompt | Expected; see re-recording above. |

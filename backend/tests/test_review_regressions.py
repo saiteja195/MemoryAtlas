@@ -339,3 +339,131 @@ def test_the_graph_probe_catches_episode_metadata_from_a_revoked_source():
     w.conn.execute("UPDATE entities SET attrs=? WHERE entity_id=?", (json.dumps(attrs), eid))
     result = probes.graph_support(w.conn, [])
     assert result.status == "fail" and result.detail["episode_metadata_from_removed_sources"] >= 1
+
+
+# ------------------------------------------------------------------------------------------
+# 5. Databases written before these fixes are upgraded, not trusted
+# ------------------------------------------------------------------------------------------
+
+from app import migrate  # noqa: E402
+
+
+def as_written_before(w):
+    """Put a database back into the shape the first release left it: no consent rows, and
+    episodes that carry only their bounds."""
+    w.conn.execute("DELETE FROM source_consents")
+    for e in w.conn.execute("SELECT entity_id, attrs FROM entities WHERE type='episode'").fetchall():
+        a = json.loads(e["attrs"])
+        a.pop("contrib", None)
+        w.conn.execute("UPDATE entities SET attrs=? WHERE entity_id=?", (json.dumps(a), e["entity_id"]))
+    w.conn.commit()
+
+
+def test_upgrade_ties_every_line_of_an_old_recording_to_all_its_participants():
+    w, g_me, g_alex = conversation_world()
+    as_written_before(w)
+    assert migrate.backfill_source_consents(w.conn) == 2
+    for (sid,) in w.conn.execute("SELECT source_id FROM sources").fetchall():
+        granted = {x[0] for x in w.conn.execute("SELECT grant_id FROM source_consents WHERE source_id=?", (sid,))}
+        assert granted == {g_me, g_alex}
+    assert migrate.backfill_source_consents(w.conn) == 0            # idempotent
+
+
+def test_after_upgrade_an_old_recording_disappears_when_the_other_participant_withdraws():
+    w, g_me, g_alex = conversation_world()
+    as_written_before(w)
+    migrate.upgrade(w.conn)
+    receipt = w.revoke(g_alex)
+    assert receipt["removed"]["sources_blanked"] == 2 and w.active() == 0   # the owner's lines too
+    assert w.conn.execute("SELECT COUNT(*) FROM claims").fetchone()[0] == 0
+
+
+def test_upgrade_leaves_notes_on_their_own_grant_only():
+    w = World()
+    g, other = w.grant("me", "s1"), w.grant("alex", "s1")
+    w.note("s1", "2026-10-29T10:00:00", "hello there")
+    w.conn.execute("DELETE FROM source_consents")
+    migrate.upgrade(w.conn)
+    assert [x[0] for x in w.conn.execute("SELECT grant_id FROM source_consents")] == [g]
+
+
+def test_connecting_to_an_old_database_file_upgrades_it(tmp_path):
+    path = str(tmp_path / "old.db")
+    conn = db.connect(path)
+    conn.execute("INSERT INTO consent_grants(grant_id, grantor, scope, scope_ref, purposes, token_hash, granted_at)"
+                 " VALUES ('g1','me','capture_session','s','[\"personal_recall\"]','h','t'),"
+                 "        ('g2','alex','capture_session','s','[\"personal_recall\"]','h','t')")
+    conn.execute("INSERT INTO sources(source_id, kind, session_id, grant_id, captured_at, ingested_at, text, content_hash)"
+                 " VALUES ('old','transcript_segment','s','g1','2026-10-29T10:00:00','t','Me: hi','h')")
+    conn.commit()
+    conn.close()
+    again = db.connect(path)
+    assert {r[0] for r in again.execute("SELECT grant_id FROM source_consents WHERE source_id='old'")} == {"g1", "g2"}
+
+
+def test_an_old_episode_forgets_revoked_location_and_time_even_though_it_had_no_provenance():
+    w, ga, gb = episode_world()
+    as_written_before(w)                                # the revocation below meets a legacy episode
+    w.revoke(ga)
+    (ep,) = episode_nodes(w)
+    assert ep["attrs"]["lat"] is None and ep["attrs"]["start"] == "2026-10-29T10:10:00"
+    assert ep["name"] == "Episode 10:10" and ep["id"].endswith("1010")
+    assert not any("10:00" in r[0] for r in w.conn.execute("SELECT text FROM claims"))
+
+
+def test_upgrade_gives_old_episodes_a_provenance_list_built_from_their_sources():
+    w, ga, gb = episode_world()
+    as_written_before(w)
+    assert migrate.backfill_episode_provenance(w.conn) == 1
+    (e,) = w.conn.execute("SELECT attrs FROM entities WHERE type='episode'").fetchall()
+    contrib = json.loads(e[0])["contrib"]
+    assert sorted(c["start"] for c in contrib) == ["2026-10-29T10:00:00", "2026-10-29T10:10:00"]
+    assert any(c["lat"] == 37.1234 for c in contrib)
+    assert migrate.backfill_episode_provenance(w.conn) == 0
+
+
+def test_metadata_left_behind_by_an_earlier_version_is_corrected_by_the_next_forgetting():
+    """An old revocation already ran and left the first source's place and time on the episode."""
+    w, ga, gb = episode_world()
+    w.revoke(ga)
+    (eid,) = [r[0] for r in w.conn.execute("SELECT entity_id FROM entities WHERE type='episode'")]
+    stale = {"start": "2026-10-29T10:00:00", "end": "2026-10-29T10:10:00", "lat": 37.1234, "lon": -122.5678}
+    w.conn.execute("UPDATE entities SET attrs=? WHERE entity_id=?", (json.dumps(stale), eid))
+    migrate.upgrade(w.conn)
+    assert probes.graph_support(w.conn, []).status == "fail"        # never a quiet pass
+    gc = w.grant("me", "C")
+    w.note("C", "2026-10-29T15:00:00", "unrelated")
+    w.revoke(gc)                                                    # any later forgetting repairs it
+    (ep,) = [n for n in episode_nodes(w)]
+    assert ep["attrs"]["lat"] is None and ep["attrs"]["start"] == "2026-10-29T10:10:00"
+    assert probes.graph_support(w.conn, []).status == "pass"
+
+
+def test_the_graph_probe_never_passes_an_episode_with_no_provenance():
+    w, ga, gb = episode_world()
+    as_written_before(w)
+    result = probes.graph_support(w.conn, [])
+    assert result.status == "fail" and result.detail["episode_metadata_from_removed_sources"] == 1
+
+
+def test_a_calendar_events_end_time_survives_the_rebuild():
+    rule = [claim("Me", "attended", "Standup", object_type="org", text="Me attended Standup")]
+    w = World(rules=[("Standup", rule)])
+    w.grant("me", "s1")
+    w.engine.ingest(RawCapture(kind="calendar", session_id="s1", captured_at="2026-10-29T09:00:00",
+                               ends_at="2026-10-29T09:45:00", text="Standup"))
+    as_written_before(w)
+    migrate.upgrade(w.conn)
+    (e,) = w.conn.execute("SELECT attrs FROM entities WHERE type='episode'").fetchall()
+    (c,) = json.loads(e[0])["contrib"]
+    assert c["start"] == "2026-10-29T09:00:00" and c["end"] == "2026-10-29T09:45:00"
+
+
+def test_an_episode_whose_only_source_produced_no_claims_is_removed_with_that_source():
+    w = World()                                         # the model extracts nothing from this note
+    g = w.grant("me", "s1")
+    w.note("s1", "2026-10-29T15:00:00", "just a place", lat=37.1, lon=-122.5)
+    assert w.conn.execute("SELECT COUNT(*) FROM entities WHERE type='episode'").fetchone()[0] == 1
+    w.revoke(g)
+    assert w.conn.execute("SELECT COUNT(*) FROM entities WHERE type='episode'").fetchone()[0] == 0
+    assert probes.graph_support(w.conn, []).status == "pass"

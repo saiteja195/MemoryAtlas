@@ -1,6 +1,6 @@
 import cytoscape, { type ElementDefinition } from "cytoscape";
 import fcose from "cytoscape-fcose";
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { buildStylesheet } from "../utils/graphStyle";
 import { claimIdOfFact, type Selection } from "../utils/graph";
 import { prefersReducedMotion, type Palette } from "../utils/theme";
@@ -42,6 +42,7 @@ export const GraphView = forwardRef<GraphHandle, Props>(function GraphView(props
   const kindRef = useRef(props.layoutKind);
   kindRef.current = props.layoutKind;
   const last = useRef({ dataKey: -1, viewKey: "" });
+  const [tip, setTip] = useState<{ x: number; y: number; title: string; sub: string } | null>(null);
   const onSelect = useRef(props.onSelect);
   onSelect.current = props.onSelect;
   // `apply` can run after a fade-out animation, so it must read the newest props, not the ones
@@ -73,6 +74,37 @@ export const GraphView = forwardRef<GraphHandle, Props>(function GraphView(props
       if (claimId) return onSelect.current({ kind: "claim", id: claimId });
       if (el.isNode()) return onSelect.current({ kind: "entity", id: el.id() });
     });
+
+    // Hover: light up the thing under the pointer and what it touches; show what it is.
+    const describe = (el: cytoscape.SingularElementReturnValue) => {
+      const full = el.data("full") as string | undefined;
+      const type = el.data("type") as string | undefined;
+      const isEdge = el.group() === "edges";
+      if (isEdge) return { title: String(el.data("label") ?? ""), sub: el.hasClass("link") ? "Same person across moments" : "Fact · click for its source" };
+      if (el.hasClass("episode")) return { title: String(el.data("label") ?? "").split("\n")[0], sub: "Moment · click to open" };
+      if (full) return { title: full, sub: "Detail · click for its source" };
+      return { title: String(el.data("label") ?? ""), sub: `${type ?? "Item"} · click to explore` };
+    };
+    cy.on("mouseover", "node, edge", (evt) => {
+      const el = evt.target as cytoscape.SingularElementReturnValue;
+      if (box.current) box.current.style.cursor = "pointer";
+      if (!latest.current.highlight) {
+        const near = el.group() === "nodes" ? (el as cytoscape.NodeSingular).closedNeighborhood() : (el as cytoscape.EdgeSingular).connectedNodes().union(el);
+        cy.elements().not(near).addClass("dim");
+      }
+      const p = evt.renderedPosition ?? el.renderedPosition();
+      setTip({ x: p.x, y: p.y, ...describe(el) });
+    });
+    cy.on("mousemove", "node, edge", (evt) => {
+      const p = evt.renderedPosition;
+      if (p) setTip((t) => (t ? { ...t, x: p.x, y: p.y } : t));
+    });
+    cy.on("mouseout", "node, edge", () => {
+      if (box.current) box.current.style.cursor = "";
+      cy.elements().removeClass("dim");
+      setTip(null);
+    });
+    cy.on("grab", () => { if (box.current) box.current.style.cursor = "grabbing"; setTip(null); });
     return () => { window.clearTimeout(settle.current); cy.destroy(); cyRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -164,10 +196,21 @@ export const GraphView = forwardRef<GraphHandle, Props>(function GraphView(props
     return () => window.clearTimeout(t);
   }, [props.pulse]);
 
-  return <div ref={box} className="graph-canvas" role="img" aria-label={props.label} />;
+  return (
+    <>
+      <div ref={box} className="graph-canvas" role="img" aria-label={props.label} />
+      {tip && (
+        <div className="graph-tip" aria-hidden="true"
+             style={{ left: tip.x, top: tip.y, transform: `translate(${tip.x > 260 ? "calc(-100% - 14px)" : "14px"}, ${tip.y < 70 ? "14px" : "calc(-100% - 10px)"})` }}>
+          <strong>{tip.title}</strong>
+          <span>{tip.sub}</span>
+        </div>
+      )}
+    </>
+  );
 });
 
-const MAX_FIT_ZOOM = 1.25;
+const MAX_FIT_ZOOM = 1.5;
 
 /** Fit everything in view, but never blow a small graph up to giant labels. */
 function fitCapped(cy: cytoscape.Core, reduced: boolean) {
@@ -231,7 +274,7 @@ function runLayout(
   const layout = cy.layout({
     name: "fcose", quality: "default", randomize: o.fresh, animate: !o.reduced,
     animationDuration: 450, fit: false, padding: 40, nodeDimensionsIncludeLabels: true,
-    nodeRepulsion: () => 8500, idealEdgeLength: () => 100, edgeElasticity: () => 0.45, nodeSeparation: 105,
+    nodeRepulsion: () => 7000, idealEdgeLength: () => 95, edgeElasticity: () => 0.5, nodeSeparation: 80,
     fixedNodeConstraint: fixed.length >= 2 ? fixed : undefined,
     stop: () => {
       cy.nodes().forEach((n) => { n.scratch("placed", true); });

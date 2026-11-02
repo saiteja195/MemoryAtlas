@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { Answer, LlmMode } from "../api/types";
 import { clock } from "../utils/graph";
 import { EvidenceChip } from "./Badges";
+import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "../utils/suggest";
 
 export type QA = {
   id: number;
@@ -9,18 +10,6 @@ export type QA = {
   answer?: Answer;
   error?: { text: string; notRecorded: boolean };
 };
-
-const BEFORE = [
-  "Which restaurant did Alex recommend when we met near the office?",
-  "Where is my wallet?",
-  "Did I leave my wallet at the café?",
-];
-const AFTER = [
-  "What did Alex promise me?",
-  "Which restaurant did Alex recommend when we met near the office?",
-  "What colour is the awning at Luna Taqueria?",
-  "Did I have a meeting with Alex?",
-];
 
 type Props = {
   qas: QA[];
@@ -45,37 +34,63 @@ export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }:
     const text = q.trim();
     if (text.length >= 3 && !asking) { onAsk(text); setQ(""); }
   };
-  const examples = forgotten ? AFTER : BEFORE;
+  const groups = forgotten ? AFTER_GROUPS : BEFORE_GROUPS;
+  const replay = mode === "replay";
+  const typed = q.trim();
+  // In replay mode a free-form question probably has no recording: offer the nearest ones while typing.
+  const near = replay && typed.length >= 3 && !isKnown(typed, groups) ? suggest(typed, groups) : [];
 
   return (
     <>
       <form className="ask-form" onSubmit={submit}>
         <label className="sr-only" htmlFor="question">Ask about your day</label>
         <input id="question" type="text" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off"
-               placeholder="Ask about your day…" maxLength={500} />
-        <button type="submit" className="btn primary" disabled={asking || q.trim().length < 3}>{asking ? "Thinking…" : "Ask"}</button>
+               placeholder={replay ? "Pick a question below, or type one…" : "Ask about your day…"} maxLength={500}
+               aria-describedby={replay ? "ask-mode-note" : undefined} />
+        <button type="submit" className="btn primary" disabled={asking || typed.length < 3}>{asking ? "Thinking…" : "Ask"}</button>
       </form>
-      <div className="examples" role="group" aria-label="Example questions">
-        {examples.map((ex) => (
-          <button type="button" key={ex} disabled={asking} onClick={() => onAsk(ex)}>{ex}</button>
+
+      {near.length > 0 && (
+        <div className="nearby" role="group" aria-label="Questions with recorded answers">
+          <p className="small muted">Closest questions with a recorded answer</p>
+          {near.map((n) => (
+            <button type="button" key={n} disabled={asking} onClick={() => { setQ(""); onAsk(n); }}>{n}</button>
+          ))}
+        </div>
+      )}
+
+      {replay && (
+        <p className="mode-note small" id="ask-mode-note">
+          <span className="chip warn">Replay mode</span>
+          <span>
+            This demo answers a fixed set of questions from recordings, so it works offline. To ask anything, run
+            with a live key (<a href="https://github.com/saiteja195/MemoryAtlas/blob/main/docs/LOCAL_SETUP.md#4-model-modes" target="_blank" rel="noopener">how</a>).
+          </span>
+        </p>
+      )}
+
+      <div className="prompt-groups" role="group" aria-label="Example questions">
+        {groups.map((g) => (
+          <details key={g.title} className="prompt-group" open>
+            <summary><strong>{g.title}</strong><span className="muted small">{g.hint}</span></summary>
+            <div className="examples">
+              {g.prompts.map((ex) => (
+                <button type="button" key={ex} disabled={asking} onClick={() => onAsk(ex)}>{ex}</button>
+              ))}
+            </div>
+          </details>
         ))}
       </div>
-      {mode === "replay" && (
-        <p className="small muted">Replay mode answers recorded questions only. The examples above are all recorded.</p>
-      )}
 
       <div className="thread" aria-live="off">
         {asking && <progress aria-label="Looking through your memories" />}
         {qas.map((qa) => (
           <article className={`card qa ${qa.answer?.status ?? ""}`} key={qa.id} aria-label={`Question: ${qa.question}`}>
             <p className="q">{qa.question}</p>
-            {qa.error && (
-              <div className="notice warn" role="alert">
-                {qa.error.notRecorded
-                  ? "That question isn't in the recording. In replay mode only recorded questions can be answered: try one of the examples, or run with a live key."
-                  : qa.error.text}
-              </div>
+            {qa.error && qa.error.notRecorded && (
+              <NotRecorded question={qa.question} groups={groups} disabled={asking} onAsk={onAsk} />
             )}
+            {qa.error && !qa.error.notRecorded && <div className="notice error" role="alert">{qa.error.text}</div>}
             {qa.answer && <Answered a={qa.answer} onCite={onCite} onWhy={onWhy} />}
           </article>
         ))}
@@ -111,5 +126,27 @@ function Answered({ a, onCite, onWhy }: { a: Answer; onCite: (id: string) => voi
         </div>
       )}
     </>
+  );
+}
+
+/** Replay mode could not answer. Say why in plain words and put the nearest answerable questions one tap away. */
+function NotRecorded({ question, groups, disabled, onAsk }: {
+  question: string; groups: typeof BEFORE_GROUPS; disabled: boolean; onAsk: (q: string) => void;
+}) {
+  const close = suggest(question, groups);
+  const fallback = groups[0].prompts.slice(0, 2);
+  const options = close.length ? close : fallback;
+  return (
+    <div className="not-recorded" role="status">
+      <p><strong>No recording for that question.</strong></p>
+      <p className="small muted">
+        Replay mode only answers questions that were recorded, and recordings depend on how far the day has played.
+        Nothing is wrong with your memory.
+      </p>
+      <p className="small muted">{close.length ? "Closest questions that do have an answer:" : "Try one of these instead:"}</p>
+      <div className="examples">
+        {options.map((o) => <button type="button" key={o} disabled={disabled} onClick={() => onAsk(o)}>{o}</button>)}
+      </div>
+    </div>
   );
 }
