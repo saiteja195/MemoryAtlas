@@ -93,6 +93,7 @@ def graph_support(conn: sqlite3.Connection, removed_entity_ids: list[str]) -> Pr
         a = json.loads(e["attrs"] or "{}")
         contrib = a.get("contrib")
         if not contrib:
+            stale_episodes += 1                  # no record of where its time and place came from
             continue
         stale = any(c["source_id"] is not None and c["source_id"] not in live for c in contrib)
         stale = stale or any(a.get(k) != v for k, v in episode_extent(contrib).items())

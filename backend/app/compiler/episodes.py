@@ -6,6 +6,7 @@ the extent by their duration. Otherwise it starts a new episode.
 """
 import json
 import math
+import re
 import sqlite3
 from datetime import datetime, timedelta
 
@@ -45,6 +46,41 @@ def episode_extent(contrib: list[dict]) -> dict:
             "lat": located["lat"] if located else None, "lon": located["lon"] if located else None}
 
 
+_CAL_SPAN = re.compile(r"(\d{2}:\d{2})-(\d{2}:\d{2})\.")
+
+
+def reconstruct_contrib(conn: sqlite3.Connection, episode_id: str, attrs: dict,
+                        fallback: bool = True) -> list[dict]:
+    """Provenance for an episode that was written before `contrib` existed: one entry per source
+    that stands behind a claim in the episode. Anything the old bounds held that no such source
+    explains (an observation that produced no claims, a source already gone) is dropped rather
+    than kept on trust, so the episode can only be as precise as what can still be traced. With
+    `fallback`, an episode nothing traces to keeps what it holds, as one entry with no source."""
+    entries = []
+    for r in conn.execute(
+            "SELECT DISTINCT s.source_id, s.kind, s.captured_at, s.text, s.lat, s.lon FROM claims c"
+            " JOIN justifications j ON j.claim_id=c.claim_id AND j.kind='source'"
+            " JOIN sources s ON s.source_id=j.source_id WHERE c.episode_id=?"
+            " ORDER BY s.captured_at, s.source_id", (episode_id,)):
+        start = datetime.fromisoformat(r["captured_at"])
+        end = start
+        span = _CAL_SPAN.search(r["text"] or "") if r["kind"] == "calendar_event" else None
+        if span:
+            end = max(start, datetime.combine(start.date(), datetime.strptime(span.group(2), "%H:%M").time()))
+        entries.append({"source_id": r["source_id"], "start": start.isoformat(), "end": end.isoformat(),
+                        "lat": r["lat"], "lon": r["lon"]})
+    if entries:
+        return entries
+    times = [r[0] for r in conn.execute(
+        "SELECT event_time FROM claims WHERE episode_id=? AND event_time IS NOT NULL", (episode_id,))]
+    if times:
+        return [{"source_id": None, "start": min(times), "end": max(times), "lat": None, "lon": None}]
+    if not fallback:
+        return []
+    return [{"source_id": None, "start": attrs["start"], "end": attrs["end"],
+            "lat": attrs.get("lat"), "lon": attrs.get("lon")}]
+
+
 def episode_id_for(start: datetime) -> str:
     return f"episode:{start:%Y%m%d-%H%M}"
 
@@ -76,10 +112,9 @@ def bind_episode(conn: sqlite3.Connection, obs: Observation) -> str:
         return eid
     _, row, a = best
     # `contrib` records which observation supplied which time and place, so the episode can be
-    # recomputed from what remains if one of them is forgotten. Older rows without it get one
-    # entry standing for what they already held.
-    contrib = a.get("contrib") or [{"source_id": None, "start": a["start"], "end": a["end"],
-                                    "lat": a.get("lat"), "lon": a.get("lon")}]
+    # recomputed from what remains if one of them is forgotten. Older rows without it are
+    # rebuilt from the sources behind their claims.
+    contrib = a.get("contrib") or reconstruct_contrib(conn, row["entity_id"], a)
     contrib = [*contrib, entry]
     a = {**episode_extent(contrib), "contrib": contrib}
     conn.execute("UPDATE entities SET name=?, attrs=? WHERE entity_id=?",

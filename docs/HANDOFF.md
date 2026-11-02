@@ -160,6 +160,14 @@ on `bug/revocation-review-fixes`, each with a regression test in `backend/tests/
 3. earlier receipts kept the text of a fact that a later revocation forgot;
 4. an episode kept the location, time and id of a source that was revoked.
 
+**Databases written before these fixes** are upgraded on connect (`backend/app/migrate.py`, idempotent):
+sources with no `source_consents` rows get them (a note: its own grant; a recorded line: its own grant plus
+every standing grant for its session, because the silent participants were never stored, so a wrong guess
+errs towards removing), and episodes with no `contrib` get one rebuilt from the sources behind their claims
+(calendar end times are read back from the event text). Bounds that no remaining source explains are
+corrected at the next forgetting, an episode whose only source produced no claims is removed with it, and
+the graph probe fails, never passes, an episode that has no provenance or whose bounds disagree with it.
+
 **Still open: replay portability.** The recorded recall responses replay only on a machine whose float
 arithmetic matches the one they were recorded on (the reviewer saw 10 setup errors in
 `tests/test_replay_recall.py` on macOS arm64). Cause: search ranking used float32 cosine, whose near-ties
