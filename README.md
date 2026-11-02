@@ -10,7 +10,21 @@ MemoryAtlas turns temporary, consented observations (what you see, hear, where y
 
 Built for the Meta AI Developer Hackathon (Indie Developer track) with Meta's Muse models.
 
-**Status:** planning. See [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
+**Status:** the memory engine works end to end: capture, claims graph, cross-source recall, self-correction and
+verifiable forgetting (with a receipt of 7 automated leak checks). The graph UI, evaluation and submission are
+still to do; see the open issues and [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
+
+## Run it locally
+
+No API key needed (it replays recorded model responses):
+
+```bash
+make setup
+make test
+make dev
+```
+
+Full guide, including the copy-and-paste demo and live mode: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
 
 ## Contributing
 
