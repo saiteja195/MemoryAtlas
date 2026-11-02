@@ -3,7 +3,7 @@ import { api, ApiError } from "./api/client";
 import { AnnouncerProvider, useAnnounce } from "./hooks/announce";
 import { useAtlas } from "./hooks/useAtlas";
 import {
-  atTime, buildElements, claimIdOfFact, describeGraph, episodeOptions, moments as momentsOf,
+  atTime, buildElements, claimIdOfFact, dayCards, describeGraph, episodeOptions, moments as momentsOf,
   pathElementIds, relatedFactClaims, type FactMode, type Selection, type ViewMode,
 } from "./utils/graph";
 import { readPalette, watchColorScheme, type Palette } from "./utils/theme";
@@ -12,7 +12,8 @@ import { ConsentDevice } from "./components/ConsentDevice";
 import { ConsentPanel } from "./components/ConsentPanel";
 import { Dialog } from "./components/Dialog";
 import { EvidenceDrawer } from "./components/Evidence";
-import { FactsTable } from "./components/FactsTable";
+import { DayOverview } from "./components/DayOverview";
+import { FactsPanel } from "./components/FactsPanel";
 import { GraphView, type GraphHandle } from "./components/GraphView";
 import { Header } from "./components/Header";
 import { HowItWorks } from "./components/HowItWorks";
@@ -43,8 +44,8 @@ export function App() {
   );
 }
 
-type Tab = "ask" | "consent";
-const TABS: { id: Tab; label: string }[] = [{ id: "ask", label: "Ask" }, { id: "consent", label: "Consent" }];
+type Tab = "ask" | "facts" | "consent";
+const TABS: { id: Tab; label: string }[] = [{ id: "ask", label: "Ask" }, { id: "facts", label: "Facts" }, { id: "consent", label: "Consent" }];
 
 function Atlas() {
   const atlas = useAtlas();
@@ -99,6 +100,7 @@ function Atlas() {
   }, [focus, selection, view]);
   const selectedId = selection ? selection.id : null;
   const episodes = useMemo(() => episodeOptions(atlas.graph), [atlas.graph]);
+  const cards = useMemo(() => dayCards(view), [view]);
   const forgotten = atlas.grants.some((g) => g.revoked_at);
 
   // --- timeline playback ----------------------------------------------------------------------
@@ -218,62 +220,75 @@ function Atlas() {
 
           <div className="toolbar" role="toolbar" aria-label="Graph view">
             <div className="seg" role="group" aria-label="View">
-              <button type="button" aria-pressed={mode === "episodes"} onClick={() => { setMode("episodes"); setEpisode(null); }}>Episodes</button>
-              <button type="button" aria-pressed={mode === "entities"} onClick={() => setMode("entities")}>Details</button>
+              <button type="button" aria-pressed={mode === "episodes"} onClick={() => { setMode("episodes"); setEpisode(null); }}>Day</button>
+              <button type="button" aria-pressed={mode === "entities"} onClick={() => setMode("entities")}>Map</button>
             </div>
             {mode === "entities" && (
               <>
-                <label className="sr-only" htmlFor="episode">Show one episode</label>
+                <label className="sr-only" htmlFor="episode">Show one moment</label>
                 <select id="episode" value={episode ?? ""} onChange={(e) => setEpisode(e.target.value || null)}>
-                  <option value="">All episodes</option>
+                  <option value="">All moments</option>
                   {episodes.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
                 <label className="sr-only" htmlFor="facts">Facts shown as boxes</label>
                 <select id="facts" value={factChoice} onChange={(e) => setFactChoice(e.target.value as typeof factChoice)}
-                        title="Facts are details such as what was said or a colour">
-                  <option value="related">Facts: related</option>
-                  <option value="all">Facts: all</option>
-                  <option value="off">Facts: off</option>
+                        title="Details are small facts such as what was said or a colour">
+                  <option value="related">Details: for what I select</option>
+                  <option value="all">Details: show all</option>
+                  <option value="off">Details: hide</option>
                 </select>
               </>
             )}
-            <label className="check"><input type="checkbox" checked={showHistory} onChange={(e) => setShowHistory(e.target.checked)} /> History</label>
+            {mode === "entities" && <label className="check" title="Show facts that newer evidence replaced"><input type="checkbox" checked={showHistory} onChange={(e) => setShowHistory(e.target.checked)} /> Show history</label>}
             <span className="spacer" />
             {mode === "entities" && (
               <button type="button" className="btn small" onClick={() => graphRef.current?.tidy()}
-                      title="Re-arrange the graph so nothing overlaps">Tidy up</button>
+                      title="Re-arrange the map so nothing overlaps">Tidy up</button>
             )}
             {(focus || selection) && (
               <button type="button" className="btn small" onClick={() => { setFocus(null); setSelection(null); }}>Clear focus</button>
             )}
-            <div className="seg" role="group" aria-label="Zoom">
+            {mode === "entities" && <div className="seg" role="group" aria-label="Zoom">
               <button type="button" aria-label="Zoom out" onClick={() => graphRef.current?.zoomOut()}>−</button>
               <button type="button" onClick={() => graphRef.current?.fit()}>Fit</button>
               <button type="button" aria-label="Zoom in" onClick={() => graphRef.current?.zoomIn()}>+</button>
-            </div>
+            </div>}
           </div>
 
-          <figure className="graph-figure">
-            {palette && (
+          <figure className={`graph-figure ${mode === "episodes" ? "is-day" : ""}`}>
+            <div className="graph-stage">
+            {mode === "entities" && palette && (
               <GraphView
                 ref={graphRef} elements={elements} palette={palette} highlight={highlight} selectedId={selectedId}
                 pulse={atlas.pulse} dataKey={atlas.dataKey} viewKey={`${mode}|${episode}`}
-                layoutKind={mode === "episodes" ? "timeline" : "force"}
-                label={describeGraph(view)} onSelect={onSelect}
+                layoutKind="force" label={describeGraph(view)} onSelect={onSelect}
               />
             )}
-            {atlas.loaded && elements.length === 0 && scrubAt === null && (
+            {mode === "entities" && elements.length > 0 && !selection && (
+              <p className="graph-hint">Hover to trace connections · click anything for details · drag to move around</p>
+            )}
+            {mode === "entities" && selection && (
+              <SelectionCard full={atlas.graph} view={view} selection={selection}
+                             onSelect={(s) => { setSelection(s); setFocus(null); }} onWhy={why}
+                             onOpenEpisode={openEpisode} onClose={() => { setSelection(null); setFocus(null); }} />
+            )}
+            </div>
+            {mode === "episodes" && cards.length > 0 && (
+              <DayOverview cards={cards} selectedId={selection?.kind === "episode" ? selection.id : null}
+                           onSelect={(id) => setSelection({ kind: "episode", id })} onOpenInMap={openEpisode} />
+            )}
+            {atlas.loaded && view.edges.length === 0 && scrubAt === null && (
               <Welcome disabled={atlas.busy !== null} offline={atlas.offline}
                        onPlayDay={() => void atlas.advance(50)} onStep={() => void atlas.advance(1)} />
             )}
-            {atlas.loaded && elements.length === 0 && scrubAt !== null && (
+            {atlas.loaded && view.edges.length === 0 && scrubAt !== null && (
               <div className="graph-empty">
                 <strong>Nothing had happened yet</strong>
                 <span>Move the timeline forward.</span>
               </div>
             )}
-            <figcaption className="sr-only">{describeGraph(view)} A table with the same facts follows.</figcaption>
-            <Legend />
+            <figcaption className="sr-only">{describeGraph(view)} The Facts tab lists the same facts as text.</figcaption>
+            {mode === "entities" && <Legend />}
           </figure>
 
           <Timeline
@@ -281,9 +296,6 @@ function Atlas() {
             onIndex={(i) => { setPlaying(false); setScrubAt(i === null ? null : moments[i]); }}
             onTogglePlay={togglePlay} onJump={jumpTo}
           />
-
-          <SelectionCard full={atlas.graph} view={view} selection={selection} onSelect={(s) => { setSelection(s); setFocus(null); }} onWhy={why} onOpenEpisode={openEpisode} />
-          <FactsTable view={view} selectedClaim={selection?.kind === "claim" ? selection.id : null} onSelect={(id) => { setSelection({ kind: "claim", id }); setFocus(null); }} />
         </main>
 
         <aside className="side" aria-label="Ask and consent">
@@ -291,6 +303,9 @@ function Atlas() {
           <div role="tabpanel" id="panel-ask" aria-labelledby="tab-ask" hidden={tab !== "ask"} tabIndex={0}>
             <AskPanel qas={qas} asking={asking} forgotten={forgotten} mode={atlas.health?.llm_mode}
                       onAsk={(q) => void ask(q)} onCite={cite} onWhy={why} />
+          </div>
+          <div role="tabpanel" id="panel-facts" aria-labelledby="tab-facts" hidden={tab !== "facts"} tabIndex={0}>
+            <FactsPanel view={view} selectedClaim={selection?.kind === "claim" ? selection.id : null} onSelect={cite} />
           </div>
           <div role="tabpanel" id="panel-consent" aria-labelledby="tab-consent" hidden={tab !== "consent"} tabIndex={0}>
             <ConsentPanel grants={atlas.grants} onSimulate={setSimulate} onReceipt={(id) => void openReceipt(id)} />

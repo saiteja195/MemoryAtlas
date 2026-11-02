@@ -323,8 +323,66 @@ export function relatedFactClaims(view: Graph, focusClaims: string[] | null, ent
 
 export type FactRow = {
   id: string; subject: string; relation: string; object: string; evidence: string;
-  status: ClaimStatus; when: string; sources: string;
+  status: ClaimStatus; when: string; sources: string; predicate: string; inferred: boolean;
 };
+
+export type FactCategory = "people" | "places" | "details" | "inferred";
+export const CATEGORY_INFO: Record<FactCategory, { title: string; hint: string }> = {
+  people: { title: "People & conversations", hint: "Who you met, what was said and promised" },
+  places: { title: "Places & locations", hint: "Where you and your things were" },
+  details: { title: "Descriptions", hint: "Colours, signs and other details" },
+  inferred: { title: "Worked out from other facts", hint: "Not seen directly: the app connected the dots" },
+};
+export const CATEGORY_ORDER: FactCategory[] = ["people", "places", "details", "inferred"];
+
+const PEOPLE_PREDICATES = new Set(["met_with", "attended", "said", "recommended", "committed_to"]);
+const PLACE_PREDICATES = new Set(["observed_at", "located_at", "near", "across_from"]);
+
+/** Which group a fact belongs to, by what it is about. Inferred facts get their own group. */
+export function factCategory(r: Pick<FactRow, "predicate" | "inferred">): FactCategory {
+  if (r.inferred) return "inferred";
+  if (PEOPLE_PREDICATES.has(r.predicate)) return "people";
+  if (PLACE_PREDICATES.has(r.predicate)) return "places";
+  return "details";
+}
+
+export function groupFacts(rows: FactRow[]): { category: FactCategory; rows: FactRow[] }[] {
+  return CATEGORY_ORDER
+    .map((category) => ({ category, rows: rows.filter((r) => factCategory(r) === category) }))
+    .filter((g) => g.rows.length > 0);
+}
+
+export type DayCard = {
+  id: string; time: string; title: string; summary: string | null;
+  people: GraphNode[]; places: GraphNode[]; things: GraphNode[];
+  facts: number; sources: string[];
+};
+
+/** One card per episode, oldest first: the day as a list of moments, in plain words. */
+export function dayCards(view: Graph): DayCard[] {
+  const members = episodeMembers(view);
+  const alias = aliasNames(view);
+  return view.nodes
+    .filter((n) => n.type === "episode" && members.has(n.id))
+    .sort((a, b) => (a.attrs?.start ?? "").localeCompare(b.attrs?.start ?? ""))
+    .map((ep) => {
+      const ms = (members.get(ep.id) ?? []).filter((m) => m.id !== OWNER_ID && !alias.has(m.name.toLowerCase()));
+      const claims = view.edges.filter((e) => e.episode_id === ep.id && e.predicate !== "part_of_episode" && e.predicate !== "summary_of");
+      const summary = view.edges.find((e) => e.predicate === "summary_of" && e.source === ep.id && e.status !== "superseded");
+      const sources = [...new Set(claims.flatMap((c) => c.support.map((s) => sourceLabel(s.kind))))];
+      const places = ms.filter((m) => m.type === "place");
+      const people = ms.filter((m) => m.type === "person");
+      const where = places[0]?.name;
+      const title = people.length && where ? `${where} with ${people.map((p) => p.name).join(" and ")}`
+        : people.length ? `With ${people.map((p) => p.name).join(" and ")}`
+        : where ? `At ${where}` : "A moment from your day";
+      return {
+        id: ep.id, time: episodeTimeLabel(ep), title, summary: summary?.value ?? null,
+        people, places, things: ms.filter((m) => m.type !== "place" && m.type !== "person"),
+        facts: claims.length, sources,
+      };
+    });
+}
 
 export function factRows(view: Graph): FactRow[] {
   const name = new Map(view.nodes.map((n) => [n.id, n.name]));
@@ -339,6 +397,8 @@ export function factRows(view: Graph): FactRow[] {
       status: e.status,
       when: clock(e.event_time),
       sources: [...new Set(e.support.map((s) => sourceLabel(s.kind)))].join(" + "),
+      predicate: e.predicate,
+      inferred: e.evidence_type === "inference",
     }))
     .sort((a, b) => a.when.localeCompare(b.when) || a.subject.localeCompare(b.subject));
 }

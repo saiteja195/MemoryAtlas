@@ -5,24 +5,25 @@
 //   what kind of thing     -> node shape  (person circle, place rounded box, object diamond, ...)
 import type cytoscape from "cytoscape";
 import type { Palette } from "./theme";
+import { ICONS } from "./icons";
 
 type Rule = { selector: string; style: Record<string, unknown> };
 
 export function buildStylesheet(p: Palette): cytoscape.StylesheetStyle[] {
   const rules: Rule[] = [
     { selector: "node", style: {
-      width: 34, height: 34, label: "data(label)", "font-size": 12.5, "font-weight": 500, color: p.text,
-      "font-family": "system-ui, -apple-system, sans-serif", "text-valign": "bottom", "text-margin-y": 6,
+      width: 54, height: 54, label: "data(label)", "font-size": 14, "font-weight": 600, color: p.text,
+      "font-family": "system-ui, -apple-system, sans-serif", "text-valign": "bottom", "text-margin-y": 8,
       "text-wrap": "wrap", "text-max-width": 120, "background-color": p["c-fact"],
       "border-width": 3, "border-color": p.surface, "text-background-color": p.surface,
       "text-background-opacity": 0.8, "text-background-padding": 3, "transition-property": "opacity, text-opacity", "transition-duration": 160,
       "text-background-shape": "roundrectangle", "min-zoomed-font-size": 6,
     } },
-    { selector: ".type-person", style: { shape: "ellipse", "background-color": p["c-person"] } },
-    { selector: ".type-place", style: { shape: "round-rectangle", "background-color": p["c-place"], width: 34 } },
-    { selector: ".type-object", style: { shape: "diamond", "background-color": p["c-object"], width: 34, height: 34 } },
-    { selector: ".type-org", style: { shape: "hexagon", "background-color": p["c-org"] } },
-    { selector: ".type-item", style: { shape: "tag", "background-color": p["c-item"] } },
+    { selector: ".type-person", style: { shape: "ellipse", "background-color": p["c-person"], "background-image": ICONS.person, "background-fit": "none", "background-width": "56%", "background-height": "56%", "background-position-x": "50%", "background-position-y": "50%" } },
+    { selector: ".type-place", style: { shape: "round-rectangle", "background-color": p["c-place"], width: 34, "background-image": ICONS.place, "background-fit": "none", "background-width": "56%", "background-height": "56%", "background-position-x": "50%", "background-position-y": "50%" } },
+    { selector: ".type-object", style: { shape: "diamond", "background-color": p["c-object"], width: 34, height: 34, "background-image": ICONS.object, "background-fit": "none", "background-width": "56%", "background-height": "56%", "background-position-x": "50%", "background-position-y": "50%" } },
+    { selector: ".type-org", style: { shape: "hexagon", "background-color": p["c-org"], "background-image": ICONS.org, "background-fit": "none", "background-width": "56%", "background-height": "56%", "background-position-x": "50%", "background-position-y": "50%" } },
+    { selector: ".type-item", style: { shape: "tag", "background-color": p["c-item"], "background-image": ICONS.item, "background-fit": "none", "background-width": "56%", "background-height": "56%", "background-position-x": "50%", "background-position-y": "50%" } },
     { selector: ".owner", style: { "border-color": p.accent, "border-width": 3 } },
     { selector: ".fact", style: {
       shape: "round-rectangle", width: "data(w)", height: 22, "font-size": 11,
@@ -32,15 +33,15 @@ export function buildStylesheet(p: Palette): cytoscape.StylesheetStyle[] {
     } },
     { selector: ".episode", style: {
       shape: "round-rectangle", width: 190, height: 76, "text-valign": "center", "text-margin-y": 0,
-      "text-wrap": "wrap", "text-max-width": 170, "font-size": 13, "font-weight": 600,
+      "text-wrap": "wrap", "text-max-width": 170, "font-size": 14, "font-weight": 600,
       "background-color": p["surface-2"], "border-width": 2, "border-color": p["c-episode"],
       "text-background-opacity": 0,
     } },
 
     { selector: "edge", style: {
       width: 2, "curve-style": "bezier", "line-color": p["s-none"], "target-arrow-color": p["s-none"],
-      "target-arrow-shape": "triangle", "arrow-scale": 0.9, label: "data(label)", "font-size": 11,
-      color: p.muted, "text-rotation": "autorotate", "text-background-color": p.bg,
+      "target-arrow-shape": "triangle", "arrow-scale": 0.9, label: "data(label)", "font-size": 12,
+      color: p.muted, "text-rotation": "none", "text-background-color": p.bg,
       "text-background-opacity": 0.9, "text-background-padding": 2, "text-background-shape": "roundrectangle",
       "min-zoomed-font-size": 7,
     } },

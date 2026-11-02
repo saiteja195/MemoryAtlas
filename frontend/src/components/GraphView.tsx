@@ -274,7 +274,7 @@ function runLayout(
   const layout = cy.layout({
     name: "fcose", quality: "default", randomize: o.fresh, animate: !o.reduced,
     animationDuration: 450, fit: false, padding: 40, nodeDimensionsIncludeLabels: true,
-    nodeRepulsion: () => 8500, idealEdgeLength: () => 100, edgeElasticity: () => 0.45, nodeSeparation: 105,
+    nodeRepulsion: () => 7000, idealEdgeLength: () => 95, edgeElasticity: () => 0.5, nodeSeparation: 80,
     fixedNodeConstraint: fixed.length >= 2 ? fixed : undefined,
     stop: () => {
       cy.nodes().forEach((n) => { n.scratch("placed", true); });

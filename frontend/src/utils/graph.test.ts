@@ -3,7 +3,7 @@ import full from "./__fixtures__/graph-full.json";
 import after from "./__fixtures__/graph-after-revoke.json";
 import type { Graph, GraphEdge } from "../api/types";
 import {
-  atTime, buildElements, claimIdOfFact, clock, describeGraph, episodeOptions, factNodeId, factRows,
+  atTime, buildElements, claimIdOfFact, clock, dayCards, describeGraph, factCategory, groupFacts, episodeOptions, factNodeId, factRows,
   firstSeen, formatBytes, humanPredicate, moments, pathElementIds, relatedFactClaims, sourceClass, truncate,
   type ViewOptions,
 } from "./graph";
@@ -256,5 +256,22 @@ describe("text alternative", () => {
     const text = describeGraph(FULL);
     expect(text).toMatch(/^Memory graph: \d+ people, places and things across 4 episodes/);
     expect(text).toMatch(/inferred/);
+  });
+});
+
+describe("grouping facts and the day overview", () => {
+  it("puts every fact in exactly one group, with inferred facts kept apart", () => {
+    const rows = factRows(FULL);
+    const groups = groupFacts(rows);
+    expect(groups.reduce((n, g) => n + g.rows.length, 0)).toBe(rows.length);
+    expect(groups.every((g) => g.rows.every((r) => factCategory(r) === g.category))).toBe(true);
+    expect(groups.find((g) => g.category === "inferred")?.rows.every((r) => r.inferred)).toBe(true);
+  });
+
+  it("describes each episode as a card in time order", () => {
+    const cards = dayCards(FULL);
+    expect(cards.length).toBeGreaterThan(1);
+    expect([...cards].map((c) => c.time)).toEqual(cards.map((c) => c.time).sort());
+    expect(cards.every((c) => c.title.length > 0 && c.facts >= 0)).toBe(true);
   });
 });

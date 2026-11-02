@@ -8,8 +8,17 @@ const line = (stroke: string, dash?: string, w = 3, extra?: React.CSSProperties)
 /** What the picture means. Colour is never the only signal: shape, dashes and a clock back it up. */
 export function Legend() {
   return (
-    <details className="legend">
-      <summary>How to read the graph</summary>
+    <div className="legend">
+      <ul className="legend-quick" aria-label="What the symbols mean">
+        <li><span className="dot-i" style={{ background: "var(--c-person)" }}>👤</span> Person</li>
+        <li><span className="dot-i sq" style={{ background: "var(--c-place)" }}>📍</span> Place</li>
+        <li><span className="dot-i dia" style={{ background: "var(--c-object)" }}><i>◆</i></span> Thing</li>
+        <li>{line("var(--s-none)")} Seen directly</li>
+        <li>{line("var(--s-derivation)", "7 4")} Worked out</li>
+        <li>{line("var(--muted)", "2 4", 3)} Replaced</li>
+      </ul>
+    <details className="legend-more">
+      <summary>All symbols</summary>
       <ul className="legend-body">
         <li>{line("var(--s-none)")} Observed directly</li>
         <li>{line("var(--s-derivation)", "7 4")} Inferred from other facts</li>
@@ -25,5 +34,6 @@ export function Legend() {
         <li><span className="shape box" style={{ color: "var(--c-fact)", blockSize: 10 }} /> A fact about something</li>
       </ul>
     </details>
+    </div>
   );
 }

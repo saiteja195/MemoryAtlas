@@ -11,23 +11,22 @@ type Props = {
   onSelect: (s: Selection) => void;
   onWhy: (claimIds: string[]) => void;
   onOpenEpisode: (episodeId: string) => void;
+  onClose: () => void;
 };
 
-export function SelectionCard({ full, view, selection, onSelect, onWhy, onOpenEpisode }: Props) {
-  if (!selection) {
-    return (
-      <section className="card selection" aria-label="Selected item">
-        <p className="muted">Click a person, place or fact in the graph, or an answer's source, to see where it came from.</p>
-      </section>
-    );
-  }
+const TYPE_WORD: Record<string, string> = { person: "Person", place: "Place", object: "Thing", org: "Organisation", item: "Item" };
+
+export function SelectionCard({ full, view, selection, onSelect, onWhy, onOpenEpisode, onClose }: Props) {
+  if (!selection) return null;
+  const close = <button type="button" className="btn small ghost close" onClick={onClose} aria-label="Close details">✕</button>;
 
   if (selection.kind === "claim") {
     const e = view.edges.find((x) => x.id === selection.id) ?? full.edges.find((x) => x.id === selection.id);
-    if (!e) return <section className="card selection"><p className="muted">That fact is no longer in the memory.</p></section>;
+    if (!e) return <section className="inspector">{close}<p className="muted">That fact is no longer in the memory.</p></section>;
     const replacedBy = e.superseded_by ? full.edges.find((x) => x.id === e.superseded_by) : undefined;
     return (
-      <section className="card selection" aria-label="Selected fact">
+      <section className="inspector" aria-label="Selected fact">{close}
+        <p className="eyebrow">Fact</p>
         <p className="claim-text">{e.text}</p>
         <div className="row">
           <EvidenceChip evidence={e.evidence_type} />
@@ -52,8 +51,9 @@ export function SelectionCard({ full, view, selection, onSelect, onWhy, onOpenEp
     const node = full.nodes.find((n) => n.id === selection.id);
     const rows = factRows({ nodes: view.nodes, edges: view.edges.filter((e) => e.source === selection.id || e.target === selection.id) });
     return (
-      <section className="card selection" aria-label="Selected item">
-        <p className="claim-text">{node?.name ?? selection.id} <span className="chip">{node?.type}</span></p>
+      <section className="inspector" aria-label="Selected item">{close}
+        <p className="eyebrow">{TYPE_WORD[node?.type ?? ""] ?? "Item"}</p>
+        <p className="claim-text">{node?.name ?? selection.id}</p>
         {rows.length === 0 ? <p className="muted">Nothing is remembered about this yet.</p> : (
           <ul className="facts-list">
             {rows.map((r) => (
@@ -75,12 +75,13 @@ export function SelectionCard({ full, view, selection, onSelect, onWhy, onOpenEp
   const members = (episodeMembers(view).get(selection.id) ?? []).filter((m) => m.id !== OWNER_ID);
   const summary = view.edges.find((e) => e.predicate === "summary_of" && e.source === selection.id && e.status !== "superseded");
   return (
-    <section className="card selection" aria-label="Selected episode">
-      <p className="claim-text">Episode {ep ? episodeTimeLabel(ep) : ""}</p>
+    <section className="inspector" aria-label="Selected moment">{close}
+      <p className="eyebrow">Moment</p>
+      <p className="claim-text">{ep ? episodeTimeLabel(ep) : ""}</p>
       <p className="small muted">{members.length ? `With ${members.map((m) => m.name).join(", ")}` : "Just you"}</p>
       {summary?.value && <p>{summary.value}</p>}
       <div className="row">
-        <button type="button" className="btn primary small" onClick={() => onOpenEpisode(selection.id)}>Open this episode</button>
+        <button type="button" className="btn primary small" onClick={() => onOpenEpisode(selection.id)}>Open in map</button>
         {summary && <button type="button" className="btn small" onClick={() => onWhy([summary.id])}>Why this summary?</button>}
       </div>
       <p className="small muted">{humanPredicate("summary_of")} is written from the facts below it and disappears with them.</p>
