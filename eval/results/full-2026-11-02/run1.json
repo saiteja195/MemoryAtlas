@@ -1,0 +1,4457 @@
+{
+ "rows": [
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M01",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which restaurant did Alex recommend when we met near the office?",
+   "status": "answered",
+   "answer": "Alex recommended Luna Taqueria.",
+   "latency_s": 5.468,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-f74560568239"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex recommend restaurant near office"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches the reference restaurant."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M01",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which restaurant did Alex recommend when we met near the office?",
+   "status": "answered",
+   "answer": "Alex recommended Luna Taqueria, the taco place across from the office with the green awning for al pastor.",
+   "latency_s": 7.17,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "summary",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-86465783a3d5#0",
+    "src-ea538d5ae841#0",
+    "src-0a60ea1b2175#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly names Luna Taqueria."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M02",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "What was the name of the taco place Alex told me about?",
+   "status": "answered",
+   "answer": "Alex recommended Luna Taqueria.",
+   "latency_s": 4.572,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-f74560568239"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "taco place Alex told recommended",
+      "k": 10
+     },
+     "results": 10
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches the reference name."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M02",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "What was the name of the taco place Alex told me about?",
+   "status": "abstained",
+   "answer": "I have no record of the name. Alex only described it as the taco place across from the office with the green awning.",
+   "latency_s": 11.968,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-bb2479c8ddf3#0"
+   ],
+   "retrieved": [
+    "src-bb2479c8ddf3#0",
+    "summary",
+    "src-2ea135b59639#0",
+    "src-86465783a3d5#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-0a60ea1b2175#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": true,
+    "leaked": null,
+    "problems": [
+     "abstained",
+     "missing 'Luna Taqueria'"
+    ]
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "It omits the key fact Luna Taqueria."
+   },
+   "final": {
+    "correct": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M03",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Where should I go for al pastor, according to Alex?",
+   "status": "answered",
+   "answer": "According to Alex, go to Luna Taqueria — the taco place across from the office with the green awning — for the best al pastor.",
+   "latency_s": 4.12,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-f74560568239",
+    "clm-f2eaca9fa4b4"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "al pastor"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly names Luna Taqueria."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M03",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Where should I go for al pastor, according to Alex?",
+   "status": "answered",
+   "answer": "Alex recommended the taco place right across the street from the office with the green awning for its al pastor.",
+   "latency_s": 3.578,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-bb2479c8ddf3#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-86465783a3d5#0",
+    "src-5da7023e0988#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing 'Luna Taqueria'"
+    ]
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Answer omits the required name Luna Taqueria."
+   },
+   "final": {
+    "correct": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M04",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which restaurant did Alex suggest, and what colour is its awning?",
+   "status": "answered",
+   "answer": "Alex suggested Luna Taqueria, which has a green awning.",
+   "latency_s": 4.909,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-f74560568239",
+    "clm-f2eaca9fa4b4",
+    "clm-1e5ef5965d5b"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex suggest restaurant"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Matches restaurant name and awning color."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M04",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which restaurant did Alex suggest, and what colour is its awning?",
+   "status": "answered",
+   "answer": "Alex suggested Luna Taqueria, which has a green awning.",
+   "latency_s": 6.537,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "summary",
+    "src-2ea135b59639#0",
+    "src-bb2479c8ddf3#0",
+    "src-86465783a3d5#0",
+    "src-0a60ea1b2175#0",
+    "src-5da7023e0988#0",
+    "src-ea538d5ae841#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches reference on both restaurant and awning colour."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M05",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Who recommended Luna Taqueria to me?",
+   "status": "answered",
+   "answer": "Alex recommended Luna Taqueria to you.",
+   "latency_s": 3.279,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-f74560568239"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Luna Taqueria recommended"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states Alex recommended Luna Taqueria."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M05",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Who recommended Luna Taqueria to me?",
+   "status": "answered",
+   "answer": "Alex recommended Luna Taqueria to you.",
+   "latency_s": 4.742,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-86465783a3d5#0",
+    "src-ea538d5ae841#0",
+    "src-0a60ea1b2175#0",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches reference that Alex recommended it."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M06",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which restaurant, recommended by someone I met with today, has a green awning?",
+   "status": "answered",
+   "answer": "Luna Taqueria, recommended by Alex you met at the Office, is the taco place across from the office with the green awning.",
+   "latency_s": 8.396,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-f74560568239",
+    "clm-f2eaca9fa4b4",
+    "clm-78180ac45720",
+    "clm-1e5ef5965d5b"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "episodes",
+     "args": {
+      "time_from": "2026-11-02T00:00:00",
+      "time_to": "2026-11-02T23:59:59"
+     },
+     "results": 0
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "restaurant recommended",
+      "k": 10
+     },
+     "results": 10
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes Luna Taqueria matching the reference."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M06",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which restaurant, recommended by someone I met with today, has a green awning?",
+   "status": "answered",
+   "answer": "Luna Taqueria, recommended by Alex, has the green awning.",
+   "latency_s": 4.623,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-86465783a3d5#0"
+   ],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "summary",
+    "src-bb2479c8ddf3#0",
+    "src-86465783a3d5#0",
+    "src-ea538d5ae841#0",
+    "src-2ea135b59639#0",
+    "src-5da7023e0988#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "It correctly names Luna Taqueria as having the green awning."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M07",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which billboard did I see before my meeting with Alex?",
+   "status": "answered",
+   "answer": "You saw the Orbit Fitness billboard reading 'first month free' at 09:40 at the street, before your 12:30 meeting with Alex.",
+   "latency_s": 3.996,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-8df5b0dc3a39",
+    "clm-96f531753f2f",
+    "clm-a11c064887b5"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "billboard seen before meeting Alex",
+      "k": 10
+     },
+     "results": 10
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Includes Orbit Fitness, 09:40, and before 12:30 meeting with only extra detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M07",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Which billboard did I see before my meeting with Alex?",
+   "status": "answered",
+   "answer": "You saw an Orbit Fitness billboard advertising first month free.",
+   "latency_s": 4.39,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-ea538d5ae841#0",
+    "src-86465783a3d5#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-86465783a3d5#0",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-0a60ea1b2175#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly identifies the Orbit Fitness billboard."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M08",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "What did the billboard I saw before lunch advertise?",
+   "status": "answered",
+   "answer": "The billboard advertised Orbit Fitness: first month free.",
+   "latency_s": 3.174,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-8df5b0dc3a39"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "billboard saw before lunch advertise"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Includes key fact Orbit Fitness; extra detail does not contradict."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M08",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "What did the billboard I saw before lunch advertise?",
+   "status": "answered",
+   "answer": "The billboard advertised Orbit Fitness with first month free.",
+   "latency_s": 3.563,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-ea538d5ae841#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-0a60ea1b2175#0",
+    "src-86465783a3d5#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes Orbit Fitness and extra detail is allowed."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M09",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Where did I meet Alex, and which restaurant did he recommend?",
+   "status": "answered",
+   "answer": "You met Alex at the Office at 400 Market St, and he recommended Luna Taqueria.",
+   "latency_s": 12.83,
+   "llm_calls": 5,
+   "steps": 5,
+   "cited": [
+    "clm-78180ac45720",
+    "clm-a021006ec957",
+    "clm-f74560568239",
+    "clm-a11c064887b5"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 5
+    },
+    {
+     "tool": "provenance",
+     "args": {
+      "claim_id": "clm-a11c064887b5"
+     },
+     "results": 1
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "met Alex Office 400 Market St location"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches both key facts."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M09",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Where did I meet Alex, and which restaurant did he recommend?",
+   "status": "answered",
+   "answer": "You met Alex at the Office, 400 Market St, and he recommended the taco place across the street with the green awning, Luna Taqueria.",
+   "latency_s": 6.489,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-86465783a3d5#0",
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-2ea135b59639#0",
+    "src-86465783a3d5#0",
+    "src-bb2479c8ddf3#0",
+    "src-ea538d5ae841#0",
+    "src-0a60ea1b2175#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Includes both location and restaurant without contradiction."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "M10",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Did Alex recommend a restaurant that I later photographed?",
+   "status": "answered",
+   "answer": "Yes – Alex recommended Luna Taqueria at 12:35, which you later observed at 13:20 as a taco restaurant with a green awning across the street.",
+   "latency_s": 15.839,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [
+    "clm-f74560568239",
+    "clm-002b95fa2cfc",
+    "clm-5192213c64d5",
+    "clm-52e5a0f168a3"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 5
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "place:luna-taqueria"
+     },
+     "results": 5
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "photographed Luna Taqueria"
+     },
+     "results": 8
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "photographed photo picture taken"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches key facts with only extra non-contradicting detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "M10",
+   "category": "multi_source",
+   "phase": "day",
+   "question": "Did Alex recommend a restaurant that I later photographed?",
+   "status": "answered",
+   "answer": "Yes, Alex recommended the taco place across from the office with the green awning, and you later photographed Luna Taqueria with a green awning across the street.",
+   "latency_s": 2.913,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-bb2479c8ddf3#0",
+    "src-86465783a3d5#0",
+    "src-2ea135b59639#0",
+    "src-ea538d5ae841#0",
+    "src-0a60ea1b2175#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the key Yes and Luna Taqueria photographed fact with only non-contradicting extra detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T01",
+   "category": "timing",
+   "phase": "day",
+   "question": "Where is my wallet?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 09:10 at Blue Door Café.",
+   "latency_s": 6.02,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer provides last sighting without claiming current location."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T01",
+   "category": "timing",
+   "phase": "day",
+   "question": "Where is my wallet?",
+   "status": "answered",
+   "answer": "Your brown leather wallet was on a wooden table next to a coffee cup at Blue Door Café.",
+   "latency_s": 3.611,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "src-5da7023e0988#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-bb2479c8ddf3#0",
+    "src-0a60ea1b2175#0",
+    "src-2ea135b59639#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-86465783a3d5#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '09:10'",
+     "none of ['last confirmed sighting', 'last seen']"
+    ]
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "It omits the 09:10 time and that current location is unknown."
+   },
+   "final": {
+    "correct": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T02",
+   "category": "timing",
+   "phase": "day",
+   "question": "When and where did I last see my wallet?",
+   "status": "answered",
+   "answer": "Last confirmed sighting on 2026-10-29 at 09:10 at Blue Door Café.",
+   "latency_s": 6.341,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Matches time and place; extra date does not contradict reference."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T02",
+   "category": "timing",
+   "phase": "day",
+   "question": "When and where did I last see my wallet?",
+   "status": "answered",
+   "answer": "You last saw your brown leather wallet at 09:10 on 2026-10-29 at Blue Door Café, on a wooden table next to a coffee cup.",
+   "latency_s": 4.775,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-5da7023e0988#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-2ea135b59639#0",
+    "src-bb2479c8ddf3#0",
+    "src-0a60ea1b2175#0",
+    "src-86465783a3d5#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Includes both 09:10 and Blue Door Café with only non-contradicting extra detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T03",
+   "category": "timing",
+   "phase": "day",
+   "question": "Did I leave my wallet at the café?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 09:10 at Blue Door Café.",
+   "latency_s": 7.994,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "It reports the last sighting without claiming the wallet was definitely left there."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T03",
+   "category": "timing",
+   "phase": "day",
+   "question": "Did I leave my wallet at the café?",
+   "status": "abstained",
+   "answer": "I have no record of you leaving your wallet at the café.",
+   "latency_s": 4.732,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "src-5da7023e0988#0",
+    "src-bb2479c8ddf3#0",
+    "summary",
+    "src-2ea135b59639#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-86465783a3d5#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": true,
+    "leaked": null,
+    "problems": [
+     "abstained",
+     "missing '09:10'",
+     "missing 'Blue Door'",
+     "none of ['last confirmed sighting', 'last seen']"
+    ]
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Omits the last confirmed 09:10 sighting at Blue Door Café."
+   },
+   "final": {
+    "correct": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T06",
+   "category": "timing",
+   "phase": "day",
+   "question": "What time was my wallet at the café?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 09:10 at Blue Door Café.",
+   "latency_s": 5.722,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "wallet at cafe"
+     },
+     "results": 8
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes 09:10 matching the reference."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T06",
+   "category": "timing",
+   "phase": "day",
+   "question": "What time was my wallet at the café?",
+   "status": "answered",
+   "answer": "Your brown leather wallet was at Blue Door Café at 09:10.",
+   "latency_s": 4.097,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-bb2479c8ddf3#0",
+    "src-5da7023e0988#0",
+    "src-2ea135b59639#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-86465783a3d5#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the key time 09:10."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T07",
+   "category": "timing",
+   "phase": "day",
+   "question": "What time did my meeting with Alex start?",
+   "status": "answered",
+   "answer": "Your meeting with Alex started at 12:30 on October 29th.",
+   "latency_s": 4.444,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a11c064887b5"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 5
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes 12:30 and extra date does not contradict reference."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T07",
+   "category": "timing",
+   "phase": "day",
+   "question": "What time did my meeting with Alex start?",
+   "status": "answered",
+   "answer": "Your meeting with Alex started at 12:30.",
+   "latency_s": 3.206,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-86465783a3d5#0"
+   ],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-2ea135b59639#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches the reference time of 12:30."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T08",
+   "category": "timing",
+   "phase": "day",
+   "question": "Did I see the billboard before or after I met Alex?",
+   "status": "abstained",
+   "answer": "I don't have a record that answers that.",
+   "latency_s": 7.835,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "billboard seen"
+     },
+     "results": 8
+    }
+   ],
+   "note": "answer failed a check twice: Object locations must be phrased as \"Last confirmed sighting at HH:MM at <place>\", never in the present tense.",
+   "checks": [
+    "Object locations must be phrased as \"Last confirmed sighting at HH:MM at <place>\", never in the present tense.",
+    "Object locations must be phrased as \"Last confirmed sighting at HH:MM at <place>\", never in the present tense."
+   ],
+   "auto": {
+    "correct": false,
+    "refused": true,
+    "leaked": null,
+    "problems": [
+     "abstained",
+     "none of ['before', 'earlier', '09:40']"
+    ]
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Reference gives times showing billboard was before meeting."
+   },
+   "final": {
+    "correct": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T08",
+   "category": "timing",
+   "phase": "day",
+   "question": "Did I see the billboard before or after I met Alex?",
+   "status": "answered",
+   "answer": "You saw the billboard before meeting Alex, with the billboard photo at 09:40 and the sync with Alex at 12:30-13:15.",
+   "latency_s": 3.326,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-ea538d5ae841#0",
+    "src-86465783a3d5#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-86465783a3d5#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-0a60ea1b2175#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer states before with matching 09:40 and 12:30 times."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "R01",
+   "category": "refuse",
+   "phase": "day",
+   "question": "What is Alex's phone number?",
+   "status": "abstained",
+   "answer": "I have no record of Alex's phone number.",
+   "latency_s": 9.729,
+   "llm_calls": 5,
+   "steps": 5,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 5
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex phone number",
+      "k": 10
+     },
+     "results": 10
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 5
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states no record and invents no number."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "R01",
+   "category": "refuse",
+   "phase": "day",
+   "question": "What is Alex's phone number?",
+   "status": "abstained",
+   "answer": "I have no record of Alex's phone number.",
+   "latency_s": 2.997,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-2ea135b59639#0",
+    "summary",
+    "src-0a60ea1b2175#0",
+    "src-86465783a3d5#0",
+    "src-bb2479c8ddf3#0",
+    "src-5da7023e0988#0",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states no record and invents no number."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "R02",
+   "category": "refuse",
+   "phase": "day",
+   "question": "Which gym did I go to?",
+   "status": "abstained",
+   "answer": "I have no record of you going to a gym.",
+   "latency_s": 14.006,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Which gym did I go to?",
+      "k": 5
+     },
+     "results": 5
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Orbit Fitness",
+      "k": 5
+     },
+     "results": 5
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "me"
+     },
+     "results": 5
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "place:orbit-fitness"
+     },
+     "results": 1
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "visited went to gym at Orbit Fitness",
+      "k": 5
+     },
+     "results": 5
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states no record of a gym visit."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "R02",
+   "category": "refuse",
+   "phase": "day",
+   "question": "Which gym did I go to?",
+   "status": "abstained",
+   "answer": "I have no record of you going to a gym.",
+   "latency_s": 4.128,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-ea538d5ae841#0"
+   ],
+   "retrieved": [
+    "src-ea538d5ae841#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-5da7023e0988#0",
+    "src-86465783a3d5#0",
+    "src-2ea135b59639#0",
+    "src-bb2479c8ddf3#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states no gym visit is on record."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "R03",
+   "category": "refuse",
+   "phase": "day",
+   "question": "Who did I have lunch with on Friday?",
+   "status": "abstained",
+   "answer": "I have no record of who you had lunch with on Friday.",
+   "latency_s": 13.946,
+   "llm_calls": 5,
+   "steps": 5,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "episodes",
+     "args": {
+      "time_from": "2026-10-30T00:00:00",
+      "time_to": "2026-10-30T23:59:59"
+     },
+     "results": 0
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "lunch with Friday",
+      "time_from": "2026-10-30T00:00:00",
+      "time_to": "2026-10-30T23:59:59"
+     },
+     "results": 0
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "lunch"
+     },
+     "results": 8
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "had lunch with"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states there is no record."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "R03",
+   "category": "refuse",
+   "phase": "day",
+   "question": "Who did I have lunch with on Friday?",
+   "status": "abstained",
+   "answer": "I have no record of who you had lunch with on Friday.",
+   "latency_s": 4.386,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-2ea135b59639#0",
+    "summary",
+    "src-86465783a3d5#0",
+    "src-bb2479c8ddf3#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly reflects no record of Friday lunch."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "R04",
+   "category": "refuse",
+   "phase": "day",
+   "question": "What did Alex order at Luna Taqueria?",
+   "status": "abstained",
+   "answer": "I have no record of what Alex ordered at Luna Taqueria.",
+   "latency_s": 17.161,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex order at Luna Taqueria"
+     },
+     "results": 8
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex ordered"
+     },
+     "results": 8
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 5
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "place:luna-taqueria"
+     },
+     "results": 5
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "ordered al pastor Luna Taqueria",
+      "predicate": "ordered"
+     },
+     "results": 0
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states there is no record of an order."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "R04",
+   "category": "refuse",
+   "phase": "day",
+   "question": "What did Alex order at Luna Taqueria?",
+   "status": "abstained",
+   "answer": "I have no record of what Alex ordered at Luna Taqueria.",
+   "latency_s": 5.44,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "summary",
+    "src-86465783a3d5#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-0a60ea1b2175#0",
+    "src-5da7023e0988#0",
+    "src-ea538d5ae841#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states there is no record of the order."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "R05",
+   "category": "refuse",
+   "phase": "day",
+   "question": "Did I eat at Luna Taqueria?",
+   "status": "abstained",
+   "answer": "I have no record that you ate at Luna Taqueria. Alex recommended it and you said you would check it out.",
+   "latency_s": 22.182,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Luna Taqueria"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "place:luna-taqueria"
+     },
+     "results": 5
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "eat at Luna Taqueria"
+     },
+     "results": 8
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "me"
+     },
+     "results": 5
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "ate lunch dinner eat meal"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "It omits the storefront photo fact and adds an unsupported Alex recommendation."
+   },
+   "final": {
+    "correct": true,
+    "disagree": true
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "R05",
+   "category": "refuse",
+   "phase": "day",
+   "question": "Did I eat at Luna Taqueria?",
+   "status": "abstained",
+   "answer": "I have no record of you eating at Luna Taqueria; you only photographed its storefront and said you'd check it out.",
+   "latency_s": 5.571,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-3b6c0c5ee2d6#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "summary",
+    "src-86465783a3d5#0",
+    "src-bb2479c8ddf3#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0",
+    "src-2ea135b59639#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes both key facts and extra detail does not contradict reference."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "R06",
+   "category": "refuse",
+   "phase": "day",
+   "question": "What time does Luna Taqueria close?",
+   "status": "abstained",
+   "answer": "I have no record of what time Luna Taqueria closes.",
+   "latency_s": 10.385,
+   "llm_calls": 5,
+   "steps": 5,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Luna Taqueria"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "place:luna-taqueria"
+     },
+     "results": 5
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Luna Taqueria closing time hours close"
+     },
+     "results": 8
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "place:luna-taqueria"
+     },
+     "results": 5
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches reference that hours are not on record."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "R06",
+   "category": "refuse",
+   "phase": "day",
+   "question": "What time does Luna Taqueria close?",
+   "status": "abstained",
+   "answer": "I have no record of what time Luna Taqueria closes.",
+   "latency_s": 4.244,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "summary",
+    "src-86465783a3d5#0",
+    "src-5da7023e0988#0",
+    "src-bb2479c8ddf3#0",
+    "src-0a60ea1b2175#0",
+    "src-2ea135b59639#0",
+    "src-ea538d5ae841#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": true,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states no record of closing time."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T04",
+   "category": "timing",
+   "phase": "after_live",
+   "question": "When did I last see my wallet?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 17:45 at the car. It was previously seen at 09:10 at Blue Door Café.",
+   "latency_s": 5.593,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a94d0f3c6a6b",
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the 17:45 car sighting and extra detail does not contradict."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T04",
+   "category": "timing",
+   "phase": "after_live",
+   "question": "When did I last see my wallet?",
+   "status": "answered",
+   "answer": "You last saw your brown leather wallet at 17:45 in the cup holder of a car.",
+   "latency_s": 3.45,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-37233fad6c9b#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "summary",
+    "src-5da7023e0988#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-bb2479c8ddf3#0",
+    "src-2ea135b59639#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Includes both 17:45 and in the car with only extra detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "T05",
+   "category": "timing",
+   "phase": "after_live",
+   "question": "Where is my wallet?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 17:45 in the car. Earlier it was at Blue Door Café at 09:10.",
+   "latency_s": 9.589,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a94d0f3c6a6b",
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Omits the cup holder detail from the last confirmed sighting."
+   },
+   "final": {
+    "correct": true,
+    "disagree": true
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "T05",
+   "category": "timing",
+   "phase": "after_live",
+   "question": "Where is my wallet?",
+   "status": "answered",
+   "answer": "Your wallet was most recently in the cup holder of a car; earlier it was on a table at Blue Door Café.",
+   "latency_s": 3.325,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-bb2479c8ddf3#0",
+    "src-0a60ea1b2175#0",
+    "src-2ea135b59639#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '17:45'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the car's cup holder location and extra detail does not contradict reference."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "C01",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Did I leave my wallet at the café?",
+   "status": "answered",
+   "answer": "No. Last confirmed sighting at 17:45 in the car; it was earlier at Blue Door Café at 09:10.",
+   "latency_s": 6.439,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a94d0f3c6a6b",
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "It correctly denies left at café and cites 17:45 car sighting."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "C01",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Did I leave my wallet at the café?",
+   "status": "answered",
+   "answer": "No, your brown leather wallet was on the café table in the morning but was later photographed in your car's cup holder in the evening.",
+   "latency_s": 4.897,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0",
+    "src-37233fad6c9b#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0",
+    "src-bb2479c8ddf3#0",
+    "summary",
+    "src-2ea135b59639#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-86465783a3d5#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '17:45'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly says not left at café and later in car."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "C02",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Where was my wallet this morning?",
+   "status": "answered",
+   "answer": "This morning at 09:10 your wallet was at Blue Door Café. Last confirmed sighting at 17:45 at car.",
+   "latency_s": 7.372,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-28867fe1e76e",
+    "clm-a94d0f3c6a6b"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the key fact of Blue Door Café at 09:10 without contradiction."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "C02",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Where was my wallet this morning?",
+   "status": "answered",
+   "answer": "Your wallet was on a wooden café table next to a coffee cup at Blue Door Café.",
+   "latency_s": 2.223,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "summary",
+    "src-5da7023e0988#0",
+    "src-bb2479c8ddf3#0",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-2ea135b59639#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '09:10'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Location matches Blue Door Café and extra detail does not contradict reference."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "C03",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Has my wallet moved since the morning?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 17:45 in the car, after an earlier sighting at 09:10 at Blue Door Café.",
+   "latency_s": 6.378,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a94d0f3c6a6b",
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "It reports both key sightings showing movement."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "C03",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Has my wallet moved since the morning?",
+   "status": "answered",
+   "answer": "Yes, your brown leather wallet moved from the café table at Blue Door Café in the morning to the car's cup holder in the evening.",
+   "latency_s": 3.677,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0",
+    "src-37233fad6c9b#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-bb2479c8ddf3#0",
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0",
+    "src-2ea135b59639#0",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-0a60ea1b2175#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '17:45'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer correctly states wallet moved from café in morning to car in evening."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "C04",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Where was my wallet at 09:10 and where was it seen later?",
+   "status": "answered",
+   "answer": "At 09:10 the wallet was at Blue Door Café, next to the coffee cup. Last confirmed sighting at 17:45 in the car.",
+   "latency_s": 7.971,
+   "llm_calls": 4,
+   "steps": 4,
+   "cited": [
+    "clm-28867fe1e76e",
+    "clm-f684968c23c6",
+    "clm-a94d0f3c6a6b"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "object:wallet"
+     },
+     "results": 5
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Matches both locations and times with only non-contradictory extra detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "C04",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Where was my wallet at 09:10 and where was it seen later?",
+   "status": "answered",
+   "answer": "At 09:10 your wallet was on a wooden café table next to a coffee cup at Blue Door Café, and later it was seen in the cup holder of a car.",
+   "latency_s": 3.85,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0",
+    "src-37233fad6c9b#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-5da7023e0988#0",
+    "src-ea538d5ae841#0",
+    "src-2ea135b59639#0",
+    "src-0a60ea1b2175#0",
+    "src-bb2479c8ddf3#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '17:45'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Both locations match the reference with only extra non-contradicting detail."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "C05",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "What was the earlier sighting of my wallet?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 17:45 at car. Earlier sighting at 09:10 at Blue Door Café.",
+   "latency_s": 6.239,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a94d0f3c6a6b",
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "It correctly states the earlier sighting was 09:10 at Blue Door Café."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "C05",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "What was the earlier sighting of my wallet?",
+   "status": "answered",
+   "answer": "The earlier sighting was at 09:10, with your brown leather wallet on a wooden café table next to a coffee cup at Blue Door Café.",
+   "latency_s": 3.625,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "src-bb2479c8ddf3#0",
+    "src-5da7023e0988#0",
+    "summary",
+    "src-2ea135b59639#0",
+    "src-ea538d5ae841#0",
+    "src-0a60ea1b2175#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the 09:10 time and Blue Door Café location."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "C06",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Is my wallet still at the café?",
+   "status": "answered",
+   "answer": "No. Last confirmed sighting at 17:45 in the car, previously seen at Blue Door Café at 09:10.",
+   "latency_s": 6.76,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a94d0f3c6a6b",
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "It gives the key car sighting at 17:45 with only extra non-contradicting detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline",
+   "run": 1,
+   "id": "C06",
+   "category": "correction",
+   "phase": "after_live",
+   "question": "Is my wallet still at the café?",
+   "status": "answered",
+   "answer": "No, your brown leather wallet was at Blue Door Café in the morning but was later photographed in your car cup holder in the evening.",
+   "latency_s": 9.084,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-5da7023e0988#0",
+    "src-37233fad6c9b#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "src-bb2479c8ddf3#0",
+    "src-5da7023e0988#0",
+    "src-2ea135b59639#0",
+    "summary",
+    "src-86465783a3d5#0",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '17:45'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches reference that it is not at the café and last seen in the car."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "F01",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What did Alex promise me?",
+   "status": "abstained",
+   "answer": "I have no record of what Alex promised you.",
+   "latency_s": 11.215,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex promise me",
+      "k": 5
+     },
+     "results": 5
+    },
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "promise",
+      "k": 10
+     },
+     "results": 10
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Answer states no record and does not mention a proposal by Friday."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "F01",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What did Alex promise me?",
+   "status": "answered",
+   "answer": "Alex promised to send the proposal by Friday.",
+   "latency_s": 3.971,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "summary"
+   ],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": false,
+    "leaked": true,
+    "problems": [
+     "mentions 'proposal'",
+     "mentions 'friday'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "The answer explicitly states Alex promised to send the proposal by Friday."
+   },
+   "final": {
+    "leaked": true,
+    "leak_by_string": true,
+    "leak_by_judge": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "F01",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What did Alex promise me?",
+   "status": "abstained",
+   "answer": "I have no record of what Alex promised you.",
+   "latency_s": 2.693,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Answer claims no record and never mentions a proposal by Friday."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "F02",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Which restaurant did Alex recommend when we met near the office?",
+   "status": "abstained",
+   "answer": "I have no record of which restaurant Alex recommended.",
+   "latency_s": 18.428,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex recommended restaurant",
+      "predicate": "recommended"
+     },
+     "results": 0
+    },
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "episodes",
+     "args": {
+      "time_from": "2026-10-29T00:00:00",
+      "time_to": "2026-10-30T00:00:00"
+     },
+     "results": 4
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "The answer states no record and never mentions Luna Taqueria or tacos."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "F02",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Which restaurant did Alex recommend when we met near the office?",
+   "status": "answered",
+   "answer": "Alex recommended Luna Taqueria, the taco place across the street with the green awning for al pastor.",
+   "latency_s": 4.535,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "summary",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "src-86465783a3d5#0",
+    "summary",
+    "src-37233fad6c9b#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": false,
+    "leaked": true,
+    "problems": [
+     "mentions 'pastor'"
+    ]
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Answer invents a recommendation while reference states no record exists."
+   },
+   "final": {
+    "leaked": true,
+    "leak_by_string": true,
+    "leak_by_judge": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "F02",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Which restaurant did Alex recommend when we met near the office?",
+   "status": "abstained",
+   "answer": "I have no record of which restaurant Alex recommended.",
+   "latency_s": 5.478,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "src-86465783a3d5#0",
+    "src-37233fad6c9b#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "The answer claims no record and never mentions Luna Taqueria."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "F03",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What did Alex say about food?",
+   "status": "abstained",
+   "answer": "I have no record of what Alex said about food.",
+   "latency_s": 18.239,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex said food"
+     },
+     "results": 8
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "It states no record and does not mention tacos, al pastor, or a restaurant."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "F03",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What did Alex say about food?",
+   "status": "answered",
+   "answer": "Alex recommended the taco place across the street with the green awning for al pastor.",
+   "latency_s": 2.323,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "summary"
+   ],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": false,
+    "leaked": true,
+    "problems": [
+     "mentions 'pastor'",
+     "mentions 'taco place'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "The answer explicitly says Alex recommended the taco place for al pastor."
+   },
+   "final": {
+    "leaked": true,
+    "leak_by_string": true,
+    "leak_by_judge": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "F03",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What did Alex say about food?",
+   "status": "abstained",
+   "answer": "I have no record of what Alex said about food.",
+   "latency_s": 4.692,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "The answer states no record and mentions no tacos."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "F04",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What was the deadline for the proposal Alex mentioned?",
+   "status": "abstained",
+   "answer": "I have no record of a proposal deadline mentioned by Alex.",
+   "latency_s": 8.929,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex proposal deadline"
+     },
+     "results": 8
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "proposal"
+     },
+     "results": 8
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "deadline"
+     },
+     "results": 8
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    }
+   ],
+   "note": "Searches for proposal and deadline returned no relevant claims.",
+   "checks": [],
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "The answer claims no record, not that deadline was Friday."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "F04",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What was the deadline for the proposal Alex mentioned?",
+   "status": "answered",
+   "answer": "Alex was to send the proposal by Friday.",
+   "latency_s": 3.096,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "summary"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "summary",
+    "src-86465783a3d5#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": false,
+    "leaked": true,
+    "problems": [
+     "mentions 'friday'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer states Alex was to send the proposal by Friday."
+   },
+   "final": {
+    "leaked": true,
+    "leak_by_string": true,
+    "leak_by_judge": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "F04",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "What was the deadline for the proposal Alex mentioned?",
+   "status": "abstained",
+   "answer": "I have no record of a proposal deadline mentioned by Alex.",
+   "latency_s": 2.618,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "src-86465783a3d5#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "The answer says no record, not Friday."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "F05",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Summarize what Alex and I talked about.",
+   "status": "partial",
+   "answer": "You met with Alex at the Office for a Sync at 12:30, but I have no record of what you talked about.",
+   "latency_s": 11.499,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [
+    "clm-a11c064887b5",
+    "clm-78180ac45720"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "episodes",
+     "args": {
+      "time_from": "2026-10-29T00:00:00",
+      "time_to": "2026-10-29T23:59:59"
+     },
+     "results": 4
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex talked discussed conversation",
+      "k": 10
+     },
+     "results": 10
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "It explicitly says it has no record of what was talked about."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "F05",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Summarize what Alex and I talked about.",
+   "status": "answered",
+   "answer": "Alex recommended the taco place across the street with the green awning for al pastor, which you said you'd check out. Alex also said he would send a proposal by Friday.",
+   "latency_s": 17.59,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "summary",
+    "src-86465783a3d5#0",
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "summary",
+    "src-86465783a3d5#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": false,
+    "leaked": true,
+    "problems": [
+     "mentions 'pastor'",
+     "mentions 'proposal'",
+     "mentions 'friday'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "The answer mentions the taco place and Friday proposal."
+   },
+   "final": {
+    "leaked": true,
+    "leak_by_string": true,
+    "leak_by_judge": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "F05",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Summarize what Alex and I talked about.",
+   "status": "abstained",
+   "answer": "I have no record of what you and Alex talked about.",
+   "latency_s": 3.696,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-86465783a3d5#0",
+    "summary"
+   ],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "The answer only says it has no record and mentions no conversation content."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "F06",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Did Alex say he would send me anything?",
+   "status": "abstained",
+   "answer": "I have no record that Alex said he would send you anything.",
+   "latency_s": 10.415,
+   "llm_calls": 6,
+   "steps": 6,
+   "cited": [],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex say send"
+     },
+     "results": 8
+    },
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "Alex would send promised"
+     },
+     "results": 8
+    },
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "timeline",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "person:alex"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Answer claims no record, not that Alex would send a proposal."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "F06",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Did Alex say he would send me anything?",
+   "status": "answered",
+   "answer": "Yes, Alex said he would send a proposal by Friday.",
+   "latency_s": 3.49,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "summary"
+   ],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": false,
+    "leaked": true,
+    "problems": [
+     "mentions 'proposal'",
+     "mentions 'friday'"
+    ]
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Reference states no record exists."
+   },
+   "final": {
+    "leaked": true,
+    "leak_by_string": true,
+    "leak_by_judge": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "F06",
+   "category": "forget",
+   "phase": "after_revoke",
+   "question": "Did Alex say he would send me anything?",
+   "status": "abstained",
+   "answer": "I have no record of whether Alex said he would send anything.",
+   "latency_s": 2.808,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": null,
+    "refused": true,
+    "leaked": false,
+    "problems": []
+   },
+   "judge": {
+    "verdict": false,
+    "reason": "Answer states no record and does not claim a proposal was promised."
+   },
+   "final": {
+    "leaked": false,
+    "leak_by_string": false,
+    "leak_by_judge": false,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "K01",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "Did I have a meeting with Alex?",
+   "status": "answered",
+   "answer": "Yes, you met with Alex at 12:30 at the Office for a sync.",
+   "latency_s": 3.52,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-a11c064887b5",
+    "clm-78180ac45720"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "meeting with Alex"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the 12:30 sync with Alex with only extra non-contradicting detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "K01",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "Did I have a meeting with Alex?",
+   "status": "answered",
+   "answer": "Yes, you had a midday sync with Alex at Office, 400 Market St.",
+   "latency_s": 3.684,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-86465783a3d5#0",
+    "summary"
+   ],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0",
+    "src-37233fad6c9b#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer confirms the midday 12:30 sync with Alex without contradiction."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "K01",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "Did I have a meeting with Alex?",
+   "status": "answered",
+   "answer": "Yes, you had a sync with Alex at the Office, 400 Market St from 12:30 to 13:15.",
+   "latency_s": 2.389,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-86465783a3d5#0"
+   ],
+   "retrieved": [
+    "src-86465783a3d5#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0",
+    "src-37233fad6c9b#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer confirms the 12:30 sync with Alex with only extra non-contradicting detail."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "K02",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "What colour is the awning at Luna Taqueria?",
+   "status": "answered",
+   "answer": "The awning at Luna Taqueria is green.",
+   "latency_s": 3.378,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-002b95fa2cfc"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "Luna Taqueria"
+     },
+     "results": 1
+    },
+    {
+     "tool": "neighbors",
+     "args": {
+      "entity_id": "place:luna-taqueria"
+     },
+     "results": 3
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches the reference color green."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "K02",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "What colour is the awning at Luna Taqueria?",
+   "status": "answered",
+   "answer": "The awning at Luna Taqueria is green.",
+   "latency_s": 2.451,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "summary",
+    "src-37233fad6c9b#0",
+    "src-86465783a3d5#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches the reference color green."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "K02",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "What colour is the awning at Luna Taqueria?",
+   "status": "answered",
+   "answer": "The awning at Luna Taqueria is green.",
+   "latency_s": 2.17,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-3b6c0c5ee2d6#0"
+   ],
+   "retrieved": [
+    "src-3b6c0c5ee2d6#0",
+    "summary",
+    "src-37233fad6c9b#0",
+    "src-86465783a3d5#0",
+    "src-ea538d5ae841#0",
+    "src-5da7023e0988#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer matches reference stating green."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "K03",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "What did the billboard advertise?",
+   "status": "answered",
+   "answer": "The billboard advertised 'Orbit Fitness: first month free' for Orbit Fitness, which is a gym.",
+   "latency_s": 2.712,
+   "llm_calls": 2,
+   "steps": 2,
+   "cited": [
+    "clm-8df5b0dc3a39",
+    "clm-c25c75652e9a"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "search_claims",
+     "args": {
+      "query": "billboard advertise"
+     },
+     "results": 8
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the key fact Orbit Fitness."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "K03",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "What did the billboard advertise?",
+   "status": "answered",
+   "answer": "The billboard advertised Orbit Fitness, offering the first month free.",
+   "latency_s": 2.602,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-ea538d5ae841#0",
+    "summary"
+   ],
+   "retrieved": [
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-5da7023e0988#0",
+    "src-86465783a3d5#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "It includes the key fact Orbit Fitness."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "K03",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "What did the billboard advertise?",
+   "status": "answered",
+   "answer": "The billboard advertised Orbit Fitness with first month free.",
+   "latency_s": 4.135,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-ea538d5ae841#0"
+   ],
+   "retrieved": [
+    "src-ea538d5ae841#0",
+    "src-37233fad6c9b#0",
+    "summary",
+    "src-3b6c0c5ee2d6#0",
+    "src-5da7023e0988#0",
+    "src-86465783a3d5#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes Orbit Fitness and extra detail does not contradict reference."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "memoryatlas",
+   "run": 1,
+   "id": "K04",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "Where is my wallet?",
+   "status": "answered",
+   "answer": "Last confirmed sighting at 17:45 in the car. Earlier at 09:10 at Blue Door Café.",
+   "latency_s": 6.852,
+   "llm_calls": 3,
+   "steps": 3,
+   "cited": [
+    "clm-a94d0f3c6a6b",
+    "clm-28867fe1e76e"
+   ],
+   "retrieved": null,
+   "trace": [
+    {
+     "tool": "find_entity",
+     "args": {
+      "name": "wallet"
+     },
+     "results": 1
+    },
+    {
+     "tool": "last_seen",
+     "args": {
+      "object_id": "object:wallet"
+     },
+     "results": 1
+    }
+   ],
+   "note": "",
+   "checks": [],
+   "auto": {
+    "correct": true,
+    "refused": false,
+    "leaked": null,
+    "problems": []
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Includes the key fact and extra detail does not contradict it."
+   },
+   "final": {
+    "correct": true,
+    "disagree": false
+   }
+  },
+  {
+   "system": "baseline_stale",
+   "run": 1,
+   "id": "K04",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "Where is my wallet?",
+   "status": "answered",
+   "answer": "Your brown leather wallet was most recently in the cup holder of a car. Earlier it was on a table at Blue Door Café.",
+   "latency_s": 4.804,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-86465783a3d5#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '17:45'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer keeps the key location in the car with only non-contradictory extra detail."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  },
+  {
+   "system": "baseline_rebuilt",
+   "run": 1,
+   "id": "K04",
+   "category": "keep",
+   "phase": "after_revoke",
+   "question": "Where is my wallet?",
+   "status": "answered",
+   "answer": "Your brown leather wallet was most recently in the car cup holder. Earlier it was on a table at Blue Door Café.",
+   "latency_s": 3.752,
+   "llm_calls": 1,
+   "steps": null,
+   "cited": [
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0"
+   ],
+   "retrieved": [
+    "src-37233fad6c9b#0",
+    "src-5da7023e0988#0",
+    "summary",
+    "src-ea538d5ae841#0",
+    "src-3b6c0c5ee2d6#0",
+    "src-86465783a3d5#0"
+   ],
+   "trace": null,
+   "note": "",
+   "checks": null,
+   "auto": {
+    "correct": false,
+    "refused": false,
+    "leaked": null,
+    "problems": [
+     "missing '17:45'"
+    ]
+   },
+   "judge": {
+    "verdict": true,
+    "reason": "Answer includes the car location and extra details do not contradict the reference."
+   },
+   "final": {
+    "correct": false,
+    "disagree": true
+   }
+  }
+ ],
+ "facts": {
+  "revocation_s": 56.876,
+  "probes_passed": 7,
+  "probes_total": 7,
+  "probes": [
+   {
+    "id": 1,
+    "name": "Graph: no claim or episode rests on removed support",
+    "status": "pass"
+   },
+   {
+    "id": 2,
+    "name": "Search index: removed phrases return nothing",
+    "status": "pass"
+   },
+   {
+    "id": 3,
+    "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+    "status": "pass"
+   },
+   {
+    "id": 4,
+    "name": "Caches: answer cache, chat log, receipts and model-response cache are clean",
+    "status": "pass"
+   },
+   {
+    "id": 5,
+    "name": "Export: a regenerated export mentions nothing removed",
+    "status": "pass"
+   },
+   {
+    "id": 6,
+    "name": "Red team: adversarial questions leak nothing",
+    "status": "pass"
+   },
+   {
+    "id": 7,
+    "name": "Disk: no media files, and the database file holds no removed text",
+    "status": "pass"
+   }
+  ],
+  "store_scan": {
+   "baseline_stale": {
+    "chunks": [],
+    "summary": [
+     "friday",
+     "pastor",
+     "proposal",
+     "taco place"
+    ]
+   },
+   "baseline_rebuilt": {
+    "chunks": [],
+    "summary": []
+   }
+  },
+  "leak_terms": [
+   "friday",
+   "pastor",
+   "proposal",
+   "taco place"
+  ],
+  "raw_media_bytes": 0,
+  "llm_calls_total": 232
+ }
+}
