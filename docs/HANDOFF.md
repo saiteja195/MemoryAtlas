@@ -57,6 +57,7 @@ Branches on `origin` (both authored only by `saiteja195`):
 | `feature/scaffold` (branched from the above) | Everything in Phase 0 and the Meta client, plus this file |
 | `feature/meta-api-verified` | Docs updated with the live smoke-test results |
 | `feature/capture-compiler` (branched from the one above) | **Phase 1**: gateway, compiler, `/graph`, demo fixtures, recorded model output |
+| `feature/recall` (branched from the one above) | **Phase 2**: derivation rules, privacy filter, recall tools, investigator, `/recall/ask` |
 
 `main` holds only the initial commit. A stale remote branch `claude/recallos-hackathon-plan-su6eaz` still exists; the owner should delete it (`git push origin --delete claude/recallos-hackathon-plan-su6eaz`). No pull requests exist yet.
 
@@ -77,7 +78,16 @@ Branches on `origin` (both authored only by `saiteja195`):
 
 **Phase 1 gaps (be honest about these):** frames are not downscaled (no real images yet and no Pillow dependency); the speaker-label-to-person mapping comes from the session declaration in the fixture, not from anything inferred; no WebSocket graph deltas yet (UI polls `/graph`); no real photos or audio have gone through the full path (only fakes in tests and the smoke test).
 
-**Not built yet:** derivation rules, investigator, revocation engine and leak probes, Atlas UI, eval, baseline.
+**Phase 2 built (`feature/recall`, 117 tests, all offline):**
+- `compiler/derive.py`: `spatial_referent_resolution` (the model proposes among candidates the code has already validated: matching attributes and GPS distance <= 100 m, the measured distance is shown to the model; writes `same_as` and `recommended`, each justified by ALL premises, confidence = min(premises) x 0.9), supersession by event time (`located_at`; reversible, late uploads reorder), and `episode_summary` (a claim whose premises are the claims it used; a changed premise set retires the old summary).
+- `privacy/filter.py`: `authorized_claim_ids` = least fixpoint from live, consented sources (cycle-safe). Every recall tool and `/graph` read through it, so a withdrawn grant already hides what only that grant supported, ahead of the Phase 3 purge.
+- `recall/`: seven tools (`search_claims` hybrid FTS + vector, `find_entity`, `timeline`, `last_seen` with place chain, `episodes`, `neighbors`, `provenance`); `Investigator` (6-step loop of JSON actions over `complete_json`, **not** native tool calling, which is untried); post-checks: citation integrity (cited ids must have been shown by a tool in this run and still be authorized and not revoked), answered needs a citation, object-location answers must read "Last confirmed sighting at HH:MM ..." when the question names that object, disputed evidence forces a conflict note; stateless per question; `RecallService` (answer cache keyed by a graph version, chat log). API: `POST /recall/ask`, `GET /claims/{id}/provenance`.
+- Questions and expectations live in `fixtures/demo_day/acts.yaml` (3 phrasings each for Act 2, Act 3 before and after the car photo, plus 3 that must be refused). `backend/scripts/ask_demo.py` plays the day and asks them live; `tests/test_replay_recall.py` replays the committed recording offline.
+- Reliability, stated honestly: with the final prompts, 4 independent fresh live recordings each scored 12/12 and each replays fully offline. Getting there took several rounds, and earlier configurations failed in ways that are now fixed (a photo merging into the spoken-only "taco place" entity; the model prefixing JSON with prose; a "Yes" that over-claimed). Live extraction is still a model call, so a live run can differ from the recording; the fixture is the safe path for the demo and `/demo/reset`.
+
+**Client and cache fixes made along the way (all pinned by tests):** `MetaClient` accepts a JSON object after leading prose and retries transport errors (then raises `LLMUnavailable`); `RecordReplayClient` returns exactly what replay returns (key order changed request hashes) and records unparseable replies so replay takes the same retry path.
+
+**Not built yet:** revocation engine, purge and leak probes, Atlas UI, eval, baseline; the "correct a claim" flow (`POST /claims/{id}/correct`); WebSocket deltas.
 
 ## 6. Next steps
 
@@ -95,7 +105,11 @@ Branches on `origin` (both authored only by `saiteja195`):
    - Wallet sightings are `located_at` a place; the car frame came back as `located_at cup holder` and `cup holder located_at car interior`. `last_seen` must follow that chain or the extraction prompt should be tightened. The two wallet claims are both `active` today, so supersession is still to do.
    - Same-episode duplicates merge into one claim, so claim confidence is the max across supports.
    - For Phase 3: revocation must also drop `entities` that no remaining claim references, and `same_as` aliases (they are claims, so they die with their source). Transcript segments are stored under the speaker's grant, so Alex revoking removes Alex's words but not the owner's own turns.
-3. **Phase 2, `feature/recall`:** derivation rules, tool-calling investigator with citation-integrity checks, supersession and disputes.
+3. ~~Phase 2, `feature/recall`~~ Done (see section 5). Notes for Phase 3:
+   - Revocation must purge every store: `claims`, `claim_index`, `claim_vectors`, `answer_cache`, `chat_messages` (assistant messages store cited claim ids), plus **derived** claims and `summary_of` text. `privacy/filter.authorized_claim_ids` already computes the support fixpoint; reuse it for the "dead" set. Transcript summaries and `recommended` die with the transcript; "Me met with Alex" survives on the calendar and the sign claim survives.
+   - `recommended` also depends on the calendar claim `Me observed_at Office` (the anchor premise), so revoking the calendar would remove it as well. Intended, but keep it in mind for the receipt.
+   - Entities left with no remaining claim should be dropped; `same_as` aliases are claims and die with their source.
+   - Cached answers and chat rows reference claim ids; `graph_version` already changes on any claim or grant change, but rows still have to be deleted, not just ignored.
 4. **Phase 3, `feature/revocation`:** grants, HMAC revoke, least-fixpoint recompute, purge across every store, 7 leak probes, receipt, property tests.
 5. **Phase 4, `feature/atlas-ui` and `feature/eval`:** graph UI and a fair baseline (same text, same model, plain retrieval).
 6. **Phase 5, `feature/submission`:** README, results, 3-minute video, submission form. Feature freeze noon ET Wed.
