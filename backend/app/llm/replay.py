@@ -6,6 +6,10 @@ from typing import Any
 from .base import LLMClient, LLMUnavailable
 
 
+ERROR_KEY = "__llm_error__"
+CONTENT_ERRORS = ("did not return valid JSON", "JSON that is not an object")
+
+
 class RecordReplayClient:
     """Caches every model call by request hash.
 
@@ -31,12 +35,24 @@ class RecordReplayClient:
     def _call(self, method: str, payload: dict[str, Any], *args: Any) -> Any:
         path = self._dir / f"{self._key(method, payload)}.json"
         if path.exists():
-            return json.loads(path.read_text())
+            data = json.loads(path.read_text())
+            if isinstance(data, dict) and ERROR_KEY in data:
+                raise LLMUnavailable(data[ERROR_KEY])      # the model's unusable reply, replayed
+            return data
         if self.mode == "replay":
             raise LLMUnavailable(f"no recorded response for {method} ({path.name})")
-        result = getattr(self._inner, method)(*args)
+        try:
+            result = getattr(self._inner, method)(*args)
+        except LLMUnavailable as e:
+            # An unparseable model reply is deterministic content, not an outage: record it so a
+            # replay takes the same retry path. Network and HTTP errors are never recorded.
+            if any(m in str(e) for m in CONTENT_ERRORS):
+                path.write_text(json.dumps({ERROR_KEY: str(e)}, indent=2))
+            raise
         path.write_text(json.dumps(result, indent=2, sort_keys=True))
-        return result
+        # Hand back exactly what replay will: key order differences would change later request
+        # hashes (callers serialise results into the next prompt) and break offline replay.
+        return json.loads(path.read_text())
 
     def complete_json(self, system: str, user: str, schema: dict[str, Any]) -> dict[str, Any]:
         return self._call("complete_json", {"s": system, "u": user, "schema": schema},
