@@ -584,3 +584,17 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); backdrop-filter: blur(6px); }
 
 /* The non-modal drawer sits in the page, not the top layer: keep it above the sticky header. */
 dialog.drawer { z-index: 40; }
+
+/* Ask panel: recorded-question guidance */
+.mode-note { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); }
+.mode-note .chip { flex: none; margin-block-start: 1px; }
+.mode-note a { color: var(--accent); }
+.nearby { display: grid; gap: 4px; padding: 8px; border-radius: 12px; background: var(--accent-soft); }
+.nearby button { all: unset; box-sizing: border-box; cursor: pointer; padding: 6px 8px; border-radius: 8px; font-size: 0.9rem; }
+.nearby button:hover { background: var(--surface); }
+.nearby button:focus-visible { outline: 2px solid var(--accent); }
+.prompt-groups { display: grid; gap: 6px; }
+.prompt-group { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.prompt-group summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 12px; cursor: pointer; min-block-size: 40px; }
+.prompt-group .examples { padding: 0 12px 10px; }
+.not-recorded { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px dashed var(--border); }

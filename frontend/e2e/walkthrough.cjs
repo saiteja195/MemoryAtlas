@@ -32,7 +32,13 @@ async function audit(page, label) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
   const problems = [];
-  page.on("console", (m) => { if (["error", "warning"].includes(m.type())) problems.push(m.text()); });
+  // The browser logs the 503 for the deliberately unrecorded question; the app handles it, so it is expected.
+  let expect503 = false;
+  page.on("console", (m) => {
+    if (!["error", "warning"].includes(m.type())) return;
+    if (expect503 && /status of 503/.test(m.text())) return;
+    problems.push(m.text());
+  });
   page.on("pageerror", (e) => problems.push(e.message));
 
   await page.request.post(`${BASE}/api/demo/reset`);
@@ -62,6 +68,15 @@ async function audit(page, label) {
   await audit(page, "evidence drawer open");
   await page.locator("dialog.drawer").getByRole("button", { name: "Close" }).click();
 
+  // A question that was never recorded gets a friendly explanation and nearby questions, not a raw error.
+  expect503 = true;
+  await page.locator("#question").fill("Which gym membership did I buy last week?");
+  await page.locator("#question").press("Enter");
+  await page.waitForSelector("text=No recording for that question.");
+  check((await page.locator(".not-recorded .examples button").count()) >= 1, "an unrecorded question explains itself and offers recorded ones");
+  check((await page.locator(".qa .notice.error").count()) === 0, "...and shows no raw error");
+  expect503 = false;
+
   // The timeline.
   await page.locator("#scrub").focus();
   await page.keyboard.press("Home");
@@ -72,7 +87,7 @@ async function audit(page, label) {
   // Act 3: a later photo corrects the wallet.
   await page.getByRole("button", { name: /Upload live photo/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
-  await page.getByRole("button", { name: "Where is my wallet?" }).click();
+  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "Where is my wallet?" }).click();
   await page.waitForSelector('.qa .a:has-text("17:45")');
   const wallet = await page.locator(".qa .a").first().innerText();
   check(/Last confirmed sighting at 17:45/.test(wallet) && /09:10/.test(wallet), "wallet answer says 'Last confirmed sighting at 17:45' and keeps the café as history");
@@ -106,10 +121,10 @@ async function audit(page, label) {
 
   // After forgetting.
   await page.getByRole("tab", { name: "Ask" }).click();
-  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a');
   check(/no record/i.test(await page.locator(".qa:has-text('What did Alex promise me?') .a").innerText()), "'What did Alex promise me?' now answers that there is no record");
-  await page.getByRole("button", { name: "What colour is the awning at Luna Taqueria?" }).click();
+  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "What colour is the awning at Luna Taqueria?" }).click();
   await page.waitForSelector('.qa:has-text("awning") .a:has-text("green")');
   check(true, "the awning (supported by the sign photo) is still answered");
   await page.getByRole("tab", { name: "Facts" }).click();

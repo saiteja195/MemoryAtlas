@@ -3,6 +3,7 @@ import full from "./__fixtures__/graph-full.json";
 import after from "./__fixtures__/graph-after-revoke.json";
 import type { Graph, GraphEdge } from "../api/types";
 import { summarize } from "./dashboard";
+import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "./suggest";
 import {
   atTime, buildElements, claimIdOfFact, clock, dayCards, describeGraph, factCategory, groupFacts, episodeOptions, factNodeId, factRows,
   firstSeen, formatBytes, humanPredicate, moments, pathElementIds, relatedFactClaims, sourceClass, truncate,
@@ -329,5 +330,27 @@ describe("lane layout of the map", () => {
   it("bows out edges that stay inside one column", () => {
     const same = els().filter((e) => e.group === "edges" && String(e.classes).includes("same-lane"));
     expect(same.length).toBeGreaterThan(0);
+  });
+});
+
+describe("suggesting recorded questions", () => {
+  it("finds the closest known question to a free-form one", () => {
+    expect(suggest("which place did alex suggest for tacos", BEFORE_GROUPS)[0]).toMatch(/taco place|restaurant|al pastor/);
+    expect(suggest("where did I put my wallet", BEFORE_GROUPS)[0]).toMatch(/wallet/);
+  });
+
+  it("does not call two questions alike for sharing only a name", () => {
+    expect(suggest("what is alex favourite colour", BEFORE_GROUPS)).toEqual([]);
+  });
+
+  it("suggests nothing for a query with no meaningful words", () => {
+    expect(suggest("the of a", BEFORE_GROUPS)).toEqual([]);
+    expect(suggest("", AFTER_GROUPS)).toEqual([]);
+  });
+
+  it("recognises an exact known question and caps the list", () => {
+    expect(isKnown("  where is my wallet? ", BEFORE_GROUPS)).toBe(true);
+    expect(isKnown("what is the weather", BEFORE_GROUPS)).toBe(false);
+    expect(suggest("alex wallet restaurant", BEFORE_GROUPS, 2).length).toBeLessThanOrEqual(2);
   });
 });
