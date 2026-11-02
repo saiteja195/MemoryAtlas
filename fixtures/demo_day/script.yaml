@@ -1,0 +1,106 @@
+# "A Day You Forgot": the scripted demo day (docs/IMPLEMENTATION_PLAN.md section 5).
+#
+# PLACEHOLDER FIXTURE. No real photos or recordings exist yet, so each frame carries a
+# hand-written `perception` (what the vision step would return) and the conversation carries
+# hand-written diarized `turns` (what Voice Transcribe would return). The capture path that
+# takes real `image` / `audio` bytes is the same code and is covered by tests with fakes.
+# Business names are fictional. Coordinates are synthetic.
+day: "2026-10-29"
+owner: me
+
+people:
+  - {id: me, name: Me}
+  - {id: alex, name: Alex}
+
+# Who consented to what. Audio is dropped unless every participant has an active grant that
+# covers the session.
+grants:
+  - {grantor: me,   session: day-1}
+  - {grantor: me,   session: sync-alex}
+  - {grantor: alex, session: sync-alex}
+
+sessions:
+  day-1:     {participants: [me]}
+  sync-alex: {participants: [me, alex], speaker_map: {A: me, B: alex}}
+
+events:
+  - id: F1
+    at: "09:10"
+    kind: frame
+    session: day-1
+    lat: 37.78930
+    lon: -122.40080
+    perception:
+      caption: A brown leather wallet on a wooden café table next to a coffee cup.
+      ocr_text: ["Blue Door Café"]
+      objects:
+        - {label: wallet, attrs: {color: brown}}
+        - {label: coffee cup}
+      scene: café interior
+    place_name: Blue Door Café
+
+  - id: F2
+    at: "09:40"
+    kind: frame
+    session: day-1
+    lat: 37.77660
+    lon: -122.39590
+    perception:
+      caption: A roadside billboard advertising a gym.
+      ocr_text: ["Orbit Fitness: first month free"]
+      objects:
+        - {label: billboard}
+      scene: street
+
+  - id: C1
+    at: "12:30"
+    ends: "13:15"
+    kind: calendar
+    session: day-1
+    lat: 37.79370
+    lon: -122.39650
+    title: Sync with Alex
+    location_name: Office, 400 Market St
+    attendees: [alex]
+
+  - id: A1
+    at: "12:35"
+    kind: audio
+    session: sync-alex
+    lat: 37.79370
+    lon: -122.39650
+    turns:
+      - {turn_id: 1, start_ms: 0,      end_ms: 14000, speaker: B,
+         text: "Thanks for coming by. You've got to try the taco place right across the street from your office, the one with the green awning. Best al pastor."}
+      - {turn_id: 2, start_ms: 15000,  end_ms: 19000, speaker: A,
+         text: "Sounds great, I'll check it out."}
+      - {turn_id: 3, start_ms: 300000, end_ms: 304000, speaker: B,
+         text: "I'll send you the proposal by Friday."}
+
+  - id: F3
+    at: "13:20"
+    kind: frame
+    session: day-1
+    lat: 37.79400
+    lon: -122.39650
+    perception:
+      caption: A small taco restaurant storefront with a green awning, seen across a street.
+      ocr_text: ["Luna Taqueria"]
+      objects:
+        - {label: awning, attrs: {color: green}}
+        - {label: storefront}
+      scene: street
+
+  # Act 3: uploaded live during the demo (deferred). It carries no GPS fix.
+  - id: F4
+    at: "17:45"
+    kind: frame
+    session: day-1
+    live_upload: true
+    perception:
+      caption: A brown leather wallet in the cup holder of a car.
+      ocr_text: []
+      objects:
+        - {label: wallet, attrs: {color: brown}}
+        - {label: cup holder}
+      scene: car interior
