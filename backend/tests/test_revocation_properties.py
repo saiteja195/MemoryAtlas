@@ -18,7 +18,7 @@ import hypothesis.strategies as st
 from hypothesis import HealthCheck, example, given, settings
 
 from app import db
-from app.embed import embed
+from app.embed import counts, embed, to_blob
 from app.privacy.consent import create_grant
 from app.privacy.revocation import RevocationEngine
 
@@ -77,7 +77,7 @@ def build(g):
         conn.execute("INSERT INTO claims VALUES (?,?,?,NULL,?,NULL,NULL,NULL,'direct_observation',"
                      "0.9,NULL,?,'active',NULL,'t')", (f"C{c}", "e0", "said", f"value qux{c}", text))
         conn.execute("INSERT INTO claim_index(claim_id, text) VALUES (?,?)", (f"C{c}", text))
-        conn.execute("INSERT INTO claim_vectors VALUES (?,?)", (f"C{c}", embed(text).tobytes()))
+        conn.execute("INSERT INTO claim_vectors VALUES (?,?)", (f"C{c}", to_blob(counts(text))))
     for c, js in enumerate(g["justs"]):
         for k, (kind, ref) in enumerate(js):
             jid = f"J{c}_{k}"

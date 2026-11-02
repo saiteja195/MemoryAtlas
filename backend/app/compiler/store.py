@@ -3,7 +3,7 @@ import hashlib
 import sqlite3
 from datetime import datetime
 
-from ..embed import embed
+from ..embed import counts, to_blob
 from .resolve import norm
 
 
@@ -42,7 +42,7 @@ class ClaimWriter:
                  valid_to, evidence_type, confidence, episode_id, text, now_iso()))
             self.conn.execute("INSERT INTO claim_index(claim_id, text) VALUES (?,?)", (cid, text))
             self.conn.execute("INSERT INTO claim_vectors(claim_id, vec) VALUES (?,?)",
-                              (cid, embed(text).tobytes()))
+                              (cid, to_blob(counts(text))))
         elif confidence > existing["confidence"]:
             self.conn.execute("UPDATE claims SET confidence=? WHERE claim_id=?", (confidence, cid))
         if not self.conn.execute("SELECT 1 FROM justifications WHERE claim_id=? AND source_id=?",
@@ -72,7 +72,7 @@ class ClaimWriter:
                  episode_id, text, now_iso()))
             self.conn.execute("INSERT INTO claim_index(claim_id, text) VALUES (?,?)", (cid, text))
             self.conn.execute("INSERT INTO claim_vectors(claim_id, vec) VALUES (?,?)",
-                              (cid, embed(text).tobytes()))
+                              (cid, to_blob(counts(text))))
         jid = "jst-" + hashlib.sha1(f"{cid}|{rule}|{'|'.join(premises)}".encode()).hexdigest()[:12]
         if not self.conn.execute("SELECT 1 FROM justifications WHERE justification_id=?",
                                  (jid,)).fetchone():
