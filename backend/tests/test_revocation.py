@@ -610,3 +610,15 @@ def test_a_phrase_split_across_two_fields_is_not_a_hit(forgotten):
     demo.conn.execute("UPDATE claims SET text='the best al pastor' WHERE claim_id=("
                       "SELECT claim_id FROM claims LIMIT 1)")
     assert probes.search_index(demo.conn, ["best al"]).detail["text_scan_hits"] == 1
+
+
+def test_the_grants_list_says_which_receipt_belongs_to_a_revoked_grant(client):
+    a = client.alex
+    before = {g["grant_id"]: g for g in client.get("/consent/grants").json()}
+    assert all(g["receipt_id"] is None for g in before.values())
+    receipt = client.post(f"/consent/grants/{a['grant_id']}/revoke", params={"red_team": "false"},
+                          json={"token": a["demo_token"]}).json()
+    after = {g["grant_id"]: g for g in client.get("/consent/grants").json()}
+    assert after[a["grant_id"]]["receipt_id"] == receipt["receipt_id"]
+    assert after[a["grant_id"]]["revoked_at"]
+    assert [g for g in after.values() if g["grant_id"] != a["grant_id"] and g["receipt_id"]] == []

@@ -21,6 +21,10 @@ class MemoryEngine:
         self.gateway = Gateway(conn, llm, owner, names)
         self.compiler = Compiler(conn, llm, owner)
 
+    def reset(self) -> None:
+        """Clear in-memory compile state. Call after the tables have been emptied."""
+        self.compiler.deriver.reset()
+
     def ingest(self, cap: RawCapture) -> list[Ingested]:
         out = []
         for res in self.gateway.ingest(cap):
