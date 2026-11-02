@@ -269,6 +269,8 @@ def revoke(grant_id, token):
 
 **Property tests (`hypothesis`):** generate random support DAGs and cyclic graphs, revoke random sources, and assert (a) every surviving claim has a well-founded support path, (b) every claim with such a path survives, (c) revocation is idempotent.
 
+*As built (Phase 3):* dead claims are **deleted** rather than marked `revoked` (a tombstone would still reveal its subject and object); revoking the grant for a recorded conversation removes **all** participants' lines of that session; survivors that lost a source are re-worded from their structure and summaries built on them are dropped; probe 7 also scans the database files for the removed text, and probe 4 covers the app's runtime model-response cache (the committed fixtures are read-only seed data). See `docs/HANDOFF.md` section 5 for the limits.
+
 **Honesty line for the pitch:** MemoryAtlas proves what *it* retains. Whatever went to a hosted model provider is covered by that provider's terms (Day-0 check #6). The local redaction step limits what gets sent.
 
 ### 4.5 The Atlas UI (`frontend/`)
