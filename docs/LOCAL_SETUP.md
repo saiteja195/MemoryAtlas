@@ -34,7 +34,7 @@ Check that it works:
 make test
 ```
 
-You should see all tests pass (172 at the time of writing, about 20 seconds). Then start everything:
+You should see all tests pass (type-check and 24 web tests, then 175 backend tests; about 25 seconds). Then start everything:
 
 ```bash
 make dev
@@ -48,11 +48,41 @@ make dev
 
 To run them separately, use `make api` and `make web` in two terminals. Stop with Ctrl+C.
 
-> **The web UI is still a status page** (it shows whether the backend is reachable and which model mode is
-> active). The Atlas graph UI is the next phase (issue #7). Everything else is usable today through the API
-> and the interactive docs at `/docs`.
+### Using the Atlas UI
 
-## 3. Try the demo (no key, copy and paste)
+Open http://localhost:5173. The whole demo can be run from the browser, in this order:
+
+1. **Build the day.** Press **Play next** (one event at a time) or **Play the day**. The memory graph appears.
+   **Episodes** (the default) shows the day as boxes in time order; **Details** shows the people, places and
+   things, and how they relate. The row under the timeline lists every event of the day; dashed ones have not
+   happened yet.
+2. **Ask a question.** Click an example (in replay mode only the examples are recorded) or type your own in
+   live mode. The facts the answer rests on light up in the graph and everything else fades. Press **Why? Show
+   the evidence** to open the proof: each fact traced to the photo, conversation or calendar entry it came from,
+   with the original quote. Click any fact in the graph to see where it came from, or use **Clear focus**.
+3. **Travel in time.** Drag **Scrub through the day**, or press **Watch it build**. Facts appear when they first
+   became knowable, and a sighting that was later replaced counts as current until the newer one arrived.
+4. **Let new evidence correct a memory.** Press **Upload live photo · 17:45**, then ask "Where is my wallet?".
+   The answer moves from the café to the car; the café sighting stays as greyed-out history (⏱, **History**
+   checkbox).
+5. **Withdraw consent.** Open the **Consent** tab. Press "Alex withdraws…" (a simulated phone appears), or
+   "Open on Alex's phone (new tab)" to do it from a second tab. The demo PIN is `4242`. The first tab notices on
+   its own, fades out what was forgotten, and shows the **forgetting receipt**: what was removed, what was kept
+   and why, and the 7 automated checks. Then ask "What did Alex promise me?" (no record) and "What colour is the
+   awning at Luna Taqueria?" (still answered).
+6. **Reset** puts everything back to the start.
+
+Reading the graph (also under "How to read the graph" in the page): a dashed line is inferred, a solid one
+observed; colour says where a fact came from (photo, conversation, calendar, several sources "×N", inferred);
+shape says what kind of thing (circle person, rounded box place, diamond thing). Useful controls: **Facts**
+(related / all / off: details such as what was said or a colour), **Tidy up** (re-arrange so nothing overlaps),
+**Fit** and zoom.
+
+The page follows your system's light or dark theme and reduced-motion setting. It works with the keyboard (the
+tabs take arrow keys, Esc closes dialogs), and every fact in the picture is also in the **All facts as a table**
+section under it. The header always shows the model mode and **Raw media kept: 0 B**.
+
+## 3. Try the demo from the terminal (no key, copy and paste)
 
 With `make api` running, in another terminal. The demo replays a staged day: a wallet at a café, a billboard,
 a calendar meeting with Alex, a recorded conversation, and a photo of a taco shop sign.
@@ -203,11 +233,24 @@ The API has no login. It is meant to run on your own machine.
 ## 8. Running the checks and re-recording
 
 ```bash
-make test                                      # everything, offline
+make test                                      # web type-check and tests, then the backend; offline
+make check-web                                 # just the web part (about 2 s)
 cd backend && . .venv/bin/activate
 python -m pytest -q -k "not properties"        # skip the 1,000-graph property tests (about 15 s)
 python -m pytest -q tests/test_replay_revoke.py   # one file
 python -m pytest -q tests/test_revocation_properties.py --hypothesis-seed=7   # a different random draw
+```
+
+**Browser check (optional).** `frontend/e2e/walkthrough.cjs` drives the whole demo in a real browser and
+asserts what it sees (the answers, the evidence, the scrubber, the wallet correction, the second-tab consent, the
+receipt, dark mode, no console errors). It needs Playwright, which is not a project dependency because it
+downloads browsers. With `make api` and `make web` running:
+
+```bash
+cd frontend
+npm install --no-save playwright && npx playwright install chromium
+npm run e2e                                   # resets the demo first; exit code 0 means every step held
+# also run an accessibility audit: AXE_PATH=/path/to/axe.min.js npm run e2e   (from the axe-core package)
 ```
 
 Re-recording the model responses needs a key and takes several minutes per script. Do it only after changing a
@@ -249,6 +292,8 @@ cd backend && . .venv/bin/activate && python -m pytest -q                       
 | `Address already in use` on 8000 or 5173 | Another server holds the port. Stop it, or run on another port: `uvicorn app.main:app --port 8001` (and update the proxy in `frontend/vite.config.ts`). |
 | `python3 -m venv` fails | On Debian/Ubuntu: `sudo apt install python3-venv`. |
 | Web UI says backend "unreachable" | `make api` is not running, or it is on another port. |
+| The UI says "That question isn't in the recording" | Replay mode only answers recorded questions: use an example chip, or switch to live mode. |
+| The graph looks crowded | Set **Facts** to "related", or press **Tidy up**; the "All facts as a table" section lists everything. |
 | `make test` fails right after you edited a prompt | Expected; see re-recording above. |
 | Results differ between live runs | Live extraction is a model call and can vary. Use replay for demos and tests. |
 | Want a clean slate | Section 6 ("To reset completely"), or `POST /demo/reset`. |
@@ -265,7 +310,8 @@ backend/app/
   api.py       all HTTP endpoints          schema.sql   the database design
 backend/scripts/  smoke test and the recording scripts
 backend/tests/    unit, property and replay tests
-frontend/         React + Cytoscape (status page for now)
+frontend/         the Atlas UI: React + Cytoscape. src/utils/graph.ts holds the logic (unit tested),
+                  src/components/ the screens, e2e/ the browser check
 fixtures/         the staged demo day and the committed model recordings
 docs/             IMPLEMENTATION_PLAN.md (design), HANDOFF.md (state and decisions), HACKATHON_FACTS.md
 ```
