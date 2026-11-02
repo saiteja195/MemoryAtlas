@@ -55,6 +55,8 @@ Branches on `origin` (both authored only by `saiteja195`):
 |---|---|
 | `feature/implementation-plan` | README, CONTRIBUTING, CLAUDE.md, `docs/IMPLEMENTATION_PLAN.md` |
 | `feature/scaffold` (branched from the above) | Everything in Phase 0 and the Meta client, plus this file |
+| `feature/meta-api-verified` | Docs updated with the live smoke-test results |
+| `feature/capture-compiler` (branched from the one above) | **Phase 1**: gateway, compiler, `/graph`, demo fixtures, recorded model output |
 
 `main` holds only the initial commit. A stale remote branch `claude/recallos-hackathon-plan-su6eaz` still exists; the owner should delete it (`git push origin --delete claude/recallos-hackathon-plan-su6eaz`). No pull requests exist yet.
 
@@ -66,7 +68,16 @@ Branches on `origin` (both authored only by `saiteja195`):
 - `frontend/`: Vite + React + Cytoscape shell that shows backend status. `Makefile`: `make setup`, `make test`, `make dev`. `.env.example`.
 - Live Meta calls verified via the smoke test (Nov 2). Not run: `make dev` end to end.
 
-**Not built yet:** capture gateway, compiler, derivation rules, investigator, revocation engine and leak probes, Atlas UI, eval, baseline, demo fixtures.
+**Phase 1 built (`feature/capture-compiler`, 58 tests, all offline):**
+- `backend/app/capture/`: `Gateway` (consent gate, local redaction, hash, blocked-hash check, text-only `sources` insert, raw bytes cleared in `finally`), `MockDayAdapter`, `media_bytes_on_disk` audit. `privacy/consent.py`: `create_grant` (HMAC token), `active_grant`.
+- `backend/app/compiler/`: `perceive` (Spark vision), `episodes` (time +-20 min, geofence 150 m), `extract` (controlled vocabulary, Pydantic, one repair retry), `resolve` (exact/alias, fuzzy plus LLM adjudication recorded as a justified `same_as` claim), `store.ClaimWriter` (identical claim from a second source adds a justification, which is how "met Alex" gets calendar plus transcript support), `contradiction` (located_at within 5 min naming different places -> both `disputed`), `pipeline.Compiler`.
+- `backend/app/api.py` (`create_app`): `/graph?at=&include=history`, `/capture/{kind}`, `/consent/grants`, `/privacy/media`, `/demo/status|reset|advance|live/{id}`. `main.py` is now just `app = create_app()`.
+- `fixtures/demo_day/script.yaml` (placeholder text fixtures, fictional names, synthetic GPS) and `fixtures/llm_cache/` (real Muse Spark responses for the demo day, recorded with `backend/scripts/record_demo.py`). `MEMORYATLAS_LLM_MODE=replay` (the default) rebuilds the graph offline. **Changing any prompt changes the cache keys: re-run `record_demo.py`.**
+- Gate met: replaying the day builds the graph with 4 episodes, Alex, the wallet and Luna Taqueria; 0 media bytes retained or on disk.
+
+**Phase 1 gaps (be honest about these):** frames are not downscaled (no real images yet and no Pillow dependency); the speaker-label-to-person mapping comes from the session declaration in the fixture, not from anything inferred; no WebSocket graph deltas yet (UI polls `/graph`); no real photos or audio have gone through the full path (only fakes in tests and the smoke test).
+
+**Not built yet:** derivation rules, investigator, revocation engine and leak probes, Atlas UI, eval, baseline.
 
 ## 6. Next steps
 
@@ -79,7 +90,11 @@ Branches on `origin` (both authored only by `saiteja195`):
 
 **Then, in this order (see plan §8 for gates)**
 1. ~~Run the smoke test~~ Done Nov 2, all PASS. Optionally re-run with a real two-person WAV to check multi-speaker diarization.
-2. **Phase 1, `feature/capture-compiler`:** demo-day fixtures (plan §5), capture gateway with consent gate, redaction, ephemeral buffer and blocked hashes, compiler (perceive, episode binding, claim extraction, entity resolution, contradiction pass), `/graph` endpoint. Gate: replaying the demo day builds the graph; 0 media bytes on disk. If the owner hasn't recorded real media, build against placeholder text fixtures first.
+2. ~~Phase 1, `feature/capture-compiler`~~ Done (see section 5). Notes for Phase 2 from the real model output:
+   - The transcript yields an **unnamed** entity `taco place` with `across_from Office` and `awning: green`. `spatial_referent_resolution` should bind it to `Luna Taqueria` (green awning, within 100 m) and write `recommended(alex, luna_taqueria)` with premises `said`, the location claim and the sign claim.
+   - Wallet sightings are `located_at` a place; the car frame came back as `located_at cup holder` and `cup holder located_at car interior`. `last_seen` must follow that chain or the extraction prompt should be tightened. The two wallet claims are both `active` today, so supersession is still to do.
+   - Same-episode duplicates merge into one claim, so claim confidence is the max across supports.
+   - For Phase 3: revocation must also drop `entities` that no remaining claim references, and `same_as` aliases (they are claims, so they die with their source). Transcript segments are stored under the speaker's grant, so Alex revoking removes Alex's words but not the owner's own turns.
 3. **Phase 2, `feature/recall`:** derivation rules, tool-calling investigator with citation-integrity checks, supersession and disputes.
 4. **Phase 3, `feature/revocation`:** grants, HMAC revoke, least-fixpoint recompute, purge across every store, 7 leak probes, receipt, property tests.
 5. **Phase 4, `feature/atlas-ui` and `feature/eval`:** graph UI and a fair baseline (same text, same model, plain retrieval).
