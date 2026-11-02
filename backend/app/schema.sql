@@ -29,6 +29,17 @@ CREATE TABLE IF NOT EXISTS sources (
 );
 CREATE INDEX IF NOT EXISTS idx_sources_grant ON sources(grant_id);
 
+-- Every grant a source depends on. A note rests on one grant; a recorded conversation rests on the
+-- grant of EVERY participant (the gateway only records audio when all of them agreed). A source is
+-- usable only while all of its grants stand, so withdrawing any participant removes the recording,
+-- and a grant that was never part of it cannot.
+CREATE TABLE IF NOT EXISTS source_consents (
+  source_id TEXT NOT NULL REFERENCES sources(source_id),
+  grant_id  TEXT NOT NULL REFERENCES consent_grants(grant_id),
+  PRIMARY KEY (source_id, grant_id)
+);
+CREATE INDEX IF NOT EXISTS idx_source_consents_grant ON source_consents(grant_id);
+
 CREATE TABLE IF NOT EXISTS entities (
   entity_id TEXT PRIMARY KEY,
   type      TEXT NOT NULL CHECK (type IN ('person', 'place', 'object', 'org', 'episode', 'item')),

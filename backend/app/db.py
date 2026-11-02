@@ -19,7 +19,8 @@ def connect(path: str = ":memory:") -> sqlite3.Connection:
 
 _TABLES_IN_DELETE_ORDER = [
     "justification_premises", "justifications", "claim_index", "claim_vectors", "answer_cache",
-    "chat_messages", "forgetting_receipts", "claims", "sources", "consent_grants", "entities",
+    "chat_messages", "forgetting_receipts", "claims", "source_consents", "sources", "consent_grants",
+    "entities",
     "blocked_hashes",
 ]
 

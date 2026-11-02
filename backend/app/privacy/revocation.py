@@ -10,14 +10,20 @@ Deterministic code decides everything here; no model is involved in what is remo
    search rows, vectors, orphaned entities, cached answers, chat messages; blank the revoked
    sources; block their content from being re-ingested; re-render survivors that lost a source
    so none carries wording that came only from the removed one.
-4. Clean the database file (rebuild the index, checkpoint the log, VACUUM) and the app's
-   model-response cache, then run the leak probes and store a receipt of counts and digests.
+4. Clean the database file (rebuild the index, checkpoint the log, VACUUM), empty the answer cache
+   and the app's model-response cache, then run the leak probes and store a receipt.
+
+Caches are derived copies, so they are cleared whole rather than searched for what was forgotten:
+phrase matching misses short or numeric secrets and paraphrases. Receipts never store claim text;
+the text of a kept fact is filled in when a receipt is read, and shows "[forgotten since]" once
+that fact is gone.
 
 Dead claims are deleted outright, not tombstoned: a tombstone would still reveal who the
 claim was about and what it pointed at.
 """
 import hashlib
 import json
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -26,6 +32,7 @@ from typing import Any, Iterable
 
 from ..compiler.contradiction import contradiction_pass
 from ..compiler.derive import Deriver
+from ..compiler.episodes import _label as episode_label, episode_extent, episode_id_for
 from ..embed import embed
 from ..llm.base import LLMClient
 from .consent import verify_token
@@ -34,6 +41,7 @@ from .probes import PASS, FAIL, SKIPPED, run_probes
 from .terms import distinctive_terms, rare_terms, term_digest
 
 REDACTED_CHAT = "[removed: this relied on information that was forgotten]"
+FORGOTTEN_SINCE = "[forgotten since]"
 
 
 class UnknownGrant(LookupError):
@@ -82,14 +90,14 @@ class RevocationEngine:
             row = self.conn.execute("SELECT report_json FROM forgetting_receipts WHERE grant_id=?"
                                     " ORDER BY created_at LIMIT 1", (grant_id,)).fetchone()
             if row:
-                return {**json.loads(row["report_json"]), "already_revoked": True}
+                return {**self._hydrate(json.loads(row["report_json"])), "already_revoked": True}
         try:
             plan = self._purge(grant)
         except Exception:
             self.conn.rollback()
             raise
         self._clean_storage()
-        cache_removed = self._purge_model_cache(plan["terms"])
+        cache_removed = self._clear_model_cache()
         probes = run_probes(
             self.conn, terms=plan["terms"], removed_texts=plan["removed_texts"],
             removed_entity_ids=plan["removed_entities"], db_path=self.db_path,
@@ -102,12 +110,33 @@ class RevocationEngine:
                           (receipt["receipt_id"], grant_id, receipt["created_at"],
                            json.dumps(receipt)))
         self.conn.commit()
-        return receipt
+        return self._hydrate(receipt)
 
     def get_receipt(self, receipt_id: str) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT report_json FROM forgetting_receipts WHERE receipt_id=?",
                                 (receipt_id,)).fetchone()
-        return json.loads(row["report_json"]) if row else None
+        return self._hydrate(json.loads(row["report_json"])) if row else None
+
+    def _hydrate(self, receipt: dict[str, Any]) -> dict[str, Any]:
+        """Add the current wording of each kept fact. Receipts are stored without claim text, so a
+        later withdrawal cannot leave forgotten words behind in an older receipt."""
+        out = json.loads(json.dumps(receipt))
+        ok = authorized_claim_ids(self.conn)
+        for r in out.get("retained", []):
+            row = self.conn.execute("SELECT text FROM claims WHERE claim_id=?", (r["claim_id"],)).fetchone()
+            r["text"] = row["text"] if row and r["claim_id"] in ok else FORGOTTEN_SINCE
+        return out
+
+    def _scrub_receipts(self) -> None:
+        """Remove claim text from every stored receipt (receipts written by an earlier version
+        embedded it)."""
+        for r in self.conn.execute("SELECT receipt_id, report_json FROM forgetting_receipts").fetchall():
+            report = json.loads(r["report_json"])
+            if any("text" in x for x in report.get("retained", [])):
+                for x in report["retained"]:
+                    x.pop("text", None)
+                self.conn.execute("UPDATE forgetting_receipts SET report_json=? WHERE receipt_id=?",
+                                  (json.dumps(report), r["receipt_id"]))
 
     # -- the transaction ---------------------------------------------------------------------
 
@@ -115,14 +144,16 @@ class RevocationEngine:
         c = self.conn
         gid = grant["grant_id"]
         now = datetime.now(timezone.utc).isoformat()
+        self._scrub_receipts()
 
-        # Everything stored under this grant, plus every line of a recorded conversation in the
-        # grant's session: the gateway only records audio when ALL participants consented, so
-        # once one of them withdraws, no one's half of that recording may stay.
+        # Every source that depends on this grant. A recorded conversation depends on the grant of
+        # each participant (the gateway only records audio when ALL of them agreed), so when one
+        # participant withdraws, no one's half of that recording may stay. A grant that was never
+        # part of a recording cannot remove it, whatever session id it names.
         revoked = c.execute(
-            "SELECT source_id, kind, text, content_hash FROM sources WHERE status='active' AND"
-            " (grant_id=? OR (kind='transcript_segment' AND session_id=?))",
-            (gid, grant["scope_ref"] if grant["scope"] == "capture_session" else None)).fetchall()
+            "SELECT s.source_id, s.kind, s.text, s.content_hash FROM sources s WHERE s.status='active'"
+            " AND (s.grant_id=? OR EXISTS (SELECT 1 FROM source_consents k WHERE k.source_id = s.source_id"
+            " AND k.grant_id=?))", (gid, gid)).fetchall()
         revoked_ids = [r["source_id"] for r in revoked]
         removed_texts = [r["text"] for r in revoked if r["text"]]
 
@@ -203,25 +234,32 @@ class RevocationEngine:
             c.execute("INSERT OR IGNORE INTO blocked_hashes(content_hash, reason) VALUES (?,?)",
                       (r["content_hash"], f"revoked:{gid}"))
 
+        # -- metadata only a removed source supplied: episode time and place, a fact's timestamp --
+        moved = self._recompute_episodes()
+        self._retime([cid for cid in lost if cid in survivors], lost, kept)
         # -- survivors that lost a source: no wording from the removed one -------------------
-        rewritten = self._rerender([cid for cid in lost if cid in survivors])
+        reword = [cid for cid in lost if cid in survivors]
+        if moved:                                  # claims that quote a changed episode's label
+            marks = ",".join("?" * len(moved))
+            reword += [r["claim_id"] for r in c.execute(
+                f"SELECT claim_id FROM claims WHERE predicate='part_of_episode' AND object_id IN ({marks})", moved)]
+        rewritten = self._rerender(sorted(set(reword)))
         self._recompute_states(claims, dead, pointing)
 
         # -- terms, then caches and chat -----------------------------------------------------
         known = self._remaining_text() + self._structural_text()
         terms = distinctive_terms(term_texts, known)
         rare = rare_terms(terms, known)
-        cache_rows = self._purge_answer_cache(dead, terms)
+        cache_rows = self._clear_answer_cache()
         chat_rows = self._redact_chat(dead, terms)
 
         retained = []
         for cid in sorted(lost):
             if cid not in survivors:
                 continue
-            row = c.execute("SELECT claim_id, text, predicate, confidence FROM claims WHERE"
-                            " claim_id=?", (cid,)).fetchone()
+            row = c.execute("SELECT predicate FROM claims WHERE claim_id=?", (cid,)).fetchone()
             retained.append({
-                "claim_id": cid, "text": row["text"], "predicate": row["predicate"],
+                "claim_id": cid, "predicate": row["predicate"],
                 "lost_support": sorted({self._describe(j, claims) for j in lost[cid]}),
                 "still_supported_by": sorted({self._describe(j, claims) for j in kept[cid]})})
         c.commit()
@@ -287,6 +325,67 @@ class RevocationEngine:
             done.append(cid)
         return done
 
+    def _recompute_episodes(self) -> list[str]:
+        """Rebuild each episode's time bounds and place from the observations that still stand,
+        and give it an id that does not carry the time of one that was forgotten."""
+        valid = valid_source_ids(self.conn)
+        changed: list[str] = []
+        for ep in self.conn.execute("SELECT entity_id, attrs FROM entities WHERE type='episode'").fetchall():
+            a = json.loads(ep["attrs"])
+            contrib = a.get("contrib")
+            if contrib is None:
+                continue                       # written before provenance was kept
+            keep = [x for x in contrib if x["source_id"] is None or x["source_id"] in valid]
+            if len(keep) == len(contrib):
+                continue
+            if not keep:
+                times = [r[0] for r in self.conn.execute(
+                    "SELECT event_time FROM claims WHERE episode_id=? AND event_time IS NOT NULL", (ep["entity_id"],))]
+                if not times:
+                    continue                   # nothing refers to it: removed as an orphan already
+                keep = [{"source_id": None, "start": min(times), "end": max(times), "lat": None, "lon": None}]
+            new = {**episode_extent(keep), "contrib": [x for x in keep if x["source_id"] is not None]}
+            start = datetime.fromisoformat(new["start"])
+            end = datetime.fromisoformat(new["end"])
+            eid = ep["entity_id"]
+            token = re.match(r"episode:(\d{8}-\d{4})", eid)
+            if token and token.group(1) != f"{start:%Y%m%d-%H%M}":
+                eid = self._rename_episode(eid, start)
+            self.conn.execute("UPDATE entities SET name=?, attrs=? WHERE entity_id=?",
+                              (episode_label(start, end), json.dumps(new), eid))
+            changed.append(eid)
+        return changed
+
+    def _rename_episode(self, old: str, start: datetime) -> str:
+        """Move an episode to an id built from its remaining start time, taking every reference
+        with it. (Claim ids stay as they are: they are identifiers, not content.)"""
+        base = episode_id_for(start)
+        new, n = base, 2
+        while self.conn.execute("SELECT 1 FROM entities WHERE entity_id=?", (new,)).fetchone():
+            new, n = f"{base}-{n}", n + 1
+        row = self.conn.execute("SELECT type, name, attrs FROM entities WHERE entity_id=?", (old,)).fetchone()
+        self.conn.execute("INSERT INTO entities(entity_id, type, name, attrs) VALUES (?,?,?,?)",
+                          (new, row["type"], row["name"], row["attrs"]))
+        for col in ("subject_id", "object_id", "episode_id"):
+            self.conn.execute(f"UPDATE claims SET {col}=? WHERE {col}=?", (new, old))
+        self.conn.execute("DELETE FROM entities WHERE entity_id=?", (old,))
+        return new
+
+    def _retime(self, claim_ids: list[str], lost: dict[str, list[dict[str, Any]]],
+                kept: dict[str, list[dict[str, Any]]]) -> None:
+        """A fact two sources stated carries the time of whichever wrote it first. If that source
+        was removed, move the time to the earliest one that remains."""
+        for cid in claim_ids:
+            when = {r["source_id"]: r["captured_at"] for r in self.conn.execute(
+                "SELECT source_id, captured_at FROM sources")}
+            gone = {when[j["source_id"]] for j in lost.get(cid, []) if j["kind"] == "source" and j["source_id"] in when}
+            left = sorted(when[j["source_id"]] for j in kept.get(cid, []) if j["kind"] == "source" and j["source_id"] in when)
+            row = self.conn.execute("SELECT event_time, valid_from FROM claims WHERE claim_id=?", (cid,)).fetchone()
+            if not left or row is None or row["event_time"] not in gone:
+                continue
+            self.conn.execute("UPDATE claims SET event_time=?, valid_from=CASE WHEN valid_from=? THEN ? ELSE valid_from END"
+                              " WHERE claim_id=?", (left[0], row["event_time"], left[0], cid))
+
     def _recompute_states(self, claims: dict[str, sqlite3.Row], dead: set[str],
                           pointing: list[str]) -> None:
         """Disputes and 'latest sighting' depend on which claims exist; redo them."""
@@ -340,16 +439,9 @@ class RevocationEngine:
         keys(export_memories(self.conn))      # field names only; values are never used
         return words
 
-    def _purge_answer_cache(self, dead: set[str], terms: list[str]) -> int:
-        from .probes import contains
-        n = 0
-        for r in self.conn.execute("SELECT question_hash, answer_json, claim_ids FROM"
-                                   " answer_cache").fetchall():
-            if dead & set(json.loads(r["claim_ids"])) or contains(r["answer_json"], terms):
-                self.conn.execute("DELETE FROM answer_cache WHERE question_hash=?",
-                                  (r["question_hash"],))
-                n += 1
-        return n
+    def _clear_answer_cache(self) -> int:
+        """Cached answers are only copies of what could be recomputed, so all of them go."""
+        return self.conn.execute("DELETE FROM answer_cache").rowcount
 
     def _redact_chat(self, dead: set[str], terms: list[str]) -> int:
         from .probes import contains
@@ -388,17 +480,17 @@ class RevocationEngine:
         if self.db_path and self.db_path != ":memory:":
             self.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
 
-    def _purge_model_cache(self, terms: list[str]) -> int:
-        """Delete recorded model responses that contain removed text. Only the app's own
-        runtime cache is touched; the committed demo fixtures are read-only seed data."""
-        from .probes import contains
-        if not self.cache_dir or not Path(self.cache_dir).is_dir() or not terms:
+    def _clear_model_cache(self) -> int:
+        """Delete every recorded model response in the app's own runtime cache. A response's
+        dependence on what was forgotten is not recorded, and searching for phrases misses short
+        or paraphrased secrets, so nothing is kept. The committed demo fixtures are read-only seed
+        data in another directory and are never touched."""
+        if not self.cache_dir or not Path(self.cache_dir).is_dir():
             return 0
         n = 0
         for p in Path(self.cache_dir).glob("*.json"):
-            if contains(p.read_text(), terms):
-                p.unlink()
-                n += 1
+            p.unlink()
+            n += 1
         return n
 
     # -- receipt -----------------------------------------------------------------------------
@@ -436,6 +528,8 @@ class RevocationEngine:
             "notes": [
                 "Removed claims are deleted outright, not hidden, and the database file was "
                 "rebuilt (index rebuild, log checkpoint, VACUUM).",
+                "Cached answers and recorded model responses are derived copies, so they were "
+                "cleared whole instead of searched for what was forgotten.",
                 "Anything already sent to Meta's hosted models is covered by Meta's terms, not "
                 "by this receipt.",
                 "Committed demo fixtures (recorded model responses and the staged script) are "
