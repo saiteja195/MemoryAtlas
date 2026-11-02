@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "gym I went to"
+  },
+  "tool": "search_claims"
+}

@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "al pastor according to Alex"
+  },
+  "tool": "search_claims"
+}

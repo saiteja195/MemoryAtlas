@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "object_id": "object:wallet"
+  },
+  "tool": "last_seen"
+}

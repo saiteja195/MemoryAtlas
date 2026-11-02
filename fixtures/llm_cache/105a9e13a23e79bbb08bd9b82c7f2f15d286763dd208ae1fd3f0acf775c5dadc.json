@@ -1,0 +1,8 @@
+{
+  "action": "tool",
+  "args": {
+    "entity_id": "person:alex",
+    "predicate": "recommended"
+  },
+  "tool": "neighbors"
+}

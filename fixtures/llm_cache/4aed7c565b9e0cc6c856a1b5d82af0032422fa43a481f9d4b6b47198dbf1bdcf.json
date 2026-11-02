@@ -1,0 +1,24 @@
+{
+  "claims": [
+    {
+      "confidence": 1.0,
+      "object": "Alex",
+      "object_type": "person",
+      "predicate": "met_with",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me met with Alex.",
+      "value": null
+    },
+    {
+      "confidence": 1.0,
+      "object": null,
+      "object_type": null,
+      "predicate": "said",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me said sounds great and will check it out.",
+      "value": "Sounds great, I'll check it out"
+    }
+  ]
+}

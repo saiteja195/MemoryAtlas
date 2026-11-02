@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "taco place Alex told about"
+  },
+  "tool": "search_claims"
+}

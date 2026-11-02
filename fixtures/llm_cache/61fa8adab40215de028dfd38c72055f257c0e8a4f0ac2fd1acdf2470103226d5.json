@@ -1,13 +1,13 @@
 {
   "claims": [
     {
-      "confidence": 0.9,
+      "confidence": 0.95,
       "object": "Blue Door Caf\u00e9",
       "object_type": "place",
       "predicate": "observed_at",
       "subject": "Me",
       "subject_type": "person",
-      "text": "Me was at Blue Door Caf\u00e9."
+      "text": "I was at Blue Door Caf\u00e9."
     },
     {
       "confidence": 0.95,
@@ -16,10 +16,10 @@
       "predicate": "located_at",
       "subject": "wallet",
       "subject_type": "object",
-      "text": "The wallet was at Blue Door Caf\u00e9."
+      "text": "The brown leather wallet was at Blue Door Caf\u00e9."
     },
     {
-      "confidence": 0.95,
+      "confidence": 0.9,
       "object": "Blue Door Caf\u00e9",
       "object_type": "place",
       "predicate": "located_at",
@@ -28,11 +28,11 @@
       "text": "The coffee cup was at Blue Door Caf\u00e9."
     },
     {
-      "confidence": 0.95,
+      "confidence": 1.0,
       "predicate": "has_attribute",
       "subject": "wallet",
       "subject_type": "object",
-      "text": "The wallet has color brown.",
+      "text": "The wallet is brown.",
       "value": "color: brown"
     },
     {

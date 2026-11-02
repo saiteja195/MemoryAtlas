@@ -1,0 +1,8 @@
+{
+  "action": "tool",
+  "args": {
+    "k": 10,
+    "query": "lunch with"
+  },
+  "tool": "search_claims"
+}

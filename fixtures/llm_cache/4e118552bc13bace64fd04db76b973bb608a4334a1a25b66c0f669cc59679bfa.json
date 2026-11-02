@@ -1,21 +1,21 @@
 {
   "claims": [
     {
+      "confidence": 1.0,
+      "object": "Alex",
+      "object_type": "person",
+      "predicate": "met_with",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me met with Alex."
+    },
+    {
       "confidence": 0.95,
       "predicate": "said",
       "subject": "Alex",
       "subject_type": "person",
       "text": "Alex said to try the taco place across from the office with the green awning for best al pastor.",
       "value": "try the taco place across from your office with the green awning, best al pastor"
-    },
-    {
-      "confidence": 0.85,
-      "object": "Office, 400 Market St",
-      "object_type": "place",
-      "predicate": "across_from",
-      "subject": "taco place",
-      "subject_type": "place",
-      "text": "The taco place is across from Office, 400 Market St."
     },
     {
       "confidence": 0.9,
@@ -26,13 +26,13 @@
       "value": "awning: green"
     },
     {
-      "confidence": 0.8,
-      "object": "Alex",
-      "object_type": "person",
-      "predicate": "met_with",
-      "subject": "Me",
-      "subject_type": "person",
-      "text": "Me met with Alex."
+      "confidence": 0.9,
+      "object": "Office",
+      "object_type": "place",
+      "predicate": "across_from",
+      "subject": "taco place",
+      "subject_type": "place",
+      "text": "The taco place is across from the Office."
     }
   ]
 }

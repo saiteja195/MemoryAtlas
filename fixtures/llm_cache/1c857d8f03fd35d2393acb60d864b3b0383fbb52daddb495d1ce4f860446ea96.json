@@ -1,0 +1,29 @@
+{
+  "claims": [
+    {
+      "confidence": 0.95,
+      "predicate": "has_attribute",
+      "subject": "Luna Taqueria",
+      "subject_type": "place",
+      "text": "Luna Taqueria has a green awning.",
+      "value": "awning: green"
+    },
+    {
+      "confidence": 0.9,
+      "predicate": "has_attribute",
+      "subject": "Luna Taqueria",
+      "subject_type": "place",
+      "text": "Luna Taqueria is a taco restaurant.",
+      "value": "business type: taco restaurant"
+    },
+    {
+      "confidence": 0.85,
+      "object": "street",
+      "object_type": "place",
+      "predicate": "across_from",
+      "subject": "Luna Taqueria",
+      "subject_type": "place",
+      "text": "Luna Taqueria is seen across a street."
+    }
+  ]
+}

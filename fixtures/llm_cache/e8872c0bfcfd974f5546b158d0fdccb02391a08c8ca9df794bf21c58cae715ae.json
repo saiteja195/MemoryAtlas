@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "entity_id": "place:orbit-fitness"
+  },
+  "tool": "timeline"
+}
