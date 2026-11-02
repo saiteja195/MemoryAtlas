@@ -6,6 +6,10 @@
     <!-- Declare both themes up front so the browser paints the right canvas colour immediately. -->
     <meta name="color-scheme" content="light dark" />
     <title>MemoryAtlas</title>
+    <script>
+      // Apply a saved appearance before first paint so there is no flash of the wrong theme.
+      try { var t = localStorage.getItem("memoryatlas-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

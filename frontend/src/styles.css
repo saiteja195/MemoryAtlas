@@ -51,6 +51,9 @@
   line-height: 1.45;
 }
 
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { block-size: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); }
@@ -509,3 +512,75 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); backdrop-filter: blur(6px); }
 .graph-stage { position: relative; }
 .graph-stage:empty { display: none; }
 .inspector .facts-list button { padding: 5px 8px; inline-size: 100%; box-sizing: border-box; border-radius: 8px; }
+
+/* ------------------------------------------------------------------------------------------
+   Theme toggle and page navigation
+   ------------------------------------------------------------------------------------------ */
+.theme-toggle button { padding-inline: 10px; min-inline-size: 34px; font-size: 1rem; }
+.page-nav button { font-weight: 600; }
+@media (max-width: 700px) { .page-nav { order: 1; inline-size: 100%; } .page-nav button { flex: 1; } }
+
+/* ------------------------------------------------------------------------------------------
+   Dashboard
+   ------------------------------------------------------------------------------------------ */
+.dash-wrap { inline-size: 100%; padding: clamp(12px, 2vw, 24px); max-inline-size: 1280px; margin-inline: auto; }
+.dash { display: grid; gap: 18px; }
+.dash-hero { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; padding: clamp(18px, 3vw, 28px);
+  border-radius: 22px; border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface) 65%); }
+.dash-hero h2 { font-size: clamp(1.5rem, 3.6vw, 2.1rem); letter-spacing: -0.03em; line-height: 1.1; margin-block: 4px 6px; }
+.dash-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.kpi { display: grid; gap: 2px; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.kpi b { font-size: 2rem; line-height: 1.1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.kpi-l { font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+.kpi-s { font-size: 0.8rem; color: var(--muted); }
+.kpi.good b { color: var(--ok); }
+.kpi.bad b { color: var(--bad); }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+.dash-card { display: grid; gap: 12px; align-content: start; }
+.dash-card h3 { font-size: 1rem; letter-spacing: -0.01em; }
+.dash-card.span-2 { grid-column: span 2; }
+@media (max-width: 700px) { .dash-card.span-2 { grid-column: auto; } }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.steps-list { display: grid; gap: 4px; }
+.steps-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-block-start: 1px solid var(--border); }
+.steps-list li:first-child { border-block-start: 0; }
+.steps-list li div { display: grid; gap: 1px; min-inline-size: 0; }
+.donut-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.donut { inline-size: 128px; block-size: 128px; flex: none; }
+.donut-n { font-size: 20px; font-weight: 700; fill: var(--text); }
+.donut-l { font-size: 7.5px; fill: var(--muted); }
+.key { display: grid; gap: 6px; font-size: 0.9rem; }
+.key li { display: flex; align-items: center; gap: 8px; }
+.key i { inline-size: 10px; block-size: 10px; border-radius: 3px; flex: none; }
+.key b { margin-inline-start: auto; padding-inline-start: 14px; font-variant-numeric: tabular-nums; }
+.bars { display: grid; gap: 9px; }
+.bars li { display: grid; grid-template-columns: minmax(90px, 40%) 1fr auto; align-items: center; gap: 10px; font-size: 0.88rem; }
+.bar-track { block-size: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar-fill { display: block; block-size: 100%; border-radius: 999px; transition: inline-size 420ms ease; }
+.bar-n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.privacy { display: grid; gap: 6px; font-size: 0.9rem; }
+.privacy .ok { color: var(--ok); }
+.privacy .warn { color: var(--warn); }
+.privacy .bad { color: var(--bad); }
+.grants-mini { display: grid; gap: 4px; }
+.grants-mini li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-block: 6px; border-block-start: 1px solid var(--border); }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mini-stats div { display: grid; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.mini-stats b { font-size: 1.5rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.mini-stats span { font-size: 0.78rem; color: var(--muted); }
+.mini-stats .good b { color: var(--ok); }
+.mini-stats .bad b { color: var(--bad); }
+.dash-card progress { inline-size: 100%; block-size: 8px; accent-color: var(--accent); }
+.mini-moments { display: grid; }
+.mini-moments button { all: unset; box-sizing: border-box; inline-size: 100%; display: grid; grid-template-columns: 7.5rem 1fr; gap: 10px; padding: 9px 4px; cursor: pointer; border-block-start: 1px solid var(--border); border-radius: 6px; }
+.mini-moments li:first-child button { border-block-start: 0; }
+.mini-moments button:hover { background: var(--surface-2); }
+.mini-moments button:focus-visible { outline: 2px solid var(--accent); }
+.mini-moments time { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.mini-moments span > span { display: block; }
+
+/* The non-modal drawer sits in the page, not the top layer: keep it above the sticky header. */
+dialog.drawer { z-index: 40; }

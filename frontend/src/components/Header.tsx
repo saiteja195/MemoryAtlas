@@ -1,5 +1,9 @@
 import type { DemoStatus, Health, Media } from "../api/types";
 import { formatBytes, truncate } from "../utils/graph";
+import type { ThemePref } from "../hooks/useTheme";
+import { ThemeToggle } from "./ThemeToggle";
+
+export type Page = "dashboard" | "atlas";
 
 type Props = {
   health: Health | null;
@@ -12,6 +16,10 @@ type Props = {
   onLive: (id: string) => void;
   onReset: () => void;
   onHelp: () => void;
+  page: Page;
+  onPage: (p: Page) => void;
+  theme: ThemePref;
+  onTheme: (t: ThemePref) => void;
 };
 
 const MODE: Record<string, { text: string; cls: string; hint: string }> = {
@@ -20,7 +28,7 @@ const MODE: Record<string, { text: string; cls: string; hint: string }> = {
   record: { text: "Recording", cls: "accent", hint: "Live calls, saved so they can be replayed later." },
 };
 
-export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp }: Props) {
+export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp, page, onPage, theme, onTheme }: Props) {
   const mode = health ? MODE[health.llm_mode] : undefined;
   const nextEvent = status?.events.find((e) => e.id === status.next);
   const live = status?.events.filter((e) => e.live_upload && !e.played) ?? [];
@@ -35,6 +43,11 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
         <span className="tagline">memories with receipts</span>
       </div>
 
+      <nav className="seg page-nav" aria-label="Main">
+        <button type="button" aria-pressed={page === "dashboard"} onClick={() => onPage("dashboard")}>Dashboard</button>
+        <button type="button" aria-pressed={page === "atlas"} onClick={() => onPage("atlas")}>Atlas</button>
+      </nav>
+
       <div className="group" aria-label="Status">
         {offline && <span className="chip bad">Backend unreachable</span>}
         {mode && <span className={`chip ${mode.cls}`} title={mode.hint}>{mode.text}</span>}
@@ -46,6 +59,7 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
         )}
       </div>
 
+      {page === "atlas" && (
       <div className="group" role="group" aria-label="Demo day controls">
         {busy && <progress aria-label={busy} />}
         <button type="button" className="btn primary" disabled={disabled || !nextEvent} onClick={onNext}>
@@ -59,7 +73,12 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
           </button>
         ))}
         <button type="button" className="btn ghost" disabled={disabled} onClick={onReset}>Reset</button>
+      </div>
+      )}
+
+      <div className="group">
         <button type="button" className="btn ghost" onClick={onHelp} aria-haspopup="dialog">How it works</button>
+        <ThemeToggle pref={theme} onChange={onTheme} />
       </div>
     </header>
   );

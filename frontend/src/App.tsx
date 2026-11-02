@@ -15,7 +15,9 @@ import { EvidenceDrawer } from "./components/Evidence";
 import { DayOverview } from "./components/DayOverview";
 import { FactsPanel } from "./components/FactsPanel";
 import { GraphView, type GraphHandle } from "./components/GraphView";
-import { Header } from "./components/Header";
+import { Header, type Page } from "./components/Header";
+import { Dashboard } from "./components/Dashboard";
+import { useTheme } from "./hooks/useTheme";
 import { HowItWorks } from "./components/HowItWorks";
 import { Welcome } from "./components/Welcome";
 import { Legend } from "./components/Legend";
@@ -67,13 +69,15 @@ function Atlas() {
   const [asking, setAsking] = useState(false);
   const [simulate, setSimulate] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
+  const [page, setPage] = useState<Page>("dashboard");
+  const theme = useTheme();
   const qaId = useRef(0);
 
   // Theme: the canvas needs real colour strings, so re-read them when the system theme flips.
   useEffect(() => {
     setPalette(readPalette());
     return watchColorScheme(() => setPalette(readPalette()));
-  }, []);
+  }, [theme.tick]);
 
   // --- what is on screen ----------------------------------------------------------------------
   const moments = useMemo(() => momentsOf(atlas.graph), [atlas.graph]);
@@ -202,13 +206,29 @@ function Atlas() {
 
   return (
     <div className="app">
-      <a className="skip-link" href="#main">Skip to the memory graph</a>
+      <a className="skip-link" href="#main">Skip to the main content</a>
       <Header
         health={atlas.health} media={atlas.media} status={atlas.status} busy={atlas.busy} offline={atlas.offline}
         onNext={() => void atlas.advance(1)} onAll={() => void atlas.advance(50)}
         onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} onHelp={() => setHelp(true)}
+        page={page} onPage={setPage} theme={theme.pref} onTheme={theme.choose}
       />
 
+      {page === "dashboard" ? (
+        <main className="dash-wrap" id="main">
+          <Dashboard
+            graph={atlas.graph} status={atlas.status} media={atlas.media} health={atlas.health} grants={atlas.grants}
+            busy={atlas.busy !== null} offline={atlas.offline}
+            onPlayNext={() => void atlas.advance(1)} onPlayAll={() => void atlas.advance(50)}
+            onOpenAtlas={() => setPage("atlas")}
+            onOpenMoment={(id) => { setPage("atlas"); openEpisode(id); }}
+            onAsk={(q) => { setPage("atlas"); void ask(q); }}
+            onConsent={() => { setPage("atlas"); setTab("consent"); }}
+            onReceipt={(id) => void openReceipt(id)}
+            onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()}
+          />
+        </main>
+      ) : (
       <div className="layout">
         <main className="stage" id="main">
           {atlas.notice && (
@@ -312,6 +332,7 @@ function Atlas() {
           </div>
         </aside>
       </div>
+      )}
 
       <HowItWorks open={help} onClose={() => setHelp(false)} />
       <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import full from "./__fixtures__/graph-full.json";
 import after from "./__fixtures__/graph-after-revoke.json";
 import type { Graph, GraphEdge } from "../api/types";
+import { summarize } from "./dashboard";
 import {
   atTime, buildElements, claimIdOfFact, clock, dayCards, describeGraph, factCategory, groupFacts, episodeOptions, factNodeId, factRows,
   firstSeen, formatBytes, humanPredicate, moments, pathElementIds, relatedFactClaims, sourceClass, truncate,
@@ -273,5 +274,26 @@ describe("grouping facts and the day overview", () => {
     expect(cards.length).toBeGreaterThan(1);
     expect([...cards].map((c) => c.time)).toEqual(cards.map((c) => c.time).sort());
     expect(cards.every((c) => c.title.length > 0 && c.facts >= 0)).toBe(true);
+  });
+});
+
+describe("dashboard summary", () => {
+  it("counts every fact once and splits them by how they are known", () => {
+    const s = summarize(FULL);
+    expect(s.facts).toBe(factRows(FULL).length);
+    expect(s.current + s.replaced + s.disputed).toBe(s.facts);
+    expect(s.evidence.observed + s.evidence.confirmed + s.evidence.inferred).toBe(s.facts);
+    expect(s.categories.reduce((n, c) => n + c.count, 0)).toBe(s.facts);
+    expect(s.avgConfidence).toBeGreaterThan(0);
+  });
+
+  it("is empty and safe with no data", () => {
+    const s = summarize({ nodes: [], edges: [] });
+    expect(s.facts).toBe(0);
+    expect(s.avgConfidence).toBeNull();
+  });
+
+  it("shows fewer facts after a forgetting", () => {
+    expect(summarize(AFTER).facts).toBeLessThan(summarize(FULL).facts);
   });
 });
