@@ -12,7 +12,7 @@ so cycles (A supports B, B supports A) are common. After revoking a random set o
  plus: other people's sources are untouched and no leak probe fails.
 """
 import hypothesis.strategies as st
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, example, given, settings
 
 from app import db
 from app.embed import embed
@@ -111,6 +111,10 @@ def revoke_all(conn, tokens, order):
     return [eng.revoke(f"G{i}", tokens[i], run_red_team=False) for i in order]
 
 
+# The graph that once made the export probe see a phrase created by JSON layout ("said value").
+@example({"n_grants": 3, "source_grant": [0, 2, 0, 1],
+          "justs": [[("s", 0)], [("d", frozenset({0}))], [("d", frozenset({0, 3})), ("s", 0)],
+                    [("s", 3)], [("d", frozenset({0}))], [("s", 1)]], "revoked": [1, 0]})
 @settings(max_examples=1000, deadline=None, suppress_health_check=list(HealthCheck))
 @given(graphs().filter(lambda g: initially_valid(g)))
 def test_revocation_is_exactly_well_founded_support(g):

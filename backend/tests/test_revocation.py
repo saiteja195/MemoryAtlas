@@ -591,3 +591,22 @@ def test_rare_terms_need_a_word_that_exists_nowhere_else():
     known = ["Alex met Luna Taqueria", "predicate said recommended"]
     terms = ["alex said", "alex recommended", "pastor", "best pastor", "luna taqueria"]
     assert rare_terms(terms, known) == ["pastor", "best pastor"]
+
+
+def test_phrases_are_never_formed_by_the_layout_of_a_json_document():
+    doc = json.dumps({"predicate": "said", "value": "value qux5", "text": "thing"})
+    assert probes.contains(doc, ["said value"]) == []          # adjacent keys, not a phrase
+    assert probes.contains(doc, ["value qux5"]) == ["value qux5"]   # inside one string: found
+    nested = json.dumps({"edges": [{"text": "best al pastor"}, {"text": "other"}]})
+    assert probes.contains(nested, ["al pastor"]) == ["al pastor"]
+    assert probes.contains(nested, ["pastor other"]) == []     # across two strings: no
+
+
+def test_a_phrase_split_across_two_fields_is_not_a_hit(forgotten):
+    demo, _ = forgotten
+    demo.conn.execute("UPDATE claims SET text='the best', object_value='al pastor' WHERE"
+                      " claim_id=(SELECT claim_id FROM claims LIMIT 1)")
+    assert probes.search_index(demo.conn, ["best al"]).detail["text_scan_hits"] == 0
+    demo.conn.execute("UPDATE claims SET text='the best al pastor' WHERE claim_id=("
+                      "SELECT claim_id FROM claims LIMIT 1)")
+    assert probes.search_index(demo.conn, ["best al"]).detail["text_scan_hits"] == 1

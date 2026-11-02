@@ -35,10 +35,33 @@ class ProbeResult:
         return {"id": self.id, "name": self.name, "status": self.status, "detail": self.detail}
 
 
+def _leaves(node: Any):
+    """Every string value in a JSON structure (keys are the app's own field names)."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for v in node.values():
+            yield from _leaves(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from _leaves(v)
+
+
 def contains(haystack: str, terms: list[str]) -> list[str]:
-    """Terms that occur in `haystack` as whole-word phrases (case-insensitive)."""
-    h = " " + " ".join(tokens(haystack)) + " "
-    return [t for t in terms if f" {t} " in h]
+    """Terms that occur in `haystack` as whole-word phrases (case-insensitive).
+
+    JSON text is searched one string value at a time: phrases must never be formed by the
+    layout of the document (`"predicate": "said", "value": ...` is not the phrase "said value")."""
+    try:
+        parsed = json.loads(haystack)
+    except (ValueError, TypeError):
+        parsed = None
+    texts = list(_leaves(parsed)) if isinstance(parsed, (dict, list)) else [haystack]
+    found: list[str] = []
+    for text in texts:
+        h = " " + " ".join(tokens(text)) + " "
+        found += [t for t in terms if f" {t} " in h and t not in found]
+    return found
 
 
 def _result(i: int, name: str, hits: int, **detail: Any) -> ProbeResult:
@@ -82,7 +105,7 @@ def search_index(conn: sqlite3.Connection, terms: list[str]) -> ProbeResult:
                                  (q,)).fetchone()[0]
     scan = 0
     for r in conn.execute("SELECT text, object_value FROM claims"):
-        scan += len(contains(f"{r['text'] or ''} {r['object_value'] or ''}", terms))
+        scan += len(contains(r["text"] or "", terms)) + len(contains(r["object_value"] or "", terms))
     for r in conn.execute("SELECT text FROM sources"):
         scan += len(contains(r["text"] or "", terms))
     index_rows = conn.execute("SELECT COUNT(*) FROM claim_index").fetchone()[0]
@@ -107,7 +130,8 @@ def vectors(conn: sqlite3.Connection, removed_texts: list[str], terms: list[str]
         ranked = sorted(rows, key=lambda r: -float(np.dot(q, np.frombuffer(r["vec"],
                                                                            dtype=np.float32))))
         for r in ranked[:NEIGHBOURS]:
-            leaked += len(contains(f"{r['text'] or ''} {r['object_value'] or ''}", terms))
+            leaked += len(contains(r["text"] or "", terms)) + \
+                len(contains(r["object_value"] or "", terms))
     return _result(3, "Vectors: no orphan vectors, neighbours of removed text are clean",
                    orphan + leaked, orphan_vectors=orphan, leaking_neighbours=leaked,
                    queries=len(removed_texts))
@@ -162,7 +186,7 @@ def red_team(conn: sqlite3.Connection, llm: LLMClient | None, questions: list[st
             a = inv.ask(q)
             # Echoing the question back is not a leak: ignore what the asker supplied.
             fresh = [t for t in terms if not contains(q, [t])]
-            leaks += len(contains(f"{a.answer} {a.uncertainty_note}", fresh))
+            leaks += len(contains(a.answer, fresh)) + len(contains(a.uncertainty_note, fresh))
             answered.append(a.status)
     except LLMUnavailable as e:
         return ProbeResult(6, "Red team: adversarial questions leak nothing", SKIPPED,
