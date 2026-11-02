@@ -10,6 +10,7 @@ from . import db
 from .capture.adapters import MockDayAdapter
 from .capture.audit import media_bytes_on_disk
 from .capture.models import KINDS, RawCapture
+from .corrections import CorrectionError, correct_claim
 from .config import Settings, runtime_cache_path
 from .demo import DemoRunner
 from .demo_acts import load_acts
@@ -47,6 +48,12 @@ class AskBody(BaseModel):
 
 class RevokeBody(BaseModel):
     token: str = Field(min_length=1)
+
+
+class CorrectBody(BaseModel):
+    text: str | None = Field(default=None, max_length=500)
+    retract: bool = False
+    at: str | None = None
 
 
 class GrantBody(BaseModel):
@@ -169,6 +176,17 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         if "error" in out:
             raise HTTPException(404, out["error"])
         return out
+
+    @app.post("/claims/{claim_id}/correct")
+    def correct(claim_id: str, body: CorrectBody) -> dict:
+        """The user says a remembered fact is wrong: replace it with `text`, or `retract` it. The old
+        fact stays as history; answers stop using it (and anything derived only from it)."""
+        try:
+            return correct_claim(engine, claim_id, body.text, body.retract, body.at)
+        except CorrectionError as e:
+            raise HTTPException(e.code, e.message) from None
+        except LLMUnavailable as e:
+            raise HTTPException(503, str(e)) from e
 
     @app.get("/demo/grants")
     def demo_grants() -> list[dict]:
