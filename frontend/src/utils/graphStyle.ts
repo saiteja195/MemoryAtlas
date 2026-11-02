@@ -53,6 +53,14 @@ export function buildStylesheet(p: Palette): cytoscape.StylesheetStyle[] {
     { selector: "edge.ev-inferred", style: { "line-style": "dashed", "line-dash-pattern": [9, 5] } },
     { selector: "edge.ev-confirmed", style: { "underlay-color": p.ok, "underlay-opacity": 0.35, "underlay-padding": 4 } },
     { selector: "edge.to-fact", style: { width: 1.6, "arrow-scale": 0.7 } },
+    { selector: ".lane-label", style: {
+      events: "no", shape: "rectangle", width: 1, height: 1, "background-opacity": 0, "border-width": 0,
+      "background-image": "none", color: p.muted, "font-size": 11, "font-weight": 700, "text-valign": "center",
+      "text-margin-y": 0, "text-background-opacity": 0, "letter-spacing": 2, "min-zoomed-font-size": 0,
+    } },
+    { selector: "edge.same-lane", style: {
+      "curve-style": "unbundled-bezier", "control-point-distances": [-70], "control-point-weights": [0.5],
+    } },
     { selector: "edge.link", style: {
       width: 3, "line-color": p.muted, "target-arrow-color": p.muted, "target-arrow-shape": "vee", color: p.text,
       "font-size": 12, "curve-style": "unbundled-bezier", "control-point-distances": [-70], "control-point-weights": [0.5],

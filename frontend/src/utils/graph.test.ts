@@ -297,3 +297,37 @@ describe("dashboard summary", () => {
     expect(summarize(AFTER).facts).toBeLessThan(summarize(FULL).facts);
   });
 });
+
+describe("lane layout of the map", () => {
+  const els = (o = opts()) => buildElements(FULL, o);
+  const pos = (es: ReturnType<typeof els>) => es.filter((e) => e.position).map((e) => [e.data.id, e.position]);
+
+  it("is identical on every call, so the map never reshuffles", () => {
+    expect(JSON.stringify(pos(els()))).toBe(JSON.stringify(pos(els())));
+  });
+
+  it("puts people, places and things in their own columns, owner first", () => {
+    const es = els();
+    const x = (id: string) => es.find((e) => e.data.id === id)!.position!.x;
+    const first = es.filter((e) => e.classes?.toString().includes("type-person")).sort((a, b) => a.position!.y - b.position!.y)[0];
+    expect(first.data.id).toBe("me");
+    const col = (type: string) => new Set(es.filter((e) => e.classes?.toString().includes(`type-${type}`)).map((e) => e.position!.x));
+    expect([...col("person")]).toEqual([0]);
+    expect([...col("place")]).toEqual([440]);
+    expect(x("lane:person")).toBe(0);
+  });
+
+  it("never stacks two nodes on the same spot", () => {
+    const seen = new Set<string>();
+    for (const e of els().filter((e) => e.position)) {
+      const key = `${e.position!.x},${e.position!.y}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it("bows out edges that stay inside one column", () => {
+    const same = els().filter((e) => e.group === "edges" && String(e.classes).includes("same-lane"));
+    expect(same.length).toBeGreaterThan(0);
+  });
+});

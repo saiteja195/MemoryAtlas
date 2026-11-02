@@ -231,7 +231,81 @@ function entityElements(view: Graph, opts: ViewOptions): ElementDefinition[] {
       data: { id, label: n.name, type: n.type },
     };
   });
-  return [...nodes, ...facts, ...edges];
+  const labels = layoutInLanes(view, nodes, facts, edges);
+  return [...labels, ...nodes, ...facts, ...edges];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Lane layout: the same picture every time
+// ---------------------------------------------------------------------------------------------
+
+export type Lane = "person" | "place" | "thing";
+const LANES: { id: Lane; title: string; x: number }[] = [
+  { id: "person", title: "People", x: 0 },
+  { id: "place", title: "Places", x: 440 },
+  { id: "thing", title: "Things", x: 880 },
+];
+const ROW = 96;        // vertical space for one node and its label
+const FACT_ROW = 36;   // one fact chip under the same owner
+const FACT_INDENT = 96; // where a fact chip starts, measured from its owner
+
+export const laneOf = (type: string): Lane => (type === "person" ? "person" : type === "place" || type === "org" ? "place" : "thing");
+
+/**
+ * Put people, places and things in three columns, each oldest first, with an owner's detail
+ * chips stacked beside it. No physics, so the map is identical on every load and nothing
+ * moves when you select something. Returns the column headings as non-interactive nodes.
+ * Mutates the `position` of the nodes and facts it is given.
+ */
+function layoutInLanes(
+  view: Graph, nodes: ElementDefinition[], facts: ElementDefinition[], edges: ElementDefinition[],
+): ElementDefinition[] {
+  const claims = new Map(view.edges.map((e) => [e.id, e]));
+  const firstTouch = new Map<string, string>();
+  for (const e of view.edges) {
+    const t = firstSeen(e) ?? "~";
+    for (const id of [e.source, e.target]) {
+      if (id && (firstTouch.get(id) ?? "~~") > t) firstTouch.set(id, t);
+    }
+  }
+  const factsOf = new Map<string, ElementDefinition[]>();
+  for (const f of facts) {
+    const owner = claims.get(f.data.claimId as string)?.source;
+    if (owner) factsOf.set(owner, [...(factsOf.get(owner) ?? []), f]);
+  }
+
+  const present = new Set<Lane>();
+  for (const lane of LANES) {
+    const members = nodes
+      .filter((n) => laneOf(n.data.type as string) === lane.id)
+      .sort((a, b) =>
+        Number(b.data.id === OWNER_ID) - Number(a.data.id === OWNER_ID)
+        || (firstTouch.get(a.data.id as string) ?? "~").localeCompare(firstTouch.get(b.data.id as string) ?? "~")
+        || String(a.data.label).localeCompare(String(b.data.label)));
+    let y = 0;
+    for (const n of members) {
+      present.add(lane.id);
+      n.position = { x: lane.x, y };
+      const mine = factsOf.get(n.data.id as string) ?? [];
+      mine.forEach((f, i) => {
+        // People's details go on the outer (left) side so lines to places never run through them.
+        const dx = FACT_INDENT + (f.data.w as number) / 2;
+        f.position = { x: lane.id === "person" ? lane.x - dx : lane.x + dx, y: y + (i - (mine.length - 1) / 2) * FACT_ROW };
+      });
+      y += ROW + Math.max(0, mine.length - 1) * FACT_ROW;
+    }
+  }
+
+  // Edges inside one column would run straight through the nodes between them: bow them out.
+  const laneById = new Map(nodes.map((n) => [n.data.id as string, laneOf(n.data.type as string)]));
+  for (const e of edges) {
+    const a = laneById.get(e.data.source as string);
+    if (a && a === laneById.get(e.data.target as string)) e.classes = `${e.classes} same-lane`;
+  }
+  return LANES.filter((l) => present.has(l.id)).map((l) => ({
+    group: "nodes" as const, classes: "lane-label", selectable: false, grabbable: false,
+    data: { id: `lane:${l.id}`, label: l.title.toUpperCase() }, position: { x: l.x, y: -80 },
+  }));
 }
 
 /** Only things that travel with you tie episodes together. Two places that merely share a generic

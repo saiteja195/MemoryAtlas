@@ -261,10 +261,6 @@ function Atlas() {
             )}
             {mode === "entities" && <label className="check" title="Show facts that newer evidence replaced"><input type="checkbox" checked={showHistory} onChange={(e) => setShowHistory(e.target.checked)} /> Show history</label>}
             <span className="spacer" />
-            {mode === "entities" && (
-              <button type="button" className="btn small" onClick={() => graphRef.current?.tidy()}
-                      title="Re-arrange the map so nothing overlaps">Tidy up</button>
-            )}
             {(focus || selection) && (
               <button type="button" className="btn small" onClick={() => { setFocus(null); setSelection(null); }}>Clear focus</button>
             )}
@@ -281,7 +277,7 @@ function Atlas() {
               <GraphView
                 ref={graphRef} elements={elements} palette={palette} highlight={highlight} selectedId={selectedId}
                 pulse={atlas.pulse} dataKey={atlas.dataKey} viewKey={`${mode}|${episode}`}
-                layoutKind="force" label={describeGraph(view)} onSelect={onSelect}
+                layoutKind="timeline" label={describeGraph(view)} onSelect={onSelect}
               />
             )}
             {mode === "entities" && elements.length > 0 && !selection && (
