@@ -58,6 +58,7 @@ Branches on `origin` (both authored only by `saiteja195`):
 | `feature/meta-api-verified` | Docs updated with the live smoke-test results |
 | `feature/capture-compiler` (branched from the one above) | **Phase 1**: gateway, compiler, `/graph`, demo fixtures, recorded model output |
 | `feature/recall` (branched from the one above) | **Phase 2**: derivation rules, privacy filter, recall tools, investigator, `/recall/ask` |
+| `feature/revocation` (branched from `main` after Phases 0 to 2 were merged) | **Phase 3**: revocation engine, purge, 7 leak probes, receipt, property tests |
 
 `main` holds only the initial commit. A stale remote branch `claude/recallos-hackathon-plan-su6eaz` still exists; the owner should delete it (`git push origin --delete claude/recallos-hackathon-plan-su6eaz`). No pull requests exist yet.
 
@@ -87,7 +88,19 @@ Branches on `origin` (both authored only by `saiteja195`):
 
 **Client and cache fixes made along the way (all pinned by tests):** `MetaClient` accepts a JSON object after leading prose and retries transport errors (then raises `LLMUnavailable`); `RecordReplayClient` returns exactly what replay returns (key order changed request hashes) and records unparseable replies so replay takes the same retry path.
 
-**Not built yet:** revocation engine, purge and leak probes, Atlas UI, eval, baseline; the "correct a claim" flow (`POST /claims/{id}/correct`); WebSocket deltas.
+**Phase 3 built (`feature/revocation`, 170 tests, all offline):**
+- `privacy/revocation.py` `RevocationEngine.revoke(grant_id, token)`: verifies the HMAC token (403 on a wrong one, nothing changes), marks the grant revoked, works out which claims no longer have a valid support path (the Phase 2 fixpoint), then in ONE transaction removes them and everything built from them: justifications and premises, search rows, vectors, entities nothing refers to any more, cached answers and chat messages that used them, the revoked sources' text/location, and blocks the content from being re-ingested. Then it rebuilds the text index, checkpoints the log and VACUUMs (SQLite now runs with `secure_delete` on), deletes matching files from the app's runtime model-response cache, runs the probes and stores a receipt. Calling it again returns the same receipt and changes nothing.
+- Decisions worth knowing: (1) dead claims are **deleted, not tombstoned**, because a tombstone would still say who it was about and what it pointed at; (2) revoking a grant for a recorded conversation removes **every participant's lines** of that session, since the gateway only records audio when everyone consented; (3) survivors that lost a source are **re-worded from their structure** so none carries phrasing that came only from the removed source, and any summary built from such a claim is deleted too; (4) older sightings come back when the newer one is forgotten, and disputes are recomputed.
+- `privacy/probes.py`, seven probes, each pass / fail / skipped (skipped never counts as a pass): graph support, search index, vectors, caches (answer cache, chat, the runtime model cache), a regenerated export (`privacy/export.py`, `GET /export`), the red team (5 adversarial questions through the real investigator), and disk (no media files, and the database files hold none of the removed text, whole-word scan). Terms (`privacy/terms.py`) are short phrases that were in the removed material and appear nowhere in what remains, minus the app's own vocabulary and schema so a keyword like `check` or `place` cannot trigger a false alarm.
+- Receipt = counts, digests, which survivors lost which source and what still supports them, probe results; it never quotes forgotten text.
+- API: `POST /consent/grants/{id}/revoke?red_team=true`, `GET /consent/grants`, `GET /receipts/{id}`, `GET /export`, and **demo only** `GET /demo/grants` (returns the tokens a real person would hold on their own device).
+- Model cache: `RecordReplayClient` takes a read-only `seed_dir`. The app writes to a runtime cache (`MEMORYATLAS_RUNTIME_CACHE`, default `<db>.llmcache`, git-ignored) and reads the committed `fixtures/llm_cache` as seed. A purge only ever touches the runtime cache.
+- Evidence: property tests on 1,000 random support graphs (633 cyclic) check the survivors against an independent oracle, idempotence, order-independence and that no probe fails; a deliberately broken engine (cycles keep each other alive) fails them. Act 4 on the real model: `scripts/revoke_demo.py` records it, `tests/test_replay_revoke.py` replays it offline. Three independent fresh live recordings each got 7/7 probes and 8/8 questions right (4 refused without leaking, 4 still answered with citations).
+- Found and fixed on the way: the red-team probe flagged echoes of the user's own question and common phrases, and the raw-file scan flagged the SQL keyword `check` in the database's own schema; a conversation's other half survived the first design.
+
+**Limits, stated plainly:** anything already sent to Meta is covered by Meta's terms, not the receipt; the committed demo script and recorded model responses are staged seed data outside the app's stores and are not modified; probes look for distinctive phrases, so a leak made only of everyday words is caught by the structural checks (probes 1 and 5) and not by phrase search; the receipt lists the kind and time of removed sources and a blocked-hash list remains so replays are refused; survivors' confidence numbers are not recomputed; filesystem snapshots and backups are out of reach; the red-team probe needs the model (live, or recorded), and shows as skipped otherwise; the investigator has no clock, so "today" questions may be refused.
+
+**Not built yet:** Atlas UI, eval, baseline; the "correct a claim" flow (`POST /claims/{id}/correct`); WebSocket deltas.
 
 ## 6. Next steps
 
@@ -110,7 +123,10 @@ Branches on `origin` (both authored only by `saiteja195`):
    - `recommended` also depends on the calendar claim `Me observed_at Office` (the anchor premise), so revoking the calendar would remove it as well. Intended, but keep it in mind for the receipt.
    - Entities left with no remaining claim should be dropped; `same_as` aliases are claims and die with their source.
    - Cached answers and chat rows reference claim ids; `graph_version` already changes on any claim or grant change, but rows still have to be deleted, not just ignored.
-4. **Phase 3, `feature/revocation`:** grants, HMAC revoke, least-fixpoint recompute, purge across every store, 7 leak probes, receipt, property tests.
+4. ~~Phase 3, `feature/revocation`~~ Done (see section 5). Notes for Phase 4:
+   - UI: `GET /demo/grants` gives Alex's demo token for the simulated "scan the QR code" step; `POST /consent/grants/{id}/revoke` returns the whole receipt (counts, retained-with-reason list, 7 probe results), so the receipt modal needs no further call. With a live model the red-team probe makes about 25 model calls, so expect tens of seconds; pass `?red_team=false` for a fast revoke and show that probe as skipped.
+   - Refetch `/graph?include=history` after a revoke: deleted claims are gone (not greyed out), and an older sighting may have become active again.
+   - Eval: the revocation categories can use `acts.yaml` (`act4_must_forget`, `act4_must_keep`) and `scripts/revoke_demo.py` as a starting point.
 5. **Phase 4, `feature/atlas-ui` and `feature/eval`:** graph UI and a fair baseline (same text, same model, plain retrieval).
 6. **Phase 5, `feature/submission`:** README, results, 3-minute video, submission form. Feature freeze noon ET Wed.
 

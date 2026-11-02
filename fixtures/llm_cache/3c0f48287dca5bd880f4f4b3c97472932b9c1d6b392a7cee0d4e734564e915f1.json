@@ -1,0 +1,8 @@
+{
+  "action": "tool",
+  "args": {
+    "predicate": "promised",
+    "query": "Alex"
+  },
+  "tool": "search_claims"
+}

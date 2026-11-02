@@ -1,0 +1,9 @@
+{
+  "action": "final",
+  "answer": "The billboard advertised 'Orbit Fitness: first month free' for Orbit Fitness, which is a gym.",
+  "cited_claim_ids": [
+    "clm-8df5b0dc3a39",
+    "clm-c25c75652e9a"
+  ],
+  "status": "answered"
+}

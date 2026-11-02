@@ -1,5 +1,6 @@
 import base64
 import os
+from dataclasses import replace
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -9,13 +10,16 @@ from . import db
 from .capture.adapters import MockDayAdapter
 from .capture.audit import media_bytes_on_disk
 from .capture.models import KINDS, RawCapture
-from .config import Settings
+from .config import Settings, runtime_cache_path
 from .demo import DemoRunner
+from .demo_acts import load_acts
 from .engine import MemoryEngine
 from .graph import build_graph
 from .llm.base import LLMClient, LLMUnavailable
 from .llm.factory import build_client
 from .privacy.consent import create_grant
+from .privacy.export import export_memories
+from .privacy.revocation import BadToken, RevocationEngine, UnknownGrant
 from .recall.service import RecallService
 
 
@@ -41,6 +45,10 @@ class AskBody(BaseModel):
     question: str = Field(min_length=3, max_length=500)
 
 
+class RevokeBody(BaseModel):
+    token: str = Field(min_length=1)
+
+
 class GrantBody(BaseModel):
     grantor: str
     session_id: str
@@ -49,12 +57,22 @@ class GrantBody(BaseModel):
 
 def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -> FastAPI:
     settings = settings or Settings()
+    # One runtime model-response cache, shared by the client and the forgetting purge.
+    settings = replace(settings, runtime_cache_dir=runtime_cache_path(settings))
     conn = db.connect(settings.db_path)
     llm = llm or build_client(settings)
     adapter = MockDayAdapter(settings.demo_script)
     engine = MemoryEngine(conn, llm, adapter.owner, adapter.names)
     demo = DemoRunner(engine, adapter, settings.revocation_secret)
     recall = RecallService(conn, llm)
+    try:
+        red_team = [q["question"] for q in load_acts().get("red_team", [])]
+    except OSError:
+        red_team = []
+    revoker = RevocationEngine(
+        conn, settings.revocation_secret, llm, adapter.owner,
+        db_path=None if settings.db_path == ":memory:" else os.path.abspath(settings.db_path),
+        cache_dir=settings.runtime_cache_dir, red_team_questions=red_team)
     data_dir = None if settings.db_path == ":memory:" else os.path.dirname(os.path.abspath(
         settings.db_path))
 
@@ -74,7 +92,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         retained = conn.execute("SELECT COALESCE(SUM(media_bytes_retained),0) FROM sources"
                                 ).fetchone()[0]
         on_disk = media_bytes_on_disk(*( [data_dir] if data_dir else []), recursive=False)
-        on_disk += media_bytes_on_disk(settings.cache_dir)
+        on_disk += media_bytes_on_disk(settings.cache_dir, settings.runtime_cache_dir)
         return {"raw_media_bytes_retained": retained, "media_bytes_on_disk": on_disk}
 
     @app.post("/consent/grants")
@@ -82,6 +100,34 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         gid, token = create_grant(conn, settings.revocation_secret, body.grantor,
                                   body.session_id, body.purposes)
         return {"grant_id": gid, "revocation_token": token}
+
+    @app.get("/consent/grants")
+    def grants() -> list[dict]:
+        return [dict(r) for r in conn.execute(
+            "SELECT grant_id, grantor, scope, scope_ref, granted_at, revoked_at FROM"
+            " consent_grants ORDER BY granted_at, grant_id")]
+
+    @app.post("/consent/grants/{grant_id}/revoke")
+    def revoke(grant_id: str, body: RevokeBody, red_team: bool = True) -> dict:
+        """Withdraw consent: forget everything only this grant supported. The token is the
+        proof that the person who consented is the one asking."""
+        try:
+            return revoker.revoke(grant_id, body.token, run_red_team=red_team)
+        except UnknownGrant:
+            raise HTTPException(404, "unknown grant") from None
+        except BadToken:
+            raise HTTPException(403, "wrong revocation token") from None
+
+    @app.get("/receipts/{receipt_id}")
+    def receipt(receipt_id: str) -> dict:
+        found = revoker.get_receipt(receipt_id)
+        if found is None:
+            raise HTTPException(404, "unknown receipt")
+        return found
+
+    @app.get("/export")
+    def export() -> dict:
+        return export_memories(conn)
 
     @app.post("/capture/{kind}")
     def capture(kind: str, body: CaptureBody) -> dict:
@@ -118,6 +164,15 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         out = recall.provenance(claim_id)
         if "error" in out:
             raise HTTPException(404, out["error"])
+        return out
+
+    @app.get("/demo/grants")
+    def demo_grants() -> list[dict]:
+        """DEMO ONLY: the revocation tokens a real person would hold on their own device, so
+        the demo can act as 'Alex scans the QR code'. Never expose this outside a demo."""
+        out = []
+        for g in grants():
+            out.append({**g, "demo_token": demo.tokens.get(f"{g['grantor']}:{g['scope_ref']}")})
         return out
 
     @app.get("/demo/status")

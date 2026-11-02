@@ -17,5 +17,18 @@ class Settings:
     cache_dir: str = os.getenv("MEMORYATLAS_CACHE_DIR", str(ROOT / "fixtures" / "llm_cache"))
     demo_script: str = os.getenv("MEMORYATLAS_DEMO_SCRIPT",
                                  str(ROOT / "fixtures" / "demo_day" / "script.yaml"))
+    # Where the app writes model responses at run time. The committed `cache_dir` is read-only
+    # seed data; a forgetting purge cleans this directory. "" means: next to the database.
+    runtime_cache_dir: str = os.getenv("MEMORYATLAS_RUNTIME_CACHE", "")
     # Keys the HMAC of consent revocation tokens (simulated authenticated action).
     revocation_secret: str = os.getenv("MEMORYATLAS_SECRET", "dev-only-secret")
+
+
+def runtime_cache_path(s: Settings) -> str:
+    """The directory the running app records model responses into."""
+    if s.runtime_cache_dir:
+        return s.runtime_cache_dir
+    if s.db_path == ":memory:":
+        import tempfile
+        return tempfile.mkdtemp(prefix="memoryatlas-llm-")
+    return str(Path(s.db_path).resolve()) + ".llmcache"

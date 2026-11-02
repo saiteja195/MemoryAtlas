@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "proposal deadline Alex mentioned"
+  },
+  "tool": "search_claims"
+}

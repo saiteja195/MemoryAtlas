@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "Alex recommended"
+  },
+  "tool": "search_claims"
+}

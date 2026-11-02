@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "meeting with Alex"
+  },
+  "tool": "search_claims"
+}

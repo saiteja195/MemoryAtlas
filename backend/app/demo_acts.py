@@ -13,8 +13,18 @@ def load_acts(path: Path = ACTS_PATH) -> dict[str, list[dict[str, Any]]]:
     return yaml.safe_load(path.read_text())
 
 
-def score(item: dict[str, Any], out: dict[str, Any], abstain: bool = False) -> list[str]:
-    """Returns the list of problems (empty means it passed)."""
+def score(item: dict[str, Any], out: dict[str, Any], abstain: bool = False,
+          forgotten: bool = False) -> list[str]:
+    """Returns the list of problems (empty means it passed).
+
+    `forgotten`: the fact was removed, so the answer may refuse or say what is still known, but
+    it must not mention any word in the item's `forbid` list and must not cite anything."""
+    if forgotten:
+        text = out["answer"].lower()
+        problems = [f"mentions {w!r}" for w in item.get("forbid", []) if w.lower() in text]
+        if out["status"] == "answered":
+            problems.append("answered a question about forgotten information")
+        return problems + (["cites claims"] if out["cited_claim_ids"] and out["status"] == "abstained" else [])
     if abstain:
         return [] if out["status"] == "abstained" else [f"expected abstention, got {out['status']}"]
     problems = []
@@ -33,10 +43,11 @@ def score(item: dict[str, Any], out: dict[str, Any], abstain: bool = False) -> l
     return problems
 
 
-def run_group(recall, items: list[dict[str, Any]], abstain: bool = False) -> list[dict[str, Any]]:
+def run_group(recall, items: list[dict[str, Any]], abstain: bool = False,
+              forgotten: bool = False) -> list[dict[str, Any]]:
     rows = []
     for item in items:
         out = recall.ask(item["question"])
-        rows.append({"question": item["question"], "problems": score(item, out, abstain),
+        rows.append({"question": item["question"], "problems": score(item, out, abstain, forgotten),
                      "out": out})
     return rows

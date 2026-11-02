@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "proposal"
+  },
+  "tool": "search_claims"
+}

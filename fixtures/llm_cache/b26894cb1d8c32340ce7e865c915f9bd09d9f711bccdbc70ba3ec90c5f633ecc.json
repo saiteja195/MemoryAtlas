@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "Alex said about food"
+  },
+  "tool": "search_claims"
+}

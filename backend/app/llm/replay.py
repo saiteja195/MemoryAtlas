@@ -17,13 +17,17 @@ class RecordReplayClient:
     replay: serve from disk only; a miss raises LLMUnavailable, never a guess.
     """
 
-    def __init__(self, cache_dir: str, mode: str, inner: LLMClient | None = None):
+    def __init__(self, cache_dir: str, mode: str, inner: LLMClient | None = None,
+                 seed_dir: str | None = None):
         if mode not in ("record", "replay"):
             raise ValueError(f"mode must be record or replay, got {mode!r}")
         if mode == "record" and inner is None:
             raise ValueError("record mode needs an inner client")
         self.mode = mode
         self._dir = Path(cache_dir)
+        # Read-only recorded fixtures (the committed demo day). Lookups fall back to it, but
+        # nothing is ever written to or deleted from it, so a purge of `cache_dir` is complete.
+        self._seed = Path(seed_dir) if seed_dir else None
         self._inner = inner
         self._dir.mkdir(parents=True, exist_ok=True)
 
@@ -33,12 +37,14 @@ class RecordReplayClient:
         return hashlib.sha256(blob.encode()).hexdigest()
 
     def _call(self, method: str, payload: dict[str, Any], *args: Any) -> Any:
-        path = self._dir / f"{self._key(method, payload)}.json"
-        if path.exists():
-            data = json.loads(path.read_text())
-            if isinstance(data, dict) and ERROR_KEY in data:
-                raise LLMUnavailable(data[ERROR_KEY])      # the model's unusable reply, replayed
-            return data
+        name = f"{self._key(method, payload)}.json"
+        path = self._dir / name
+        for candidate in (path, self._seed / name if self._seed else None):
+            if candidate is not None and candidate.exists():
+                data = json.loads(candidate.read_text())
+                if isinstance(data, dict) and ERROR_KEY in data:
+                    raise LLMUnavailable(data[ERROR_KEY])  # the model's unusable reply, replayed
+                return data
         if self.mode == "replay":
             raise LLMUnavailable(f"no recorded response for {method} ({path.name})")
         try:
