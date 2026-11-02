@@ -12,3 +12,17 @@ def connect(path: str = ":memory:") -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode = WAL")
     conn.executescript(SCHEMA_PATH.read_text())
     return conn
+
+
+_TABLES_IN_DELETE_ORDER = [
+    "justification_premises", "justifications", "claim_index", "claim_vectors", "answer_cache",
+    "chat_messages", "forgetting_receipts", "claims", "sources", "consent_grants", "entities",
+    "blocked_hashes",
+]
+
+
+def reset(conn: sqlite3.Connection) -> None:
+    """Empty every table (used by /demo/reset)."""
+    for t in _TABLES_IN_DELETE_ORDER:
+        conn.execute(f"DELETE FROM {t}")
+    conn.commit()
