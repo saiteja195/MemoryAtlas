@@ -26,6 +26,17 @@ make dev
 
 Full guide, including the copy-and-paste demo and live mode: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
 
+## How memory is stored
+
+The memory map is a **claims graph kept in one SQLite file**: entities (people, places, objects, episodes), claims
+(facts with time, confidence and evidence type), and the justifications that say why each claim exists. Search is
+SQLite FTS5 plus vector similarity. There is no separate graph or vector database, on purpose: forgetting is
+deterministic code over a single store that the leak checks can scan completely, including the file itself.
+
+It is sized for a person's days and weeks, not yet a lifetime. Planned next, measured before it is built
+(see [#29](https://github.com/saiteja195/MemoryAtlas/issues/29)): incremental support tracking, a faster vector index,
+and PostgreSQL if it ever becomes multi-user.
+
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch naming, commit conventions and the authorship rule.
