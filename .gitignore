@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MemoryAtlas
+node_modules/
+*.db
+*.db-wal
+*.db-shm
+.env
+!frontend/src/lib/
