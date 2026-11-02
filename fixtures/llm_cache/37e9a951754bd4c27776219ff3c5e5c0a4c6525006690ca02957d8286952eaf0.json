@@ -1,0 +1,48 @@
+{
+  "claims": [
+    {
+      "confidence": 0.9,
+      "object": "Blue Door Caf\u00e9",
+      "object_type": "place",
+      "predicate": "observed_at",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me was at Blue Door Caf\u00e9."
+    },
+    {
+      "confidence": 0.95,
+      "object": "Blue Door Caf\u00e9",
+      "object_type": "place",
+      "predicate": "located_at",
+      "subject": "wallet",
+      "subject_type": "object",
+      "text": "The wallet was at Blue Door Caf\u00e9."
+    },
+    {
+      "confidence": 0.95,
+      "object": "Blue Door Caf\u00e9",
+      "object_type": "place",
+      "predicate": "located_at",
+      "subject": "coffee cup",
+      "subject_type": "object",
+      "text": "The coffee cup was at Blue Door Caf\u00e9."
+    },
+    {
+      "confidence": 0.95,
+      "predicate": "has_attribute",
+      "subject": "wallet",
+      "subject_type": "object",
+      "text": "The wallet has color brown.",
+      "value": "color: brown"
+    },
+    {
+      "confidence": 0.9,
+      "object": "coffee cup",
+      "object_type": "object",
+      "predicate": "near",
+      "subject": "wallet",
+      "subject_type": "object",
+      "text": "The wallet was next to the coffee cup."
+    }
+  ]
+}

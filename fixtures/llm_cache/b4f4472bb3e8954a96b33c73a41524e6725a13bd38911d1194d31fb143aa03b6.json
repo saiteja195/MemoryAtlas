@@ -1,0 +1,20 @@
+{
+  "claims": [
+    {
+      "confidence": 1.0,
+      "predicate": "said",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me said sounds great and will check it out.",
+      "value": "Sounds great, will check it out"
+    },
+    {
+      "confidence": 0.85,
+      "predicate": "committed_to",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me committed to checking it out.",
+      "value": "will check it out"
+    }
+  ]
+}

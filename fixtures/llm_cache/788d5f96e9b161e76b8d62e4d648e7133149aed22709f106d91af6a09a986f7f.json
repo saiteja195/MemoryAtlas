@@ -1,0 +1,38 @@
+{
+  "claims": [
+    {
+      "confidence": 0.95,
+      "object": "cup holder",
+      "object_type": "object",
+      "predicate": "located_at",
+      "subject": "wallet",
+      "subject_type": "object",
+      "text": "The wallet was in the cup holder."
+    },
+    {
+      "confidence": 0.95,
+      "predicate": "has_attribute",
+      "subject": "wallet",
+      "subject_type": "object",
+      "text": "The wallet is brown.",
+      "value": "color: brown"
+    },
+    {
+      "confidence": 0.9,
+      "predicate": "has_attribute",
+      "subject": "wallet",
+      "subject_type": "object",
+      "text": "The wallet is leather.",
+      "value": "material: leather"
+    },
+    {
+      "confidence": 0.9,
+      "object": "car interior",
+      "object_type": "place",
+      "predicate": "located_at",
+      "subject": "cup holder",
+      "subject_type": "object",
+      "text": "The cup holder is in the car interior."
+    }
+  ]
+}

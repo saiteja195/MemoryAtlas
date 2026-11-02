@@ -1,0 +1,24 @@
+{
+  "claims": [
+    {
+      "confidence": 0.9,
+      "event_time": "2026-10-29T12:30:00",
+      "object": "Office, 400 Market St",
+      "object_type": "place",
+      "predicate": "observed_at",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me was at Office, 400 Market St for Sync with Alex."
+    },
+    {
+      "confidence": 0.85,
+      "event_time": "2026-10-29T12:30:00",
+      "object": "Alex",
+      "object_type": "person",
+      "predicate": "met_with",
+      "subject": "Me",
+      "subject_type": "person",
+      "text": "Me met with Alex at Sync with Alex."
+    }
+  ]
+}
