@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "Alex promise"
+  },
+  "tool": "search_claims"
+}

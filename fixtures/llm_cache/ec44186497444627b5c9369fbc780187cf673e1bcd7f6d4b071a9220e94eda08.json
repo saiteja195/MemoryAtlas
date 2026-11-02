@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "name": "Alex"
+  },
+  "tool": "find_entity"
+}

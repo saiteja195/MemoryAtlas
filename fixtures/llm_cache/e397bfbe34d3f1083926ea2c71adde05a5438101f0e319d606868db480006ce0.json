@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "restaurant"
+  },
+  "tool": "search_claims"
+}

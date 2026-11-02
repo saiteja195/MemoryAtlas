@@ -1,0 +1,8 @@
+{
+  "action": "tool",
+  "args": {
+    "predicate": "recommended",
+    "query": "Alex recommended restaurant near office"
+  },
+  "tool": "search_claims"
+}

@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "billboard advertise"
+  },
+  "tool": "search_claims"
+}

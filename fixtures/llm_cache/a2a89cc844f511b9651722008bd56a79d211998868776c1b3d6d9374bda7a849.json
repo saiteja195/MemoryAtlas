@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "query": "What colour is the awning at Luna Taqueria"
+  },
+  "tool": "search_claims"
+}
