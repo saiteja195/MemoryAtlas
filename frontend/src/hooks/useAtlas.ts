@@ -107,6 +107,12 @@ export function useAtlas() {
   const uploadLive = useCallback(
     (id: string) => run("Uploading the photo", () => api.uploadLive(id)), [run]);
 
+  /** Correct or set aside a remembered fact. Returns true when the server accepted it. */
+  const correct = useCallback(async (claimId: string, body: { text?: string; retract?: boolean; at?: string }) => {
+    const out = await run("Recording the correction", () => api.correct(claimId, body));
+    return out !== undefined;
+  }, [run]);
+
   const reset = useCallback(async () => {
     shown.current = new Set();
     setReceipt(null);
@@ -126,6 +132,6 @@ export function useAtlas() {
   return {
     health, status, media, graph, dataKey, grants, busy, notice, setNotice, offline, loaded,
     receipt, closeReceipt: () => setReceipt(null), openReceipt: (r: Receipt) => setReceipt(r),
-    pulse, refresh, advance, uploadLive, reset, revoke,
+    pulse, refresh, advance, uploadLive, correct, reset, revoke,
   };
 }

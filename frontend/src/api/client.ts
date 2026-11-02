@@ -52,6 +52,9 @@ export const api = {
   uploadLive: (eventId: string) => post<{ ingested: number }>(`/demo/live/${encodeURIComponent(eventId)}`),
   reset: () => post<DemoStatus>("/demo/reset"),
   ask: (question: string) => post<Answer>("/recall/ask", { question }),
+  correct: (claimId: string, body: { text?: string; retract?: boolean; at?: string }) =>
+    post<{ corrected: string; replacement: string | null; also_superseded: string[] }>(
+      `/claims/${encodeURIComponent(claimId)}/correct`, body),
   revoke: (grantId: string, token: string, redTeam = true) =>
     post<Receipt>(`/consent/grants/${encodeURIComponent(grantId)}/revoke?red_team=${redTeam}`, { token }),
 };

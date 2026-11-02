@@ -3,6 +3,7 @@ import {
   clock, episodeMembers, episodeTimeLabel, factRows, humanPredicate, OWNER_ID, type Selection,
 } from "../utils/graph";
 import { EvidenceChip, SourceChips, StatusChip } from "./Badges";
+import { CorrectClaim, type CorrectionBody } from "./CorrectClaim";
 
 type Props = {
   full: Graph;
@@ -10,13 +11,15 @@ type Props = {
   selection: Selection;
   onSelect: (s: Selection) => void;
   onWhy: (claimIds: string[]) => void;
+  onCorrect: (claimId: string, body: CorrectionBody) => Promise<boolean>;
+  replay: boolean;
   onOpenEpisode: (episodeId: string) => void;
   onClose: () => void;
 };
 
 const TYPE_WORD: Record<string, string> = { person: "Person", place: "Place", object: "Thing", org: "Organisation", item: "Item" };
 
-export function SelectionCard({ full, view, selection, onSelect, onWhy, onOpenEpisode, onClose }: Props) {
+export function SelectionCard({ full, view, selection, onSelect, onWhy, onCorrect, replay, onOpenEpisode, onClose }: Props) {
   if (!selection) return null;
   const close = <button type="button" className="btn small ghost close" onClick={onClose} aria-label="Close details">✕</button>;
 
@@ -43,6 +46,9 @@ export function SelectionCard({ full, view, selection, onSelect, onWhy, onOpenEp
         <div className="row">
           <button type="button" className="btn primary small" onClick={() => onWhy([e.id])}>Why do we believe this?</button>
         </div>
+        {(e.status === "active" || e.status === "disputed") && e.predicate !== "part_of_episode" && (
+          <CorrectClaim key={e.id} claimText={e.text} replay={replay} onSubmit={(body) => onCorrect(e.id, body)} />
+        )}
       </section>
     );
   }

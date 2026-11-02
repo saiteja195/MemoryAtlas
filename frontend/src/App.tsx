@@ -134,10 +134,14 @@ function Atlas() {
 
   // --- keep the screen honest when the data changes --------------------------------------------
   const firstLoad = useRef(true);
+  const pendingNote = useRef<string | null>(null);
   useEffect(() => {
     if (!atlas.loaded) return;
     if (firstLoad.current) { firstLoad.current = false; return; }
-    announce(describeGraph(atlas.graph));
+    // One live region: a message waiting for this refresh is folded in, or the refresh would replace it.
+    const note = pendingNote.current;
+    pendingNote.current = null;
+    announce(note ? `${note} ${describeGraph(atlas.graph)}` : describeGraph(atlas.graph));
     // a selection or focus on something that no longer exists is dropped
     const ids = new Set(atlas.graph.edges.map((e) => e.id));
     setSelection((s) => (s?.kind === "claim" && !ids.has(s.id) ? null : s));
@@ -183,6 +187,13 @@ function Atlas() {
     setScrubAt(null);
     setSelection({ kind: "claim", id: claimId });
     setFocus([claimId]);
+  };
+  const correct = async (claimId: string, body: { text?: string; retract?: boolean; at?: string }) => {
+    pendingNote.current = body.retract ? "That fact is set aside and kept as history."
+      : "Correction recorded. The earlier fact is kept as history.";
+    const ok = await atlas.correct(claimId, body);
+    if (!ok) pendingNote.current = null;
+    return ok;
   };
   const why = (ids: string[]) => { setEvidence(ids); setFocus(ids); };
   const onSelect = (s: Selection) => {
@@ -286,6 +297,7 @@ function Atlas() {
             {mode === "entities" && selection && (
               <SelectionCard full={atlas.graph} view={view} selection={selection}
                              onSelect={(s) => { setSelection(s); setFocus(null); }} onWhy={why}
+                             onCorrect={correct} replay={atlas.health?.llm_mode === "replay"}
                              onOpenEpisode={openEpisode} onClose={() => { setSelection(null); setFocus(null); }} />
             )}
             </div>

@@ -175,3 +175,19 @@ rank differently across BLAS libraries. The fix (exact integer similarity, deter
 `tests/test_replay_portability.py`) is committed on `bug/replay-portability`; it makes the existing
 recordings stale, so merging it needs `python scripts/ask_demo.py` and then `python scripts/revoke_demo.py`
 (live key, about 10 minutes) and a clean `make test`.
+
+
+## 9. User corrections (issue #10, first half)
+
+`POST /claims/{id}/correct` with `{"text": "..."}` replaces a remembered fact, or `{"retract": true}` sets it
+aside (`backend/app/corrections.py`). Nothing is deleted: the claim and anything derived only from it become
+`superseded` history, so answers stop using them and the Atlas still shows them. The replacement is an ordinary
+user-confirmed note recorded under the owner's own consent and compiled like any other source; the replacement
+must be about the same subject, otherwise nothing changes (422). A claim nobody may read is reported as unknown
+(404), never as forgotten. In the Atlas, select a fact and press "That's wrong…".
+
+Replay mode has one recorded correction (`scripts/correct_demo.py`, `tests/test_replay_correct.py`; the time is
+pinned because it is part of the request). Limits: an episode summary derived from a corrected fact is set aside
+but not regenerated; a correction text that yields no replacement for the same subject is recorded as a note but
+changes nothing. **Not built:** the `WS /events` live-update stream (the UI still refreshes after each action and
+polls consent changes).
