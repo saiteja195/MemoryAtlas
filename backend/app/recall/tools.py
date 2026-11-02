@@ -6,11 +6,11 @@ import sqlite3
 from datetime import datetime
 from typing import Any, Callable
 
-import numpy as np
+from fractions import Fraction
 
 from ..compiler.episodes import haversine_m
 from ..compiler.resolve import norm
-from ..embed import embed
+from ..embed import counts, from_blob, rank
 from ..privacy.filter import HISTORY, READABLE, authorized_claim_ids
 
 HIDDEN_PREDICATES = ("part_of_episode",)
@@ -97,20 +97,22 @@ class RecallTools:
         fts: list[str] = []
         if terms:
             q = " OR ".join(f'"{t}"' for t in terms)
-            fts = [r["claim_id"] for r in self.conn.execute(
-                "SELECT claim_id FROM claim_index WHERE claim_index MATCH ? ORDER BY bm25(claim_index)"
-                " LIMIT 50", (q,))]
-        qv = embed(query)
-        vec = sorted(((float(np.dot(qv, np.frombuffer(r["vec"], dtype=np.float32))), r["claim_id"])
-                      for r in self.conn.execute("SELECT claim_id, vec FROM claim_vectors")),
-                     reverse=True)[:50]
-        score: dict[str, float] = {}
-        for rank, cid in enumerate(fts):
-            score[cid] = score.get(cid, 0) + 1 / (60 + rank)
-        for rank, (_, cid) in enumerate(vec):
-            score[cid] = score.get(cid, 0) + 1 / (60 + rank)
+            rows = self.conn.execute(
+                "SELECT claim_id, rowid, bm25(claim_index) AS s FROM claim_index WHERE claim_index MATCH ?",
+                (q,)).fetchall()
+            # bm25 is a float; round away last-digit differences between SQLite builds, and break
+            # exact ties by insertion order, so the order is the same on every machine.
+            fts = [r["claim_id"] for r in sorted(rows, key=lambda r: (round(r["s"], 9), r["rowid"]))[:50]]
+        vec = rank(counts(query), [
+            (r["claim_id"], from_blob(r["vec"], r["text"])) for r in self.conn.execute(
+                "SELECT v.claim_id, v.vec, c.text FROM claim_vectors v JOIN claims c ON c.claim_id = v.claim_id")])[:50]
+        score: dict[str, Fraction] = {}                     # reciprocal rank fusion, in exact arithmetic
+        for rank_i, cid in enumerate(fts):
+            score[cid] = score.get(cid, Fraction(0)) + Fraction(1, 60 + rank_i)
+        for rank_i, cid in enumerate(vec):
+            score[cid] = score.get(cid, Fraction(0)) + Fraction(1, 60 + rank_i)
         out = []
-        for cid in sorted(score, key=score.get, reverse=True):
+        for cid in sorted(score, key=lambda c: -score[c]):   # stable: equal scores keep fusion order
             row = self.conn.execute("SELECT * FROM claims WHERE claim_id=?", (cid,)).fetchone()
             if not row or not self._readable(row):
                 continue

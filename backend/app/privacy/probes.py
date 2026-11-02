@@ -11,11 +11,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-import numpy as np
-
 from ..capture.audit import media_bytes_on_disk
 from ..compiler.episodes import episode_extent
-from ..embed import embed
+from ..embed import counts, from_blob, rank
 from ..llm.base import LLMClient, LLMUnavailable
 from .export import export_memories
 from .filter import authorized_claim_ids, valid_source_ids
@@ -133,16 +131,15 @@ def vectors(conn: sqlite3.Connection, removed_texts: list[str], terms: list[str]
     """No vector without a claim, and the nearest neighbours of the removed text are clean."""
     orphan = conn.execute("SELECT COUNT(*) FROM claim_vectors v WHERE NOT EXISTS (SELECT 1 FROM"
                           " claims c WHERE c.claim_id = v.claim_id)").fetchone()[0]
-    rows = conn.execute("SELECT v.claim_id, v.vec, c.text, c.object_value FROM claim_vectors v"
-                        " JOIN claims c ON c.claim_id = v.claim_id").fetchall()
+    rows = {r["claim_id"]: r for r in conn.execute(
+        "SELECT v.claim_id, v.vec, c.text, c.object_value FROM claim_vectors v"
+        " JOIN claims c ON c.claim_id = v.claim_id")}
     leaked = 0
+    items = [(cid, from_blob(r["vec"], r["text"] or "")) for cid, r in rows.items()]
     for text in removed_texts:
-        q = embed(text)
-        ranked = sorted(rows, key=lambda r: -float(np.dot(q, np.frombuffer(r["vec"],
-                                                                           dtype=np.float32))))
-        for r in ranked[:NEIGHBOURS]:
-            leaked += len(contains(r["text"] or "", terms)) + \
-                len(contains(r["object_value"] or "", terms))
+        for cid in rank(counts(text), items)[:NEIGHBOURS]:
+            r = rows[cid]
+            leaked += len(contains(r["text"] or "", terms)) + len(contains(r["object_value"] or "", terms))
     return _result(3, "Vectors: no orphan vectors, neighbours of removed text are clean",
                    orphan + leaked, orphan_vectors=orphan, leaking_neighbours=leaked,
                    queries=len(removed_texts))

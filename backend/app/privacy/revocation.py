@@ -33,7 +33,7 @@ from typing import Any, Iterable
 from ..compiler.contradiction import contradiction_pass
 from ..compiler.derive import Deriver
 from ..compiler.episodes import _label as episode_label, episode_extent, episode_id_for
-from ..embed import embed
+from ..embed import counts, to_blob
 from ..llm.base import LLMClient
 from .consent import verify_token
 from .filter import authorized_claim_ids, valid_source_ids
@@ -321,7 +321,7 @@ class RevocationEngine:
             self.conn.execute("DELETE FROM claim_index WHERE claim_id=?", (cid,))
             self.conn.execute("INSERT INTO claim_index(claim_id, text) VALUES (?,?)", (cid, text))
             self.conn.execute("UPDATE claim_vectors SET vec=? WHERE claim_id=?",
-                              (embed(text).tobytes(), cid))
+                              (to_blob(counts(text)), cid))
             done.append(cid)
         return done
 
