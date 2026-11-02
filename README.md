@@ -24,6 +24,9 @@ make test
 make dev
 ```
 
+With Docker instead (separate `web` and `backend` services on one network, no local Python or Node needed):
+`docker compose up --build`, then open <http://localhost:8080>. See [`docs/DOCKER.md`](docs/DOCKER.md).
+
 Full guide, including the copy-and-paste demo and live mode: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
 
 ## Contributing

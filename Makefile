@@ -1,4 +1,4 @@
-.PHONY: setup dev test api web check-web eval
+.PHONY: setup dev test api web check-web eval docker-up docker-down docker-logs docker-eval
 
 setup:
 	cd backend && python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
@@ -24,3 +24,18 @@ check-web:
 # Usage: make eval LABEL=my-run
 eval:
 	cd backend && . .venv/bin/activate && { [ ! -f ../.env ] || { set -a; . ../.env; set +a; }; } && python scripts/run_eval.py --label $(LABEL) --runs 3
+
+# --- Docker: the whole app as separate services (see docs/DOCKER.md) --------------------------------
+docker-up:
+	docker compose up --build -d
+	@echo "MemoryAtlas is starting at http://localhost:$${WEB_PORT:-8080}  (docker compose logs -f to watch)"
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
+
+# Needs MODEL_API_KEY in .env or the environment. Results land in ./eval/results/<EVAL_LABEL>.
+docker-eval:
+	HOST_UID=$$(id -u) HOST_GID=$$(id -g) docker compose --profile eval run --rm eval
