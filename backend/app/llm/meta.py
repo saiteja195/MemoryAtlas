@@ -16,10 +16,10 @@ class MetaClient:
 
     Verified from the docs: POST /v1/responses with `input_text` content parts, Bearer auth,
     and POST /v1/asr/transcribe (multipart `request` + `audio` WAV parts, DIARIZATION mode).
-    NOT yet verified against the live API: the system-message shape, the `input_image` content
-    part, and structured-output parameters. `complete_json` therefore asks for JSON in the
-    prompt and parses it; callers validate with Pydantic. Run `scripts/smoke_meta.py` with a
-    key to confirm each shape.
+    Confirmed against the live API on 2026-11-02 with `scripts/smoke_meta.py`: the `system`-role
+    message in `input`, the `input_image` content part with a base64 data URL, and diarized
+    transcription. NOT yet tried: native structured-output parameters. `complete_json` therefore
+    asks for JSON in the prompt and parses it; callers validate with Pydantic.
     """
 
     mode = "live"

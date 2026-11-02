@@ -45,7 +45,7 @@ MemoryAtlas is a privacy-first memory engine for the Meta Global AI Developer Ha
 - No embedding model exists, so embeddings are local (`backend/app/embed.py`).
 - Pricing: Spark 1.3 $1.25 input / $0.15 cached / $4.25 output per million tokens; Voice $0.18 per audio hour. The Voice docs mention zero data retention (ZDR); not yet known how to enable it or whether Spark supports it.
 
-**Unverified guesses in `MetaClient` (confirm with `backend/scripts/smoke_meta.py`):** the `input_image` content part with a base64 data URL, a `system`-role message in `input`, and JSON output. The client currently asks for JSON in the prompt and parses it. Native structured-output parameters are not used yet. Fix the client only if live calls show these are wrong.
+**Confirmed live (Nov 2, `backend/scripts/smoke_meta.py`, all PASS, no client changes needed):** the `input_image` content part with a base64 data URL, a `system`-role message in `input`, JSON output via the prompt, and diarized `/v1/asr/transcribe`. The test WAV was a single synthetic voice (espeak-ng), so multi-speaker diarization is not yet exercised. Native structured-output parameters are still untried; the client asks for JSON in the prompt and parses it.
 
 ## 5. Repo state
 
@@ -64,7 +64,7 @@ Branches on `origin` (both authored only by `saiteja195`):
 - `backend/app/main.py`: FastAPI with `/health` reporting the LLM mode. `backend/app/config.py`: env settings. `backend/app/embed.py`: local hashed n-gram embeddings.
 - `backend/scripts/smoke_meta.py`: checks JSON output, image input and diarized transcription. Needs `--image` and `--wav` sample files.
 - `frontend/`: Vite + React + Cytoscape shell that shows backend status. `Makefile`: `make setup`, `make test`, `make dev`. `.env.example`.
-- Not run: `make dev` end to end, and any live Meta call (no key was available in the session).
+- Live Meta calls verified via the smoke test (Nov 2). Not run: `make dev` end to end.
 
 **Not built yet:** capture gateway, compiler, derivation rules, investigator, revocation engine and leak probes, Atlas UI, eval, baseline, demo fixtures.
 
@@ -75,10 +75,10 @@ Branches on `origin` (both authored only by `saiteja195`):
 2. Add the key to the cloud environment as `MODEL_API_KEY` (a new session picks it up), or to a local `.env`. Never paste it into chat.
 3. Confirm the repo is public.
 4. Ask in #office-hours how to enable ZDR.
-5. Provide two sample files for the smoke test: a photo and a short mono WAV.
+5. Optional: provide a real photo and a two-person mono WAV for a fuller smoke test.
 
 **Then, in this order (see plan §8 for gates)**
-1. Run `cd backend && python scripts/smoke_meta.py --image <jpg> --wav <wav>`. Fix `MetaClient` for any FAIL.
+1. ~~Run the smoke test~~ Done Nov 2, all PASS. Optionally re-run with a real two-person WAV to check multi-speaker diarization.
 2. **Phase 1, `feature/capture-compiler`:** demo-day fixtures (plan §5), capture gateway with consent gate, redaction, ephemeral buffer and blocked hashes, compiler (perceive, episode binding, claim extraction, entity resolution, contradiction pass), `/graph` endpoint. Gate: replaying the demo day builds the graph; 0 media bytes on disk. If the owner hasn't recorded real media, build against placeholder text fixtures first.
 3. **Phase 2, `feature/recall`:** derivation rules, tool-calling investigator with citation-integrity checks, supersession and disputes.
 4. **Phase 3, `feature/revocation`:** grants, HMAC revoke, least-fixpoint recompute, purge across every store, 7 leak probes, receipt, property tests.

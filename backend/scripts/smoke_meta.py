@@ -1,4 +1,4 @@
-"""Check each Meta Model API shape that is not yet verified. Run locally with a key:
+"""Check each Meta Model API shape the client relies on. Run locally with a key:
 
     export MODEL_API_KEY=...   (never paste it into chat or commit it)
     python scripts/smoke_meta.py [--image photo.jpg] [--wav clip.wav]

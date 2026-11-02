@@ -16,7 +16,7 @@ This repo builds the "RecallOS" concept under the name **MemoryAtlas**. The atla
 
 | Open item | Why it matters | How to close it |
 |---|---|---|
-| Does `/v1/responses` accept the `input_image` part, a `system` message and structured-output params as the client assumes? | Compiler and investigator calls | Run `backend/scripts/smoke_meta.py` with the key |
+| Does `/v1/responses` accept the `input_image` part, a `system` message and structured-output params as the client assumes? | Compiler and investigator calls | Yes for `input_image` and a `system` message (live smoke test, Nov 2); structured-output params untried, client parses JSON from the prompt instead |
 | How to enable zero data retention (ZDR), and whether Spark supports it | Decides how strongly we can word the privacy claim (§9) | Meta dashboard / #office-hours (weekdays 10 to 11 AM ET) |
 | Spark rate limits | Whether eval runs live or from the cache | Dashboard |
 | Credits claimed, card on file | Nothing runs without a key and credit | Claim form, by Nov 4, 9 PM ET |
@@ -410,7 +410,7 @@ Stage 1 is pass/fail (fits the theme, uses Meta's models). Stage 2 scores 0 to 1
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Meta API access, quota or capability gaps (e.g. no image input) | Med | Docs now confirm image, tool calling and structured output on Spark 1.3. Remaining unknowns are checked by `smoke_meta.py`. `RecordReplayClient` and recorded fixtures cover outages |
+| Meta API access, quota or capability gaps (e.g. no image input) | Med | Docs now confirm image, tool calling and structured output on Spark 1.3. Live smoke test (Nov 2) confirmed image input, a `system` message and diarized transcription; only native structured-output params are untried. `RecordReplayClient` and recorded fixtures cover outages |
 | LLM extraction drifts or is inconsistent | High | Controlled vocabulary, Pydantic schema + one repair, fixture regression test asserting the key claims exist |
 | Spatial inference is brittle | Med | Rule-validated bindings. Unit tests with the exact demo geometry. Graceful "partial" answer showing candidates |
 | Graph too cluttered to read on video | Med | Episode-collapsed default view, focus mode on the cited path |
