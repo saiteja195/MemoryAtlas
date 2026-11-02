@@ -50,6 +50,8 @@ def main() -> int:
     ap.add_argument("--start-run", type=int, default=1, help="resume: first run number to execute")
     ap.add_argument("--only", default="", help="comma-separated question ids (a smoke check)")
     ap.add_argument("--aggregate-only", action="store_true")
+    ap.add_argument("--reviewed", action="store_true",
+                    help="add the table that counts hand-reviewed disagreements (only after reading REVIEW.md)")
     args = ap.parse_args()
     s = Settings()
     out_dir = ROOT / "eval" / "results" / args.label
@@ -66,11 +68,11 @@ def main() -> int:
             print(f"== run {n}", flush=True)
             write_run(out_dir, n, run_once(n, questions, live, s, progress=lambda m: print(m, flush=True)))
     runs = load_runs(out_dir)
-    summary = aggregate(runs)
+    summary, reviewed = aggregate(runs), aggregate(runs, reviewed=True)
     meta = {"label": args.label, "model": s.llm_model, "questions": len(questions), "commit": commit(),
             "date": date.today().isoformat()}
-    (out_dir / "summary.json").write_text(json.dumps({**summary, "meta": meta}, indent=1))
-    (out_dir / "RESULTS.md").write_text(markdown(summary, meta))
+    (out_dir / "summary.json").write_text(json.dumps({**summary, "reviewed": reviewed, "meta": meta}, indent=1))
+    (out_dir / "RESULTS.md").write_text(markdown(summary, meta, reviewed if args.reviewed else None))
     (out_dir / "REVIEW.md").write_text(review_md(disagreements(runs)))
     print((out_dir / "RESULTS.md").read_text())
     return 0

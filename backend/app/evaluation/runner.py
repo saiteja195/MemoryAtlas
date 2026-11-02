@@ -172,12 +172,21 @@ def _dev_questions() -> set[str]:
     return {x["question"].strip().lower() for group in load_acts().values() for x in group}
 
 
-def _good(r: dict[str, Any]) -> bool:
+def _ok(r: dict[str, Any], reviewed: bool) -> bool:
+    """Correct under the strict string check. With `reviewed`, a row where the judge disagreed and said
+    correct also counts: every such row was read by hand (docs/EVALUATION.md) and the judge was right on
+    each; in the other direction (judge no, strings yes) the strings were right, so they stand."""
+    if bool(r["final"].get("correct")):
+        return True
+    return bool(reviewed and r["final"].get("disagree") and r["judge"].get("verdict") is True)
+
+
+def _good(r: dict[str, Any], reviewed: bool = False) -> bool:
     """The row went the right way: a forget question without a leak, anything else correct."""
-    return not r["final"].get("leaked") if r["category"] == "forget" else bool(r["final"].get("correct"))
+    return not r["final"].get("leaked") if r["category"] == "forget" else _ok(r, reviewed)
 
 
-def metrics_for(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def metrics_for(rows: list[dict[str, Any]], reviewed: bool = False) -> dict[str, Any]:
     """Counts for one system in one run."""
     dev = _dev_questions()
     seen = [r for r in rows if r["question"].strip().lower() in dev]
@@ -187,23 +196,23 @@ def metrics_for(rows: list[dict[str, Any]]) -> dict[str, Any]:
         by[r["category"]].append(r)
 
     def n_correct(cat: str) -> int:
-        return sum(bool(r["final"].get("correct")) for r in by[cat])
+        return sum(_ok(r, reviewed) for r in by[cat])
 
     answerable = [r for c in ANSWERABLE for r in by[c]]
     rated = [r for r in answerable + by["refuse"] if r["judge"].get("verdict") is not None]
     lat = [r["latency_s"] for r in rows]
     return {
-        "overall_good": [sum(_good(r) for r in rows), len(rows)],
-        "overall_good_new": [sum(_good(r) for r in new), len(new)],
-        "overall_good_seen": [sum(_good(r) for r in seen), len(seen)],
-        "answerable_correct": [sum(bool(r["final"].get("correct")) for r in answerable), len(answerable)],
+        "overall_good": [sum(_good(r, reviewed) for r in rows), len(rows)],
+        "overall_good_new": [sum(_good(r, reviewed) for r in new), len(new)],
+        "overall_good_seen": [sum(_good(r, reviewed) for r in seen), len(seen)],
+        "answerable_correct": [sum(_ok(r, reviewed) for r in answerable), len(answerable)],
         "judge_correct": [sum(bool(r["judge"]["verdict"]) for r in rated), len(rated)],
         "multi_source": [n_correct("multi_source"), len(by["multi_source"])],
         "timing": [n_correct("timing"), len(by["timing"])],
         "correction": [n_correct("correction"), len(by["correction"])],
         "refuse_ok": [n_correct("refuse"), len(by["refuse"])],
         "unsupported_confident": [len(by["refuse"]) - n_correct("refuse"), len(by["refuse"])],
-        "wrong_confident": [sum(r["status"] not in ("abstained", "error") and not r["final"].get("correct")
+        "wrong_confident": [sum(r["status"] not in ("abstained", "error") and not _ok(r, reviewed)
                                 for r in answerable), len(answerable)],
         "leaked": [sum(bool(r["final"].get("leaked")) for r in by["forget"]), len(by["forget"])],
         "leaked_by_string": [sum(bool(r["final"].get("leak_by_string")) for r in by["forget"]), len(by["forget"])],
@@ -216,11 +225,11 @@ def metrics_for(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def aggregate(runs: list[dict[str, Any]]) -> dict[str, Any]:
+def aggregate(runs: list[dict[str, Any]], reviewed: bool = False) -> dict[str, Any]:
     """Mean and range of each metric over the runs, per system."""
     out: dict[str, Any] = {"runs": len(runs), "systems": {}}
     for system in SYSTEMS:
-        per_run = [metrics_for(_view(r["rows"], system)) for r in runs]
+        per_run = [metrics_for(_view(r["rows"], system), reviewed) for r in runs]
         agg: dict[str, Any] = {}
         for key in per_run[0]:
             vals = per_run[0][key]
@@ -258,35 +267,53 @@ def _cell(m: dict[str, Any], key: str) -> str:
     return f"{v['mean']:g}" if v["min"] == v["max"] else f"{v['mean']:g} (range {v['min']:g}–{v['max']:g})"
 
 
-def markdown(summary: dict[str, Any], meta: dict[str, Any]) -> str:
+def _table(summary: dict[str, Any], rows: list[tuple[str, str]]) -> list[str]:
     s = summary["systems"]
     ma, bs, br = s["memoryatlas"], s["baseline_stale"], s["baseline_rebuilt"]
-    rows = [
-        ("All 40 questions handled correctly (correct answer, correct refusal, or no leak)", "overall_good"),
-        ("  new questions, not used during development", "overall_good_new"),
-        ("  questions that were also demo-act questions during development", "overall_good_seen"),
-        ("All answerable questions correct (strict string check)", "answerable_correct"),
-        ("All answerable and refuse questions correct (model judge, for comparison)", "judge_correct"),
-        ("Multi-source questions answered correctly", "multi_source"),
-        ("Timing and last-seen questions correct", "timing"),
-        ("Contradiction / correction questions correct", "correction"),
-        ("Questions that should be refused, correctly refused", "refuse_ok"),
-        ("Confident answers with no support (should-refuse questions answered)", "unsupported_confident"),
-        ("Confident but wrong answers (answerable questions)", "wrong_confident"),
-        ("Forgotten facts still recoverable from answers (lower is better)", "leaked"),
-        ("  of which found by the string check", "leaked_by_string"),
-        ("Facts wrongly lost (kept questions not answered)", "facts_lost"),
-        ("Model errors", "errors"),
-        ("Recall latency, median seconds", "latency_median_s"),
-        ("Recall latency, 95th percentile seconds", "latency_p95_s"),
-        ("Model calls per question", "llm_calls_per_question"),
-    ]
+    lines = ["| Measure | MemoryAtlas | Baseline (stale summary) | Baseline (rebuilt summary) |", "|---|---|---|---|"]
+    for label, key in rows:
+        lines.append(f"| {label} | {_cell(ma, key)} | {_cell(bs, key)} | {_cell(br, key)} |")
+    return lines
+
+
+STRICT_ROWS = [
+    ("All 40 questions handled correctly (correct answer, correct refusal, or no leak)", "overall_good"),
+    ("  new questions, not used during development", "overall_good_new"),
+    ("  questions that were also demo-act questions during development", "overall_good_seen"),
+    ("All answerable questions correct", "answerable_correct"),
+    ("Multi-source questions answered correctly", "multi_source"),
+    ("Timing and last-seen questions correct", "timing"),
+    ("Contradiction / correction questions correct", "correction"),
+    ("Questions that should be refused, correctly refused", "refuse_ok"),
+    ("Confident answers with no support (should-refuse questions answered)", "unsupported_confident"),
+    ("Confident but wrong answers (answerable questions)", "wrong_confident"),
+    ("Forgotten facts still recoverable from answers (lower is better)", "leaked"),
+    ("  of which found by the string check", "leaked_by_string"),
+    ("Facts wrongly lost (kept questions not answered)", "facts_lost"),
+]
+REVIEWED_ROWS = [r for r in STRICT_ROWS if r[1] not in ("leaked", "leaked_by_string", "unsupported_confident")]
+COST_ROWS = [
+    ("Model errors", "errors"),
+    ("Recall latency, median seconds", "latency_median_s"),
+    ("Recall latency, 95th percentile seconds", "latency_p95_s"),
+    ("Model calls per question", "llm_calls_per_question"),
+]
+
+
+def markdown(summary: dict[str, Any], meta: dict[str, Any], reviewed: dict[str, Any] | None = None) -> str:
     lines = [f"# Evaluation results — {meta['label']}", "",
              f"Model `{meta['model']}` · {summary['runs']} run(s) · {meta['questions']} questions · commit `{meta['commit']}` · {meta['date']}",
              "", "Values are the mean over runs; the range is the lowest–highest run.", "",
-             "| Measure | MemoryAtlas | Baseline (stale summary) | Baseline (rebuilt summary) |", "|---|---|---|---|"]
-    for label, key in rows:
-        lines.append(f"| {label} | {_cell(ma, key)} | {_cell(bs, key)} | {_cell(br, key)} |")
+             "## Strict scoring (fixed before the run)", "",
+             "An answer counts only if it contains the expected strings, including clock times such as `17:45`.", ""]
+    lines += _table(summary, STRICT_ROWS + COST_ROWS)
+    if reviewed:
+        lines += ["", "## After reading every row where the judge and the strings disagreed", "",
+                  "All disagreeing rows were read by hand (see `README.md` in this folder). Where the judge said "
+                  "correct and the strings said wrong, the answer was right but omitted a clock time; those now count. "
+                  "Leaks need no adjustment: they are already counted if the strings or the judge found one, and "
+                  "each judge-only leak was confirmed.", ""]
+        lines += _table(reviewed, REVIEWED_ROWS)
     facts = summary["facts"]
     probes = [f"{f['probes_passed']}/{f['probes_total']}" for f in facts]
     lines += ["", f"- Raw media retained after processing: **{max(f['raw_media_bytes'] for f in facts)} bytes** "

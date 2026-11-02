@@ -215,3 +215,13 @@ def test_a_full_pass_runs_through_the_day_the_live_photo_and_the_withdrawal(tmp_
     summary = aggregate([result])
     assert summary["systems"]["memoryatlas"]["refuse_ok"]["of"] == 1
     assert "MemoryAtlas" in markdown(summary, {"label": "t", "model": "m", "questions": 5, "commit": "c", "date": "d"})
+
+
+def test_reviewed_scoring_counts_a_judge_correct_disagreement_but_never_a_leak():
+    from app.evaluation.runner import _good, _ok
+    wrong_by_strings = {"category": "timing", "final": {"correct": False, "disagree": True}, "judge": {"verdict": True}}
+    wrong_for_real = {"category": "timing", "final": {"correct": False, "disagree": False}, "judge": {"verdict": True}}
+    leak = {"category": "forget", "final": {"leaked": True}, "judge": {"verdict": True}}
+    assert not _ok(wrong_by_strings, reviewed=False) and _ok(wrong_by_strings, reviewed=True)
+    assert not _ok(wrong_for_real, reviewed=True)           # only reviewed disagreements are overturned
+    assert not _good(leak, reviewed=True)
