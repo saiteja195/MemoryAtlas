@@ -21,6 +21,10 @@ export const BEFORE_GROUPS: PromptGroup[] = [
     "Which gym did I go to?",
     "Who did I have lunch with on Friday?",
   ] },
+  // Recorded with the car photo already uploaded; then select the cited fact and press "That's wrong…".
+  { title: "Correct a memory", hint: "Ask this after the 17:45 photo, then correct the answer", prompts: [
+    "What did Alex promise me?",
+  ] },
 ];
 
 /** After someone withdrew consent. */
@@ -53,7 +57,9 @@ export function suggest(query: string, groups: PromptGroup[], n = 3): string[] {
   const scored = [...new Set(groups.flatMap((g) => g.prompts))].map((p) => {
     const w = new Set(words(p));
     const shared = [...q].filter((x) => w.has(x)).length;
-    return { p, score: shared / Math.sqrt(q.size * Math.max(w.size, 1)) };
+    // Two questions need two words in common (one, if either has only one): a shared name is not enough.
+    const enough = shared >= Math.min(2, q.size, w.size);
+    return { p, score: enough ? shared / Math.sqrt(q.size * Math.max(w.size, 1)) : 0 };
   });
   // A single shared name ("Alex") is not enough to call two questions alike.
   return scored.filter((s) => s.score >= MIN_SCORE).sort((a, b) => b.score - a.score).slice(0, n).map((s) => s.p);

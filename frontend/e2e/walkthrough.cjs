@@ -141,6 +141,33 @@ async function audit(page, label) {
   await page.waitForSelector("text=Latest forgetting", { timeout: 10000 });
   check(await page.locator("text=7/7").isVisible(), "dashboard shows the latest forgetting with 7/7 leak checks");
 
+  // Correcting a memory. Replay mode has one recorded correction, so start again from a clean day
+  // (the forgetting run above changed the graph that the recording assumes).
+  await page.request.post(`${BASE}/api/demo/reset`);
+  await page.reload();
+  await page.waitForSelector("text=Replay mode");
+  await page.getByRole("button", { name: "Atlas", exact: true }).click();
+  await page.getByRole("button", { name: "Play the day", exact: true }).click();
+  await page.waitForSelector("text=Day played");
+  await page.getByRole("button", { name: /Upload live photo/ }).click();
+  await page.waitForSelector(".event:not(.future) >> text=17:45");
+  await page.getByRole("tab", { name: "Ask" }).click();
+  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a:has-text("Friday")');
+  check(true, "before the correction: 'What did Alex promise me?' answers Friday");
+  await page.locator(".qa .cite").first().click();
+  await page.getByRole("button", { name: "That's wrong…" }).click();
+  await page.getByRole("button", { name: "Use the recorded example" }).click();
+  if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
+  await audit(page, "correction form open");
+  await page.getByRole("button", { name: "Replace this fact" }).click();
+  await page.waitForSelector("text=Correction recorded", { state: "attached" });
+  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a:has-text("Monday")');
+  const promised = await page.locator(".qa .a").first().innerText();
+  check(/Monday/.test(promised) && !/Friday/.test(promised), `after the correction: the answer says Monday and no longer Friday (got: ${promised})`);
+  await audit(page, "after a correction");
+
   check(problems.length === 0, `no console errors or warnings${problems.length ? ": " + problems.join(" | ") : ""}`);
   await browser.close();
   console.log(failures === 0 ? "\nAll steps held." : `\n${failures} step(s) failed.`);
