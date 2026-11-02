@@ -28,6 +28,10 @@ DEMO_RULES: list[tuple[str, list[dict]]] = [
         claim("Me", "observed_at", "Office", object_type="place", text="Me was at the Office")]),
     ("taco place", [
         claim("Me", "met_with", "Alex", object_type="person", text="Me met with Alex"),
+        claim("taco place", "across_from", "Office", subject_type="place", object_type="place",
+              text="The taco place is across the street from the Office"),
+        claim("taco place", "has_attribute", subject_type="place", value="awning: green",
+              text="The taco place has a green awning"),
         claim("Alex", "said", value="try the taco place across the street from the office with "
               "the green awning, best al pastor",
               text="Alex said to try the taco place across the street from the office, the one "
@@ -52,6 +56,10 @@ class FakeLLM:
     def __init__(self, rules=None, adjudicate: str | None = None):
         self.rules = DEMO_RULES if rules is None else rules
         self.adjudicate = adjudicate
+        self.recall_replies: list[dict] = []   # scripted investigator steps, in order
+        self.recall_payloads: list[dict] = []
+        self.bind = True                       # False: the model declines every binding
+        self.bind_requests: list[dict] = []
         self.calls: list[tuple[str, str]] = []
         self.transcribed: list[bytes] = []
         self.described: list[bytes] = []
@@ -59,8 +67,18 @@ class FakeLLM:
 
     def complete_json(self, system, user, schema):
         self.calls.append((system, user))
+        if system.startswith("You answer questions"):
+            self.recall_payloads.append(json.loads(user.split("\n\nYour previous")[0]))
+            return self.recall_replies.pop(0)
         if system.startswith("You decide whether"):
             return {"match": self.adjudicate}
+        if system.startswith("A spoken conversation described a place"):
+            self.bind_requests.append(json.loads(user))
+            cands = json.loads(user)["candidates"]
+            return {"match": cands[0]["id"] if cands and self.bind else None}
+        if system.startswith("Write one factual paragraph"):
+            return {"summary": f"Summary of {user.count(chr(10)) + 1} claims: "
+                            + user.replace("\n", " ")[:120]}
         if self.extraction_replies is not None:
             return self.extraction_replies.pop(0)
         text = json.loads(user.split("\n\nYour previous")[0])["observation"]["text"]

@@ -166,3 +166,28 @@ def test_contradiction_pass_only_flags_near_simultaneous_conflicts(conn):
     assert len(contradiction_pass(conn, {"o"})) == 1
     status = dict(conn.execute("SELECT claim_id, status FROM claims").fetchall())
     assert status[cafe] == status[desk] == "disputed" and status[car] == "active"
+
+
+def test_photos_are_not_offered_conversation_only_entities_for_merging():
+    from app.compiler.pipeline import Compiler
+    from app import db
+    conn = db.connect()
+    llm = FakeLLM(rules=[("taco", [claim("taco place", "has_attribute", subject_type="place",
+                                         value="awning: green")]), ("Photo", [])])
+    comp = Compiler(conn, llm)
+    seen = []
+    orig = llm.complete_json
+
+    def spy(system, user, schema):
+        if system.startswith("You extract"):
+            seen.append(json.loads(user)["known_entities"])
+        return orig(system, user, schema)
+
+    llm.complete_json = spy
+    for sid, kind, text in [("t1", "transcript_segment", "Alex: the taco place"),
+                            ("f1", "frame_observation", "Photo: a storefront")]:
+        conn.execute("INSERT INTO sources(source_id, kind, captured_at, ingested_at, content_hash)"
+                     " VALUES (?,?, '2026-10-29T13:00:00','t',?)", (sid, kind, sid))
+        comp.compile(obs(sid, kind, "2026-10-29T13:00:00", text))
+    assert "taco place" not in seen[1]          # the photo is not offered the spoken-only entity
+    assert "Me" in seen[1]
