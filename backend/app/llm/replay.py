@@ -46,8 +46,6 @@ class RecordReplayClient:
         digest = hashlib.sha256(image).hexdigest()
         return self._call("describe_image", {"img": digest, "p": prompt}, image, prompt)
 
-    def transcribe(self, audio: bytes) -> list[dict[str, Any]]:
-        return self._call("transcribe", {"a": hashlib.sha256(audio).hexdigest()}, audio)
-
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        return self._call("embed", {"t": texts}, texts)
+    def transcribe(self, audio: bytes, keywords: list[str] | None = None) -> list[dict[str, Any]]:
+        payload = {"a": hashlib.sha256(audio).hexdigest(), "k": keywords}
+        return self._call("transcribe", payload, audio, keywords)

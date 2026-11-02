@@ -12,10 +12,17 @@ This repo builds the "RecallOS" concept under the name **MemoryAtlas**. The atla
 
 ## 0. Day-0 verification checklist (do this first, ~1 hour)
 
-These facts came from the pitch research and **could not be checked from the planning environment**, because the event and Meta docs sites were unreachable. Confirm each one before writing integration code:
+**Resolved on Nov 2** from the Participant Guide and the Meta model docs; see `docs/HACKATHON_FACTS.md`. Still open:
 
-| # | Verify | Where | Why it matters |
-|---|---|---|---|
+| Open item | Why it matters | How to close it |
+|---|---|---|
+| Does `/v1/responses` accept the `input_image` part, a `system` message and structured-output params as the client assumes? | Compiler and investigator calls | Run `backend/scripts/smoke_meta.py` with the key |
+| How to enable zero data retention (ZDR), and whether Spark supports it | Decides how strongly we can word the privacy claim (§9) | Meta dashboard / #office-hours (weekdays 10 to 11 AM ET) |
+| Spark rate limits | Whether eval runs live or from the cache | Dashboard |
+| Credits claimed, card on file | Nothing runs without a key and credit | Claim form, by Nov 4, 9 PM ET |
+| Public repo | Hard rule | Check GitHub repo settings |
+
+---|---|---|---|
 | 1 | Exact submission requirements: video length, repo visibility, demo link, required form fields | Cerebral Valley event page / Devpost-style form | The Day 5 schedule depends on it |
 | 2 | Whether submissions **must** use a specific Meta model/API | Rules page | Decides whether the Meta model is the default path or optional |
 | 3 | Model IDs and capabilities: Muse Spark 1.3 (image input? tool calling? JSON/structured output?), Muse Voice Transcribe | dev.meta.ai model docs | Compiler and investigator design |
@@ -272,10 +279,10 @@ def revoke(grant_id, token):
 - `frontend/src/lib/` is ignored by the root `.gitignore` (Python template ignores `lib/`). Put shared code in `frontend/src/utils/` or add a `!frontend/src/lib/` exception.
 
 ### 4.6 LLM client (`backend/app/llm/`)
-- `LLMClient` protocol: `complete_json(schema, messages)`, `run_tools(tools, messages)`, `describe_image(bytes)`, `transcribe(bytes)`, `embed(texts)`.
-- `MetaClient` is the real implementation (Day-0 checks #3–4). `RecordReplayClient` wraps any client and caches responses by request hash in `fixtures/llm_cache/`.
-- Modes: `live` (default, used for judges' unscripted questions), `record`, `replay` (offline fallback). **The UI shows the active mode.** Never pass replay off as live.
-- Embeddings: use the Meta endpoint if one exists. Otherwise a small local sentence-embedding model. Record which one in `HACKATHON_FACTS.md`.
+- `LLMClient` protocol: `complete_json`, `describe_image`, `transcribe`. Embeddings are local (`app/embed.py`, feature-hashed n-grams) because Meta's model list has no embedding model.
+- `MetaClient` calls `POST /v1/responses` (`muse-spark-1.3`) and `POST /v1/asr/transcribe` (`muse-voice-transcribe-1.0`, DIARIZATION). It fails loudly on missing keys or API errors and retries 429/5xx. `RecordReplayClient` wraps any client and caches responses by request hash in `fixtures/llm_cache/`.
+- **Audio constraints:** WAV, mono, 16-bit PCM, 16 or 24 kHz, at most 10 minutes. Speaker labels (A/B) are *session-scoped*, not names, so the gateway maps them to people using the capture session's declared participants and the consent grants. Pass names as `keywords` ("Alex", "Luna Taqueria") to bias recognition.
+- Modes: `live` (default for judges' unscripted questions), `record`, `replay` (offline fallback). **The UI shows the active mode.** Never pass replay off as live.
 
 ### 4.7 API surface
 ```
@@ -382,15 +389,18 @@ Budget: about 12 hours per day. If a phase slips by more than 3 hours, apply the
 
 ---
 
-## 9. Mapping to judging (creativity · technical ambition · it works)
+## 9. Mapping to the judging rubric
 
-| Judges look for | Where MemoryAtlas shows it |
-|---|---|
-| Real problem, "Build for Your World" | Forgotten commitments, lost objects, fragmented days. Frees mental space without surveillance |
-| Creativity | Consent as a first-class part of the data model. Forgetting as a *verifiable* feature, with a receipt |
-| Technical ambition | Truth-maintenance-style support graph, well-founded revocation over cycles, cross-source spatial/temporal inference, citation-integrity checks |
-| Works | Live unscripted questions, held-out day, reproducible benchmark committed in the repo |
-| Use of Meta tech | Muse Spark (perception, extraction, investigation), Muse Voice Transcribe, optional SAM 3.1 and Wearables DAT |
+Stage 1 is pass/fail (fits the theme, uses Meta's models). Stage 2 scores 0 to 10 on the weights below, so effort should follow the weights.
+
+| Criterion (weight) | Where MemoryAtlas shows it | What to do about it |
+|---|---|---|
+| **Impact (30%)** | Forgotten commitments, lost things, a day spread across what you saw, heard and where you went. "Build for Your World": free up mental space without surveillance | Lead the video and README with one relatable story. **Avoid medical or memory-impairment framing**: the rules ban projects that give medical advice. Say who benefits (busy people, caregivers of their own schedules, anyone wearing a capture device around others) and why consent-aware memory is a precondition for these devices, not a feature |
+| **Use of Meta AI tooling (25%)** | Spark 1.3 for image understanding, structured claim extraction and a tool-calling investigator. Voice Transcribe with **diarization and keyword biasing**. Optional SAM 3.1 to track the wallet across frames | "Beyond a basic integration" means showing several capabilities doing distinct jobs, and naming them in the video. Promote SAM 3.1 from P2 to P1 only if Phases 1 to 3 pass early. Also qualifies for the $5K Best Agentic Use-Case bonus (the investigator) |
+| **Demo (25%)** | The four-act demo in §6, live and on unscripted questions | **Hard 3:00 cap.** The video is the primary judging artifact: record a clean run early, then re-cut |
+| **Technical depth (20%)** | Support-graph revocation (least fixpoint, cycle-safe), citation-integrity checks, leak probes, property tests, a fair baseline | The eval table and receipt are the proof. Don't cut them |
+
+**Avoid looking like a listed anti-project** ("basic RAG", "simple image analyzer"): the baseline comparison is what shows we are not a retrieval wrapper, so show its numbers on screen.
 
 **Claims to avoid:** "perfect privacy", "never forgets anything", "the provider never sees your data". **Claims to make:** "the app retains zero raw media", "revoked facts are unrecoverable from every store we control, verified by automated probes".
 
@@ -400,7 +410,7 @@ Budget: about 12 hours per day. If a phase slips by more than 3 hours, apply the
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Meta API access, quota or capability gaps (e.g. no image input) | Med | Day-0 verification. `RecordReplayClient`. Recorded fixtures for eval. If image input is missing, use SAM/OCR locally, with Muse Spark on the text |
+| Meta API access, quota or capability gaps (e.g. no image input) | Med | Docs now confirm image, tool calling and structured output on Spark 1.3. Remaining unknowns are checked by `smoke_meta.py`. `RecordReplayClient` and recorded fixtures cover outages |
 | LLM extraction drifts or is inconsistent | High | Controlled vocabulary, Pydantic schema + one repair, fixture regression test asserting the key claims exist |
 | Spatial inference is brittle | Med | Rule-validated bindings. Unit tests with the exact demo geometry. Graceful "partial" answer showing candidates |
 | Graph too cluttered to read on video | Med | Episode-collapsed default view, focus mode on the cited path |
@@ -412,12 +422,13 @@ Budget: about 12 hours per day. If a phase slips by more than 3 hours, apply the
 
 ## 11. Submission checklist (D5)
 
-- [ ] Public repo, `main` green, tag `v1.0-submission`
+- [ ] **Public** repo (hard rule), `main` green, tag `v1.0-submission`, everyone who worked on it listed on the submission page
 - [ ] README: one-paragraph pitch, 60-second quickstart (`make dev`, `make demo`, `make eval`), architecture diagram, Meta tech used, results table, limitations, privacy statement
-- [ ] Video at the required length (Day-0 check #1), following §6, with captions
+- [ ] **3-minute** demo video (link accessible without login), following §6, showing only what was built during the event (Oct 27 to Nov 4)
 - [ ] `eval/results/` with raw outputs and the command to reproduce
 - [ ] Consent notes for everyone recorded in the fixtures (don't commit personal details)
-- [ ] `.env.example`, no secrets in git history (`git log -p | grep -i key` sanity check)
+- [ ] $150 credits claimed by Nov 4, 9 PM ET (per participant, card on file)
+- [ ] `.env.example`, no secrets in git history (`git log -p | grep -i 'MODEL_API_KEY=.'` sanity check)
 - [ ] Every commit authored by `saiteja195` (`git log --format='%an %ae' | sort -u`) and no `Co-authored-by` trailers (`git log --format=%B | grep -i co-authored` returns nothing)
 
 ---

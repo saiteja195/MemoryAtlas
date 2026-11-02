@@ -10,10 +10,10 @@ class LLMClient(Protocol):
 
     def describe_image(self, image: bytes, prompt: str) -> dict[str, Any]: ...
 
-    def transcribe(self, audio: bytes) -> list[dict[str, Any]]: ...
-
-    def embed(self, texts: list[str]) -> list[list[float]]: ...
+    def transcribe(self, audio: bytes, keywords: list[str] | None = None) -> list[dict[str, Any]]:
+        """Diarized turns: [{turn_id, start_ms, end_ms, speaker, text}]."""
+        ...
 
 
 class LLMUnavailable(RuntimeError):
-    """Raised when a request cannot be served (no cached response, no credentials)."""
+    """Raised when a request cannot be served (no cached response, no credentials, API error)."""
