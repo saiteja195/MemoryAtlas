@@ -15,6 +15,8 @@ import { EvidenceDrawer } from "./components/Evidence";
 import { FactsTable } from "./components/FactsTable";
 import { GraphView, type GraphHandle } from "./components/GraphView";
 import { Header } from "./components/Header";
+import { HowItWorks } from "./components/HowItWorks";
+import { Welcome } from "./components/Welcome";
 import { Legend } from "./components/Legend";
 import { ReceiptDialog } from "./components/ReceiptDialog";
 import { SelectionCard } from "./components/SelectionCard";
@@ -63,6 +65,7 @@ function Atlas() {
   const [qas, setQas] = useState<QA[]>([]);
   const [asking, setAsking] = useState(false);
   const [simulate, setSimulate] = useState<string | null>(null);
+  const [help, setHelp] = useState(false);
   const qaId = useRef(0);
 
   // Theme: the canvas needs real colour strings, so re-read them when the system theme flips.
@@ -201,7 +204,7 @@ function Atlas() {
       <Header
         health={atlas.health} media={atlas.media} status={atlas.status} busy={atlas.busy} offline={atlas.offline}
         onNext={() => void atlas.advance(1)} onAll={() => void atlas.advance(50)}
-        onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()}
+        onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} onHelp={() => setHelp(true)}
       />
 
       <div className="layout">
@@ -259,10 +262,14 @@ function Atlas() {
                 label={describeGraph(view)} onSelect={onSelect}
               />
             )}
-            {atlas.loaded && elements.length === 0 && (
+            {atlas.loaded && elements.length === 0 && scrubAt === null && (
+              <Welcome disabled={atlas.busy !== null} offline={atlas.offline}
+                       onPlayDay={() => void atlas.advance(50)} onStep={() => void atlas.advance(1)} />
+            )}
+            {atlas.loaded && elements.length === 0 && scrubAt !== null && (
               <div className="graph-empty">
-                <strong>{scrubAt ? "Nothing had happened yet" : "No memories yet"}</strong>
-                <span>{scrubAt ? "Move the timeline forward." : "Press “Play next” to start the staged day."}</span>
+                <strong>Nothing had happened yet</strong>
+                <span>Move the timeline forward.</span>
               </div>
             )}
             <figcaption className="sr-only">{describeGraph(view)} A table with the same facts follows.</figcaption>
@@ -291,6 +298,7 @@ function Atlas() {
         </aside>
       </div>
 
+      <HowItWorks open={help} onClose={() => setHelp(false)} />
       <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />
       <ReceiptDialog receipt={atlas.receipt} onClose={atlas.closeReceipt} />
       <Dialog open={simulate !== null} onClose={() => setSimulate(null)} title="Simulated device" initialFocus="[data-autofocus]">

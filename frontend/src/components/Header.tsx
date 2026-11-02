@@ -11,6 +11,7 @@ type Props = {
   onAll: () => void;
   onLive: (id: string) => void;
   onReset: () => void;
+  onHelp: () => void;
 };
 
 const MODE: Record<string, { text: string; cls: string; hint: string }> = {
@@ -19,7 +20,7 @@ const MODE: Record<string, { text: string; cls: string; hint: string }> = {
   record: { text: "Recording", cls: "accent", hint: "Live calls, saved so they can be replayed later." },
 };
 
-export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset }: Props) {
+export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp }: Props) {
   const mode = health ? MODE[health.llm_mode] : undefined;
   const nextEvent = status?.events.find((e) => e.id === status.next);
   const live = status?.events.filter((e) => e.live_upload && !e.played) ?? [];
@@ -29,8 +30,9 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
   return (
     <header className="header">
       <div className="brand">
+        <span className="logo" aria-hidden="true" />
         <h1>MemoryAtlas</h1>
-        <span>memories with receipts</span>
+        <span className="tagline">memories with receipts</span>
       </div>
 
       <div className="group" aria-label="Status">
@@ -57,6 +59,7 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
           </button>
         ))}
         <button type="button" className="btn ghost" disabled={disabled} onClick={onReset}>Reset</button>
+        <button type="button" className="btn ghost" onClick={onHelp} aria-haspopup="dialog">How it works</button>
       </div>
     </header>
   );

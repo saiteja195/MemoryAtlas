@@ -11,11 +11,11 @@ type Rule = { selector: string; style: Record<string, unknown> };
 export function buildStylesheet(p: Palette): cytoscape.StylesheetStyle[] {
   const rules: Rule[] = [
     { selector: "node", style: {
-      width: 30, height: 30, label: "data(label)", "font-size": 12, color: p.text,
-      "font-family": "system-ui, sans-serif", "text-valign": "bottom", "text-margin-y": 6,
+      width: 34, height: 34, label: "data(label)", "font-size": 12.5, "font-weight": 500, color: p.text,
+      "font-family": "system-ui, -apple-system, sans-serif", "text-valign": "bottom", "text-margin-y": 6,
       "text-wrap": "wrap", "text-max-width": 120, "background-color": p["c-fact"],
-      "border-width": 2, "border-color": p.surface, "text-background-color": p.bg,
-      "text-background-opacity": 0.85, "text-background-padding": 2,
+      "border-width": 3, "border-color": p.surface, "text-background-color": p.surface,
+      "text-background-opacity": 0.8, "text-background-padding": 3, "transition-property": "opacity, text-opacity", "transition-duration": 160,
       "text-background-shape": "roundrectangle", "min-zoomed-font-size": 6,
     } },
     { selector: ".type-person", style: { shape: "ellipse", "background-color": p["c-person"] } },
@@ -38,8 +38,8 @@ export function buildStylesheet(p: Palette): cytoscape.StylesheetStyle[] {
     } },
 
     { selector: "edge", style: {
-      width: 2.2, "curve-style": "bezier", "line-color": p["s-none"], "target-arrow-color": p["s-none"],
-      "target-arrow-shape": "triangle", "arrow-scale": 0.9, label: "data(label)", "font-size": 10,
+      width: 2, "curve-style": "bezier", "line-color": p["s-none"], "target-arrow-color": p["s-none"],
+      "target-arrow-shape": "triangle", "arrow-scale": 0.9, label: "data(label)", "font-size": 11,
       color: p.muted, "text-rotation": "autorotate", "text-background-color": p.bg,
       "text-background-opacity": 0.9, "text-background-padding": 2, "text-background-shape": "roundrectangle",
       "min-zoomed-font-size": 7,
@@ -61,6 +61,7 @@ export function buildStylesheet(p: Palette): cytoscape.StylesheetStyle[] {
     { selector: ".st-disputed", style: { "line-style": "dashed", "line-color": p.warn, "target-arrow-color": p.warn, width: 3 } },
 
     // Focus, selection and the "this survived" pulse. Later rules win, so cited beats faded.
+    { selector: ".dim", style: { opacity: 0.18, "text-opacity": 0.2 } },
     { selector: ".faded", style: { opacity: 0.12, "text-opacity": 0.12 } },
     { selector: ".cited", style: { opacity: 1, "text-opacity": 1, "underlay-color": p.accent, "underlay-opacity": 0.3, "underlay-padding": 6, "z-index": 20 } },
     { selector: "node.cited", style: { "border-color": p.accent, "border-width": 4 } },
