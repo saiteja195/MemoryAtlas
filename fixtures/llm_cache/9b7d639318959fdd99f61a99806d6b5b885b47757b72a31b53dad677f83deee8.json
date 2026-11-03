@@ -1,0 +1,8 @@
+{
+  "action": "tool",
+  "args": {
+    "time_from": "2026-10-29T00:00:00",
+    "time_to": "2026-10-29T23:59:59"
+  },
+  "tool": "episodes"
+}

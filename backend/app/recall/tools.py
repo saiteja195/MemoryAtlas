@@ -48,7 +48,25 @@ class RecallTools:
         n = len(out) if isinstance(out, list) else (0 if isinstance(out, dict) and "error" in out
                                                     else 1)
         self.trace.append({"tool": name, "args": args, "results": n})
+        if out == [] and (args.get("time_from") or args.get("time_to")):
+            out = self._outside_memory(args) or out
         return out
+
+    def _outside_memory(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        """An empty result for a date window that lies wholly outside what the memory covers is almost always
+        a guessed date ("this morning" taken to mean the real today). Say what the memory covers, using only
+        readable claims, so the caller can ask again with a window that exists."""
+        times = sorted(r["event_time"] for r in self._claims("event_time IS NOT NULL")
+                       if r["predicate"] != "part_of_episode")
+        if not times:
+            return None
+        lo, hi = times[0], times[-1]
+        start, end = args.get("time_from") or "", args.get("time_to") or "9999"
+        if not (end < lo or start > hi):
+            return None                       # the window overlaps the memory: nothing really matches
+        return {"results": [], "note": (
+            f"Nothing in that window. The memory only covers {when(lo)} to {when(hi)}. Words like 'today' or "
+            f"'this morning' refer to that period, not to the current date.")}
 
     def _name(self, eid: str | None) -> str | None:
         if eid is None:

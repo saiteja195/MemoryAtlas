@@ -1,0 +1,10 @@
+{
+  "action": "tool",
+  "args": {
+    "k": 10,
+    "query": "lunch",
+    "time_from": "2026-10-30T00:00:00",
+    "time_to": "2026-10-30T23:59:59"
+  },
+  "tool": "search_claims"
+}
