@@ -1,0 +1,187 @@
+# Held-out day (issue #12): a second staged day, written AFTER the system was developed against the
+# first one (fixtures/demo_day). Nothing in the code, prompts or post-checks may be changed in response
+# to how this day scores. See docs/HELDOUT_DAY.md for the rules.
+#
+# Same fixture format and the same kind of PLACEHOLDER inputs as the demo day: hand-written `perception`
+# for frames and diarized `turns` for conversations. Names and businesses are fictional; coordinates are
+# synthetic.
+day: "2026-10-30"
+owner: me
+
+people:
+  - {id: me, name: Me}
+  - {id: priya, name: Priya}
+  - {id: sam, name: Sam}
+
+grants:
+  - {grantor: me,    session: day-1}
+  - {grantor: me,    session: sync-priya}
+  - {grantor: priya, session: sync-priya}
+  - {grantor: me,    session: lunch-sam}
+  - {grantor: sam,   session: lunch-sam}
+
+sessions:
+  day-1:      {participants: [me]}
+  sync-priya: {participants: [me, priya], speaker_map: {A: me, B: priya}}
+  lunch-sam:  {participants: [me, sam],   speaker_map: {A: me, B: sam}}
+
+events:
+  # Two objects with last-seen sightings that never move (keys), or move once (umbrella), plus a bag
+  # that sits beside the umbrella at the café. Several things are "left somewhere" at once.
+  - id: H1
+    at: "07:50"
+    kind: frame
+    session: day-1
+    lat: 37.80410
+    lon: -122.42110
+    perception:
+      caption: A set of house keys with a red tag on a kitchen counter next to a fruit bowl.
+      ocr_text: []
+      objects:
+        - {label: keys, attrs: {tag: red}}
+        - {label: fruit bowl}
+      scene: home kitchen
+    place_name: Home
+
+  - id: H2
+    at: "08:20"
+    kind: frame
+    session: day-1
+    lat: 37.79850
+    lon: -122.40870
+    perception:
+      caption: A station platform display showing a delayed train.
+      ocr_text: ["Harbor Line", "Platform 3", "Delayed 15 min"]
+      objects:
+        - {label: display}
+      scene: train station
+    place_name: Eastgate Station
+
+  - id: H3
+    at: "09:05"
+    kind: frame
+    session: day-1
+    lat: 37.79620
+    lon: -122.40330
+    perception:
+      caption: A navy umbrella hooked over the back of a chair, next to a black laptop bag.
+      ocr_text: ["Kestrel Coffee"]
+      objects:
+        - {label: umbrella, attrs: {color: navy}}
+        - {label: laptop bag, attrs: {color: black}}
+        - {label: chair}
+      scene: café interior
+    place_name: Kestrel Coffee
+
+  - id: C1
+    at: "10:00"
+    ends: "10:45"
+    kind: calendar
+    session: day-1
+    lat: 37.80100
+    lon: -122.39800
+    title: Roadmap review with Priya
+    location_name: Room 4B, Pier 9 Offices
+    attendees: [priya]
+
+  # Priya's conversation. It names no business: the photo H4 is what names the bakery.
+  # The loading dock code is a detail only this conversation supports.
+  - id: A1
+    at: "10:05"
+    kind: audio
+    session: sync-priya
+    lat: 37.80100
+    lon: -122.39800
+    turns:
+      - {turn_id: 1, start_ms: 0,      end_ms: 13000, speaker: B,
+         text: "Before I forget, try the bakery around the corner from the market, the one with the yellow door. Best sourdough in the city."}
+      - {turn_id: 2, start_ms: 14000,  end_ms: 17000, speaker: A,
+         text: "I'll check it out."}
+      - {turn_id: 3, start_ms: 600000, end_ms: 605000, speaker: B,
+         text: "I'll share the budget draft by Thursday."}
+      - {turn_id: 4, start_ms: 620000, end_ms: 627000, speaker: B,
+         text: "And the loading dock code is 4417, in case you come in early."}
+
+  - id: C2
+    at: "12:30"
+    ends: "13:10"
+    kind: calendar
+    session: day-1
+    lat: 37.79720
+    lon: -122.40240
+    title: Lunch with Sam
+    location_name: Fig Street Market
+    attendees: [sam]
+
+  # Sam's conversation recommends a DIFFERENT bakery, and stays after Priya withdraws consent.
+  - id: A2
+    at: "12:40"
+    kind: audio
+    session: lunch-sam
+    lat: 37.79720
+    lon: -122.40240
+    turns:
+      - {turn_id: 1, start_ms: 0,      end_ms: 12000, speaker: B,
+         text: "If you want something sweet, the bakery down by the harbor with the striped awning. Their cinnamon buns are unreal."}
+      - {turn_id: 2, start_ms: 13000,  end_ms: 16000, speaker: A,
+         text: "Noted, thanks."}
+      - {turn_id: 3, start_ms: 400000, end_ms: 407000, speaker: B,
+         text: "By the way, I'm moving to Denver in March."}
+      - {turn_id: 4, start_ms: 420000, end_ms: 426000, speaker: B,
+         text: "I'll send you the hiking photos on Saturday."}
+
+  - id: H4
+    at: "13:25"
+    kind: frame
+    session: day-1
+    lat: 37.79760
+    lon: -122.40180
+    perception:
+      caption: A small bakery storefront with a bright yellow door.
+      ocr_text: ["Marrow & Rye Bakery"]
+      objects:
+        - {label: door, attrs: {color: yellow}}
+        - {label: storefront}
+      scene: street
+
+  - id: H5
+    at: "13:40"
+    kind: frame
+    session: day-1
+    lat: 37.80020
+    lon: -122.39520
+    perception:
+      caption: A bakery storefront near the water with a red and white striped awning.
+      ocr_text: ["Tidewater Bakery"]
+      objects:
+        - {label: awning, attrs: {color: red and white striped}}
+        - {label: storefront}
+      scene: harbor street
+
+  - id: H6
+    at: "15:10"
+    kind: frame
+    session: day-1
+    lat: 37.80100
+    lon: -122.39800
+    perception:
+      caption: A whiteboard in a meeting room with a launch plan written on it.
+      ocr_text: ["Q1 launch: Feb 12", "Beta: Jan 8"]
+      objects:
+        - {label: whiteboard}
+      scene: meeting room
+    place_name: Room 4B, Pier 9 Offices
+
+  # Uploaded live (deferred); no GPS fix. The umbrella has moved from the café to the office.
+  - id: H7
+    at: "17:20"
+    kind: frame
+    session: day-1
+    live_upload: true
+    perception:
+      caption: A navy umbrella hanging on a coat stand beside a glass door.
+      ocr_text: []
+      objects:
+        - {label: umbrella, attrs: {color: navy}}
+        - {label: coat stand}
+      scene: office entrance

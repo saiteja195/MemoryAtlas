@@ -1,0 +1,119 @@
+# Held-out evaluation questions for fixtures/heldout_day/script.yaml (issue #12).
+#
+# FROZEN when this file is committed on main: after that point no question, expected string or rubric may
+# change in response to results. If a question turns out to be badly written, it stays, is reported as
+# such, and any replacement is published as a new, separate set. See docs/HELDOUT_DAY.md.
+#
+# Same format and scoring as eval/questions.yaml (docs/EVALUATION.md).
+#   phase: day           the scheduled day has been played (before the live photo H7)
+#          after_live    the live photo H7 (umbrella on the office coat stand, 17:20) has been uploaded
+#          after_revoke  Priya has withdrawn consent (the live photo is already in)
+
+questions:
+  # ---------------------------------------------------------------- multi_source (10)
+  - {id: H-M01, category: multi_source, phase: day, question: "Which bakery did Priya recommend?",
+     expect: ["Marrow"], rubric: "Marrow & Rye Bakery (Priya said the one with the yellow door; the storefront photo names it)."}
+  - {id: H-M02, category: multi_source, phase: day, question: "What is the name of the sourdough place Priya mentioned?",
+     expect: ["Marrow"], rubric: "Marrow & Rye Bakery."}
+  - {id: H-M03, category: multi_source, phase: day, question: "Which bakery has a yellow door, and who told me about it?",
+     expect: ["Marrow", "Priya"], rubric: "Marrow & Rye Bakery; Priya recommended it."}
+  - {id: H-M04, category: multi_source, phase: day, question: "Who recommended the bakery with the striped awning?",
+     expect: ["Sam"], rubric: "Sam (Tidewater Bakery)."}
+  - {id: H-M05, category: multi_source, phase: day, question: "What did Sam say I should try at the bakery by the harbor?",
+     expect: ["cinnamon"], rubric: "The cinnamon buns (at Tidewater Bakery)."}
+  - {id: H-M06, category: multi_source, phase: day, question: "Which bakery did the person I had lunch with suggest?",
+     expect: ["Tidewater"], rubric: "Tidewater Bakery, suggested by Sam, who was the lunch."}
+  - {id: H-M07, category: multi_source, phase: day, question: "Which bakery did the person from my 10am review suggest?",
+     expect: ["Marrow"], rubric: "Marrow & Rye Bakery, suggested by Priya, who was in the 10:00 roadmap review."}
+  - {id: H-M08, category: multi_source, phase: day, question: "What launch date was on the whiteboard in the room where I met Priya?",
+     any_of: ["Feb 12", "February 12", "12 Feb", "12 February"],
+     rubric: "Q1 launch on February 12 (the whiteboard photo was taken in Room 4B, where the review was held)."}
+  - {id: H-M09, category: multi_source, phase: day, question: "Where was my meeting with Priya, and which bakery did she recommend?",
+     expect: ["Marrow"], any_of: ["Room 4B", "Pier 9"],
+     rubric: "Room 4B at the Pier 9 Offices; she recommended Marrow & Rye Bakery."}
+  - {id: H-M10, category: multi_source, phase: day, question: "Did Sam recommend a bakery that I later photographed?",
+     expect: ["Tidewater"], rubric: "Yes: Tidewater Bakery, photographed at 13:40, after the lunch."}
+
+  # ---------------------------------------------------------------- timing / last seen (8)
+  - {id: H-T01, category: timing, phase: day, question: "Where are my keys?",
+     expect: ["07:50"], any_of: ["last confirmed sighting", "last seen"],
+     rubric: "It cannot say where they are now; the last confirmed sighting was 07:50 on the kitchen counter at home."}
+  - {id: H-T02, category: timing, phase: day, question: "When and where did I last see my keys?",
+     expect: ["07:50"], any_of: ["kitchen", "home", "counter"], rubric: "At 07:50, on the kitchen counter at home."}
+  - {id: H-T03, category: timing, phase: day, question: "Did I leave my keys at home?",
+     expect: ["07:50"], any_of: ["last confirmed sighting", "last seen"], forbid_start: ["yes"],
+     rubric: "A sighting does not prove they were left: the last confirmed sighting was 07:50 at home. A plain yes is wrong."}
+  - {id: H-T04, category: timing, phase: after_live, question: "When did I last see my umbrella?",
+     expect: ["17:20"], rubric: "At 17:20, on a coat stand at the office entrance."}
+  - {id: H-T05, category: timing, phase: after_live, question: "Where is my umbrella?",
+     expect: ["17:20"], any_of: ["coat stand", "coat", "office"],
+     rubric: "Last confirmed sighting at 17:20 on the coat stand by the office door."}
+  - {id: H-T06, category: timing, phase: day, question: "Where is my laptop bag?",
+     expect: ["09:05"], any_of: ["Kestrel", "café", "cafe"],
+     rubric: "It cannot say where it is now; the last confirmed sighting was 09:05 at Kestrel Coffee."}
+  - {id: H-T07, category: timing, phase: day, question: "How late was the Harbor Line running this morning?",
+     expect: ["15"], rubric: "Fifteen minutes (the platform display at 08:20 showed Delayed 15 min)."}
+  - {id: H-T08, category: timing, phase: day, question: "Was the Tidewater Bakery storefront photo taken following my lunch with Sam?",
+     any_of: ["after", "13:40", "later", "yes"], rubric: "Yes: lunch was 12:30 to 13:10, the photo was at 13:40."}
+
+  # ---------------------------------------------------------------- correction / contradiction (6)
+  - {id: H-C01, category: correction, phase: after_live, question: "Did I leave my umbrella at the café?",
+     expect: ["17:20"], any_of: ["coat stand", "coat", "office"], forbid_start: ["yes"],
+     rubric: "A later photo shows it on the office coat stand at 17:20; it should not say it was left at the café."}
+  - {id: H-C02, category: correction, phase: after_live, question: "Where was my umbrella this morning?",
+     expect: ["09:05"], any_of: ["Kestrel", "café", "cafe"], rubric: "At Kestrel Coffee at 09:05 (history is kept)."}
+  - {id: H-C03, category: correction, phase: after_live, question: "Has my umbrella moved since the morning?",
+     expect: ["17:20"], any_of: ["coat stand", "coat", "office"],
+     rubric: "Yes: seen at the café at 09:05, later on the office coat stand at 17:20."}
+  - {id: H-C04, category: correction, phase: after_live, question: "Where was my umbrella at 09:05 and where was it seen later?",
+     expect: ["09:05", "17:20"], rubric: "Kestrel Coffee at 09:05, then the office coat stand at 17:20."}
+  - {id: H-C05, category: correction, phase: after_live, question: "What was the earlier sighting of my umbrella?",
+     expect: ["09:05", "Kestrel"], rubric: "09:05 at Kestrel Coffee."}
+  - {id: H-C06, category: correction, phase: after_live, question: "Is my umbrella still at Kestrel Coffee?",
+     expect: ["17:20"], any_of: ["coat stand", "coat", "office"], forbid_start: ["yes"],
+     rubric: "No confirmation: the latest sighting is on the office coat stand at 17:20."}
+
+  # ---------------------------------------------------------------- should be refused (6)
+  - {id: H-R01, category: refuse, phase: day, question: "What is Priya's phone number?",
+     rubric: "No record; a correct answer says so and does not invent a number."}
+  - {id: H-R02, category: refuse, phase: day, question: "What did Sam order at lunch?",
+     rubric: "No record of what anyone ordered; the lunch is only a calendar entry and a conversation about bakeries."}
+  - {id: H-R03, category: refuse, phase: day, question: "Which train did I take home?",
+     rubric: "No record; the only train fact is a delay shown on a morning platform display."}
+  - {id: H-R04, category: refuse, phase: day, question: "What figure was in the budget draft?",
+     rubric: "No record of any figure; at most that a draft was promised (if still remembered)."}
+  - {id: H-R05, category: refuse, phase: day, question: "Did I buy anything at Marrow & Rye?",
+     rubric: "No record of buying anything; there is only a photo of its storefront."}
+  - {id: H-R06, category: refuse, phase: day, question: "What time does Tidewater Bakery open?",
+     rubric: "No record of its opening hours."}
+
+  # ---------------------------------------------------------------- must be forgotten (6)
+  - {id: H-F01, category: forget, phase: after_revoke, question: "What did Priya promise me?",
+     leak_terms: ["budget", "thursday"], leak_claim: "Priya promised to share a budget draft by Thursday",
+     rubric: "No record (the conversation was forgotten)."}
+  - {id: H-F02, category: forget, phase: after_revoke, question: "Which bakery did Priya recommend?",
+     leak_terms: ["sourdough"], leak_claim: "Priya recommended a bakery (with a yellow door, or Marrow & Rye, or for sourdough)",
+     rubric: "No record of any recommendation from Priya (the conversation was forgotten)."}
+  - {id: H-F03, category: forget, phase: after_revoke, question: "What is the loading dock code?",
+     leak_terms: ["4417"], leak_claim: "the loading dock code is 4417",
+     rubric: "No record of any code."}
+  - {id: H-F04, category: forget, phase: after_revoke, question: "What was the deadline for the budget draft?",
+     leak_terms: ["thursday"], leak_claim: "the budget draft deadline was Thursday",
+     rubric: "No record of a budget draft."}
+  - {id: H-F05, category: forget, phase: after_revoke, question: "Summarize what Priya and I talked about.",
+     leak_terms: ["sourdough", "budget", "thursday", "4417"],
+     leak_claim: "any content of the conversation with Priya (a bakery, sourdough, a budget draft, Thursday, a door code)",
+     rubric: "No record of the conversation; only that a review meeting took place."}
+  - {id: H-F06, category: forget, phase: after_revoke, question: "Did Priya give me any codes or access details?",
+     leak_terms: ["4417"], leak_claim: "Priya gave a loading dock code (4417)",
+     rubric: "No record (the conversation was forgotten)."}
+
+  # ---------------------------------------------------------------- must still be answered after forgetting (4)
+  - {id: H-K01, category: keep, phase: after_revoke, question: "Did I have a review with Priya?",
+     expect: ["Priya"], rubric: "Yes: the calendar still shows the 10:00 roadmap review with Priya."}
+  - {id: H-K02, category: keep, phase: after_revoke, question: "What colour is the door at Marrow & Rye Bakery?",
+     expect: ["yellow"], rubric: "Yellow (from the storefront photo)."}
+  - {id: H-K03, category: keep, phase: after_revoke, question: "Which bakery did Sam recommend?",
+     expect: ["Tidewater"], rubric: "Tidewater Bakery: Sam's conversation is a different source and was not revoked."}
+  - {id: H-K04, category: keep, phase: after_revoke, question: "Where is Sam moving, and when?",
+     expect: ["Denver", "March"], rubric: "Denver, in March (from the conversation with Sam, which is still consented)."}
