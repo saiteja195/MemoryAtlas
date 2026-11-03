@@ -155,6 +155,11 @@ class DraftStore:
         self._drafts[stored.draft_id] = (self._clock() + self._ttl, stored)
         return stored
 
+    def peek(self, draft_id: str) -> Draft:
+        """Look without removing, so a commit that fails validation leaves the draft usable."""
+        self._expire()
+        return self._drafts[draft_id][1]
+
     def take(self, draft_id: str) -> Draft:
         self._expire()
         _, draft = self._drafts.pop(draft_id)       # KeyError when unknown or expired

@@ -159,3 +159,12 @@ def test_store_expires():
 def test_store_unknown_id_raises():
     with pytest.raises(KeyError):
         DraftStore().take("nope")
+
+
+def test_store_peek_does_not_remove():
+    store = DraftStore()
+    d = store.put(photo())
+    assert store.peek(d.draft_id).draft_id == d.draft_id
+    assert store.take(d.draft_id).draft_id == d.draft_id
+    with pytest.raises(KeyError):
+        store.peek(d.draft_id)

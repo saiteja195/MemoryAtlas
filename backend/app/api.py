@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from . import db
 from .capture.adapters import MockDayAdapter
 from .capture.audit import media_bytes_on_disk
+from .capture.commit import Answers, CommitError, commit as commit_draft, plan as plan_commit
 from .capture.draft import DraftStore
 from .capture.media_info import MediaError
 from .capture.models import KINDS, RawCapture
@@ -57,6 +58,11 @@ class PreviewBody(BaseModel):
     audio_b64: str | None = None                # video: the audio track as WAV
     text: str | None = None
     file_modified_at: str | None = None         # local time of the file, naive ISO
+
+
+class CommitBody(BaseModel):
+    draft_id: str
+    answers: Answers = Field(default_factory=Answers)
 
 
 class AskBody(BaseModel):
@@ -206,6 +212,26 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
         return drafts.put(draft).model_dump()
+
+    @app.post("/capture/commit")
+    def capture_commit(body: CommitBody) -> dict:
+        """Store a confirmed draft. Consent is decided here, in code, from the answers."""
+        try:
+            draft = drafts.peek(body.draft_id)
+        except KeyError:
+            raise HTTPException(404, "draft expired or unknown") from None
+        try:
+            decided = plan_commit(draft, body.answers, engine.gateway.owner)
+        except CommitError as e:
+            raise HTTPException(e.status, e.message) from None
+        try:
+            drafts.take(body.draft_id)          # from here on a second call gets 404
+        except KeyError:
+            raise HTTPException(404, "draft expired or unknown") from None
+        try:
+            return commit_draft(conn, engine, settings.revocation_secret, draft, decided)
+        except LLMUnavailable as e:
+            raise HTTPException(503, str(e)) from e
 
     @app.post("/capture/{kind}")
     def capture(kind: str, body: CaptureBody) -> dict:
