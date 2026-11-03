@@ -246,17 +246,37 @@ td button:focus-visible { outline: 2px solid var(--accent); }
 [role="tabpanel"] { display: grid; gap: 10px; }
 [role="tabpanel"][hidden] { display: none; }
 
-.ask-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.ask-form input { min-inline-size: 0; }
+/* Chat: a thread of bubbles above a pinned composer. */
+.chat { display: grid; gap: 10px; }
+.chat-thread { display: flex; flex-direction: column; gap: 12px; max-block-size: min(62vh, 560px); min-block-size: 160px; overflow-y: auto; padding: 4px 2px; overscroll-behavior: contain; scroll-padding: 8px; }
+.chat-empty { display: grid; gap: 8px; padding: 14px 4px; }
+.chat-empty h3 { font-size: 1.05rem; }
+.chat-empty .starters { flex-direction: column; flex-wrap: nowrap; }
+.chat-empty .starters button { border-radius: 14px; padding: 9px 14px; font-size: 0.92rem; }
+.qa { display: flex; flex-direction: column; gap: 8px; }
+.bubble { max-inline-size: 94%; padding: 9px 13px; border-radius: 18px; overflow-wrap: anywhere; }
+.bubble.me { align-self: flex-end; background: var(--accent); color: var(--accent-text); border-end-end-radius: 6px; margin: 0; }
+.bubble.bot { align-self: flex-start; background: var(--surface-2); border-end-start-radius: 6px; display: grid; gap: 8px; }
+.bubble.bot p { margin: 0; }
+.qa .a { font-size: 1rem; }
+.qa.abstained .a { color: var(--muted); }
+.qa .cites { display: grid; gap: 4px; }
+.steps { list-style: none; margin: 0; padding: 2px 6px; display: grid; gap: 2px; font-size: 0.86rem; color: var(--muted); }
+.steps .done { color: var(--ok); }
+.steps .now { color: var(--text); font-weight: 600; }
+.follow { align-self: flex-start; }
+.follow button { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.ask-form { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 999px; padding: 4px 4px 4px 14px; background: var(--surface); }
+.ask-form:focus-within { border-color: var(--accent); }
+.ask-form input { flex: 1; min-inline-size: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; padding: 6px 0; min-block-size: 0; }
+.send { inline-size: 36px; block-size: 36px; flex: none; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; cursor: pointer; }
+.send:disabled { opacity: 0.45; cursor: not-allowed; }
+.chat-note { margin: -4px 6px 0; }
+.more-prompts > summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; padding: 6px 2px; min-block-size: 32px; }
+.more-prompts .prompt-groups { padding-block-start: 4px; }
 .examples { display: flex; flex-wrap: wrap; gap: 6px; }
 .examples button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 11px; min-block-size: 28px; cursor: pointer; font-size: 0.85rem; text-align: start; }
 .examples button:hover:not(:disabled) { background: var(--surface-2); }
-.thread { display: grid; gap: 10px; }
-.qa { padding: 12px 14px; display: grid; gap: 8px; }
-.qa .q { color: var(--muted); font-size: 0.88rem; }
-.qa .a { font-size: 1.02rem; }
-.qa.abstained .a { color: var(--muted); }
-.qa .cites { display: grid; gap: 4px; }
 .cite {
   display: flex; gap: 8px; align-items: baseline; text-align: start; border: 1px solid var(--border);
   background: var(--surface-2); border-radius: 8px; padding: 5px 9px; cursor: pointer; inline-size: 100%;
@@ -595,7 +615,7 @@ dialog.drawer { z-index: 40; }
 .nearby button:focus-visible { outline: 2px solid var(--accent); }
 .prompt-groups { display: grid; gap: 6px; }
 .prompt-group { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
-.prompt-group summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 12px; cursor: pointer; min-block-size: 40px; }
+.prompt-title { margin: 0; padding: 8px 12px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .prompt-group .examples { padding: 0 12px 10px; }
 .not-recorded { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px dashed var(--border); }
 

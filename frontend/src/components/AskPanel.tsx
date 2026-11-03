@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Answer, LlmMode } from "../api/types";
 import { clock } from "../utils/graph";
+import { followUps, oldestFirst, PHASES, phaseAt } from "../utils/chat";
+import { prefersReducedMotion } from "../utils/theme";
 import { EvidenceChip } from "./Badges";
 import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "../utils/suggest";
 
@@ -29,26 +31,83 @@ const STATUS = {
 
 export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }: Props) {
   const [q, setQ] = useState("");
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const text = q.trim();
-    if (text.length >= 3 && !asking) { onAsk(text); setQ(""); }
-  };
+  const [examplesOpen, setExamplesOpen] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const thread = useRef<HTMLDivElement>(null);
+
   const groups = forgotten ? AFTER_GROUPS : BEFORE_GROUPS;
   const replay = mode === "replay";
+  const turns = oldestFirst(qas);
   const typed = q.trim();
   // In replay mode a free-form question probably has no recording: offer the nearest ones while typing.
   const near = replay && typed.length >= 3 && !isKnown(typed, groups) ? suggest(typed, groups) : [];
+  const last = qas[0];
+  const next = !asking && last?.answer ? followUps(qas.map((x) => x.question), groups) : [];
+  const starters = groups.flatMap((g) => g.prompts).slice(0, 4);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (typed.length >= 3 && !asking) { onAsk(typed); setQ(""); }
+  };
+
+  // The three "working" steps advance on elapsed time only; the server reports no real progress.
+  useEffect(() => {
+    if (!asking) { setElapsed(0); return; }
+    const began = Date.now();
+    const id = window.setInterval(() => setElapsed(Date.now() - began), 250);
+    return () => window.clearInterval(id);
+  }, [asking]);
+
+  // Keep the newest message in view inside the thread, without scrolling the whole page.
+  useEffect(() => {
+    const el = thread.current;
+    if (!el) return;
+    if (prefersReducedMotion()) el.scrollTop = el.scrollHeight;
+    else el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [qas.length, asking]);
+
+  const phase = phaseAt(elapsed);
 
   return (
-    <>
-      <form className="ask-form" onSubmit={submit}>
-        <label className="sr-only" htmlFor="question">Ask about your day</label>
-        <input id="question" type="text" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off"
-               placeholder={replay ? "Pick a question below, or type one…" : "Ask about your day…"} maxLength={500}
-               aria-describedby={replay ? "ask-mode-note" : undefined} />
-        <button type="submit" className="btn primary" disabled={asking || typed.length < 3}>{asking ? "Thinking…" : "Ask"}</button>
-      </form>
+    <div className="chat">
+      <div className="thread chat-thread" ref={thread} role="log" aria-label="Conversation" aria-live="off" tabIndex={0}>
+        {turns.length === 0 && !asking && (
+          <div className="chat-empty">
+            <h3>What do you want to understand?</h3>
+            <p className="muted small">Ask anything about your day, in your own words. Each answer shows the memories it rests on.</p>
+            <div className="examples starters">
+              {starters.map((s) => <button type="button" key={s} disabled={asking} onClick={() => onAsk(s)}>{s}</button>)}
+            </div>
+          </div>
+        )}
+
+        {turns.map((qa) => (
+          <article className={`qa ${qa.answer?.status ?? ""}`} key={qa.id} aria-label={`Question: ${qa.question}`}>
+            <p className="q bubble me">{qa.question}</p>
+            {qa.error && qa.error.notRecorded && (
+              <NotRecorded question={qa.question} groups={groups} disabled={asking} onAsk={onAsk} />
+            )}
+            {qa.error && !qa.error.notRecorded && <div className="notice error" role="alert">{qa.error.text}</div>}
+            {qa.answer && <Answered a={qa.answer} onCite={onCite} onWhy={onWhy} />}
+          </article>
+        ))}
+
+        {asking && (
+          <ol className="steps" role="status" aria-label="Looking through your memories">
+            {PHASES.map((label, i) => (
+              <li key={label} className={i < phase ? "done" : i === phase ? "now" : ""}>
+                <span aria-hidden="true">{i < phase ? "✓" : i === phase ? "…" : "·"}</span> {label}
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {next.length > 0 && (
+          <div className="examples follow" role="group" aria-label="Suggested next questions">
+            {next.map((n) => <button type="button" key={n} onClick={() => onAsk(n)}>{n}</button>)}
+          </div>
+        )}
+      </div>
 
       {near.length > 0 && (
         <div className="nearby" role="group" aria-label="Questions with recorded answers">
@@ -58,6 +117,17 @@ export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }:
           ))}
         </div>
       )}
+
+      <form className="ask-form chat-composer" onSubmit={submit}>
+        <label className="sr-only" htmlFor="question">Ask about your day</label>
+        <input id="question" type="text" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off"
+               placeholder={replay ? "Pick a question below, or type one…" : "Ask about your day, people or places…"} maxLength={500}
+               aria-describedby={replay ? "ask-mode-note" : undefined} />
+        <button type="submit" className="send" disabled={asking || typed.length < 3} aria-label={asking ? "Thinking" : "Ask"}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5m0 0-6 6m6-6 6 6" /></svg>
+        </button>
+      </form>
+      <p className="small muted chat-note">Answers only use what is in your Atlas. Forgotten memories are never used.</p>
 
       {replay && (
         <p className="mode-note small" id="ask-mode-note">
@@ -69,41 +139,29 @@ export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }:
         </p>
       )}
 
-      <div className="prompt-groups" role="group" aria-label="Example questions">
-        {groups.map((g) => (
-          <details key={g.title} className="prompt-group" open>
-            <summary><strong>{g.title}</strong><span className="muted small">{g.hint}</span></summary>
-            <div className="examples">
-              {g.prompts.map((ex) => (
-                <button type="button" key={ex} disabled={asking} onClick={() => onAsk(ex)}>{ex}</button>
-              ))}
-            </div>
-          </details>
-        ))}
-      </div>
-
-      <div className="thread" aria-live="off">
-        {asking && <progress aria-label="Looking through your memories" />}
-        {qas.map((qa) => (
-          <article className={`card qa ${qa.answer?.status ?? ""}`} key={qa.id} aria-label={`Question: ${qa.question}`}>
-            <p className="q">{qa.question}</p>
-            {qa.error && qa.error.notRecorded && (
-              <NotRecorded question={qa.question} groups={groups} disabled={asking} onAsk={onAsk} />
-            )}
-            {qa.error && !qa.error.notRecorded && <div className="notice error" role="alert">{qa.error.text}</div>}
-            {qa.answer && <Answered a={qa.answer} onCite={onCite} onWhy={onWhy} />}
-          </article>
-        ))}
-        {qas.length === 0 && !asking && <p className="muted small">Answers appear here, each with the memories it rests on.</p>}
-      </div>
-    </>
+      <details className="more-prompts" open={examplesOpen} onToggle={(e) => setExamplesOpen(e.currentTarget.open)}>
+        <summary>Example questions</summary>
+        <div className="prompt-groups" role="group" aria-label="Example questions">
+          {groups.map((g) => (
+            <section key={g.title} className="prompt-group">
+              <p className="prompt-title"><strong>{g.title}</strong> <span className="muted small">{g.hint}</span></p>
+              <div className="examples">
+                {g.prompts.map((ex) => (
+                  <button type="button" key={ex} disabled={asking} onClick={() => onAsk(ex)}>{ex}</button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </details>
+    </div>
   );
 }
 
 function Answered({ a, onCite, onWhy }: { a: Answer; onCite: (id: string) => void; onWhy: (ids: string[]) => void }) {
   const s = STATUS[a.status];
   return (
-    <>
+    <div className="bubble bot">
       <div className="row">
         <span className={`chip ${s.cls}`}><span aria-hidden="true">{s.mark}</span> {s.text}</span>
         {a.checks.length > 0 && <span className="chip" title={a.checks.join(" ")}>Checked and corrected</span>}
@@ -125,7 +183,7 @@ function Answered({ a, onCite, onWhy }: { a: Answer; onCite: (id: string) => voi
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -137,7 +195,7 @@ function NotRecorded({ question, groups, disabled, onAsk }: {
   const fallback = groups[0].prompts.slice(0, 2);
   const options = close.length ? close : fallback;
   return (
-    <div className="not-recorded" role="status">
+    <div className="not-recorded bubble bot" role="status">
       <p><strong>No recording for that question.</strong></p>
       <p className="small muted">
         Replay mode only answers questions that were recorded, and recordings depend on how far the day has played.
