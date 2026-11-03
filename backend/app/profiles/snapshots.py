@@ -22,13 +22,14 @@ def restore(runtimes: Runtimes, profile: Profile) -> None:
     src = snapshot_path(kind)
     if not os.path.isfile(src):
         raise FileNotFoundError(src)
-    runtimes.evict(profile.profile_id)
-    folder = runtimes.profile_dir(profile.profile_id)
-    db = os.path.join(folder, "memoryatlas.db")
-    for suffix in ("-wal", "-shm"):
-        if os.path.exists(db + suffix):
-            os.remove(db + suffix)
-    shutil.rmtree(os.path.join(folder, "llmcache"), ignore_errors=True)
-    tmp = db + ".tmp"
-    shutil.copyfile(src, tmp)
-    os.replace(tmp, db)
+    with runtimes.exclusive(profile.profile_id):      # no request can rebuild the runtime on the old file meanwhile
+        runtimes.evict(profile.profile_id)
+        folder = runtimes.profile_dir(profile.profile_id)
+        db = os.path.join(folder, "memoryatlas.db")
+        for suffix in ("-wal", "-shm"):
+            if os.path.exists(db + suffix):
+                os.remove(db + suffix)
+        shutil.rmtree(os.path.join(folder, "llmcache"), ignore_errors=True)
+        tmp = db + ".tmp"
+        shutil.copyfile(src, tmp)
+        os.replace(tmp, db)

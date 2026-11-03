@@ -55,23 +55,56 @@ class ProfileRuntime:
             log.exception("closing a profile database failed")
 
 
+class ProfileGone(Exception):
+    """The profile was deleted; nothing may be built or opened for it again."""
+
+
 class Runtimes:
+    """One runtime per profile. Each profile has its own lock, so building or swapping one never stalls another;
+    `exclusive` lets a caller hold a profile still while its files are replaced."""
+
     def __init__(self, settings: Settings, llm: LLMClient | None, root: str | None):
         self.settings, self.llm, self.root = settings, llm, root
         self._by_id: dict[str, ProfileRuntime] = {}
-        self._lock = threading.RLock()
+        self._locks: dict[str, threading.RLock] = {}
+        self._gone: set[str] = set()                # ids are random and never reused, so this stays small
+        self._lock = threading.Lock()               # guards the three dicts above, never held while building
+
+    def exclusive(self, profile_id: str) -> threading.RLock:
+        """Hold this (`with runtimes.exclusive(pid):`) while evicting and replacing a profile's files."""
+        with self._lock:
+            return self._locks.setdefault(profile_id, threading.RLock())
 
     def get(self, profile_id: str, owner_name: str, seed_demo: bool) -> ProfileRuntime:
-        with self._lock:
-            rt = self._by_id.get(profile_id)
+        with self.exclusive(profile_id):
+            if profile_id in self._gone:
+                raise ProfileGone(profile_id)
+            with self._lock:
+                rt = self._by_id.get(profile_id)
             if rt is None:
-                rt = self._by_id[profile_id] = self._build(profile_id, owner_name, seed_demo)
+                rt = self._build(profile_id, owner_name, seed_demo)
+                with self._lock:
+                    self._by_id[profile_id] = rt
             return rt
 
     def evict(self, profile_id: str) -> None:
+        with self.exclusive(profile_id):
+            with self._lock:
+                rt = self._by_id.pop(profile_id, None)
+            if rt is not None:
+                rt.close()
+
+    def forget(self, profile_id: str) -> None:
+        """The profile is being deleted: close it, and refuse every later `get`, so a request that was already
+        in flight cannot recreate its files."""
+        with self.exclusive(profile_id):
+            self._gone.add(profile_id)
+            self.evict(profile_id)
+
+    def close_all(self) -> None:
         with self._lock:
-            rt = self._by_id.pop(profile_id, None)
-        if rt is not None:
+            runtimes, self._by_id = list(self._by_id.values()), {}
+        for rt in runtimes:
             rt.close()
 
     def close_all(self) -> None:

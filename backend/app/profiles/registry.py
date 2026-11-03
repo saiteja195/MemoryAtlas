@@ -144,29 +144,46 @@ class Registry:
         if row is None:
             self._fail_unknown(key, passcode)
             raise BadCredentials()
-        now = self.clock()
-        if row["locked_until"] > now:
-            raise Locked(row["locked_until"] - now)
+        pid, demo = row["profile_id"], bool(row["demo_kind"])      # a demo passcode is public: locking it only locks everyone out
+        if not demo:
+            try:
+                self._reserve_attempt(pid)
+            except Locked:
+                burn_hash(passcode)                   # a locked name costs one hash, like an unknown one
+                raise
         ok = verify_passcode(passcode, row["salt"], row["passcode_hash"])
         with self._lock:
-            if not ok and row["demo_kind"]:
-                raise BadCredentials()          # a demo passcode is public, so locking it would only let anyone lock everyone out
             if ok:
-                self.conn.execute("UPDATE profiles SET failed_count=0, locked_until=0 WHERE profile_id=?",
-                                  (row["profile_id"],))
-                self.conn.commit()
+                if not demo:
+                    now = self.clock()
+                    locked = self.conn.execute("SELECT locked_until FROM profiles WHERE profile_id=?", (pid,)).fetchone()
+                    if locked and locked["locked_until"] > now:      # the lock landed while this guess was hashing
+                        raise Locked(locked["locked_until"] - now)
+                    self.conn.execute("UPDATE profiles SET failed_count=0, locked_until=0 WHERE profile_id=?", (pid,))
+                    self.conn.commit()
                 return self._profile(row)
-            fails = self.conn.execute("SELECT failed_count FROM profiles WHERE profile_id=?",
-                                      (row["profile_id"],)).fetchone()
-            fails = (fails["failed_count"] if fails else 0) + 1
-            if fails >= MAX_FAILURES:
-                self.conn.execute("UPDATE profiles SET failed_count=0, locked_until=? WHERE profile_id=?",
-                                  (self.clock() + LOCK_SECONDS, row["profile_id"]))
-            else:
-                self.conn.execute("UPDATE profiles SET failed_count=? WHERE profile_id=?",
-                                  (fails, row["profile_id"]))
-            self.conn.commit()
+            if not demo:
+                fails = self.conn.execute("SELECT failed_count FROM profiles WHERE profile_id=?", (pid,)).fetchone()
+                if fails and fails["failed_count"] >= MAX_FAILURES:
+                    self.conn.execute("UPDATE profiles SET failed_count=0, locked_until=? WHERE profile_id=?",
+                                      (self.clock() + LOCK_SECONDS, pid))
+                    self.conn.commit()
         raise BadCredentials()
+
+    def _reserve_attempt(self, pid: str) -> None:
+        """Count the attempt before it is checked, so guesses made in parallel cannot all slip past the lock."""
+        with self._lock:
+            row = self.conn.execute("SELECT failed_count, locked_until FROM profiles WHERE profile_id=?",
+                                    (pid,)).fetchone()
+            if row is None:
+                return
+            now = self.clock()
+            if row["locked_until"] > now:
+                raise Locked(row["locked_until"] - now)
+            if row["failed_count"] >= MAX_FAILURES:      # five guesses are already being checked
+                raise Locked(LOCK_SECONDS)
+            self.conn.execute("UPDATE profiles SET failed_count=failed_count+1 WHERE profile_id=?", (pid,))
+            self.conn.commit()
 
     def _fail_unknown(self, key: str, passcode: str) -> None:
         """An unknown name costs one hash and locks after five tries, so it cannot be told from a real one."""

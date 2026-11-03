@@ -75,6 +75,11 @@ To go back to local-only: `docker compose down`, then `docker compose up -d`. Yo
   whose passcodes are public), and there is a cap of 500 profiles. The limits use the first address in
   `X-Forwarded-For`, which Caddy sets to the visitor's address; do not publish the web container's port
   directly alongside this setup.
+- Anything that calls Muse (questions, uploads, the sample day) is limited to 100 calls an hour per profile and 300
+  an hour per address, so open sign-up cannot run up your model bill. A demo profile is limited per address only.
+  The numbers are `Budget()` in `backend/app/profiles/limits.py`.
+- A demo profile cannot be deleted, only reset. Run `seed_profiles.py register` for both demo profiles before you
+  publish the site, so nobody can sign up under those names first.
 - Sessions are cookies (`HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS) that last 30 days.
 - If you used the old single shared login, its data stays in the volume but is not shown to any profile: the
   profile system starts empty.

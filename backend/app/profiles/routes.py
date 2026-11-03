@@ -134,6 +134,8 @@ def make_router(settings: Settings, registry: Registry | None, runtimes: Runtime
     def delete_me(body: DeleteBody, request: Request) -> Response:
         reg = require_registry()
         profile = current_profile(request, reg)
+        if profile.demo_kind:
+            raise HTTPException(403, "A demo profile cannot be deleted. Use Settings to reset it.")
         limited(signins, request)
         try:
             checked = reg.authenticate(profile.name, body.passcode)
@@ -143,7 +145,7 @@ def make_router(settings: Settings, registry: Registry | None, runtimes: Runtime
             raise HTTPException(423, str(e), headers={"Retry-After": str(int(e.retry_after) + 1)}) from None
         if checked.profile_id != profile.profile_id:
             raise HTTPException(401, "Wrong name or passcode")
-        runtimes.evict(profile.profile_id)
+        runtimes.forget(profile.profile_id)        # a late request can no longer rebuild it
         reg.delete(profile.profile_id)
         shutil.rmtree(runtimes.profile_dir(profile.profile_id), ignore_errors=True)
         response = Response(status_code=204)

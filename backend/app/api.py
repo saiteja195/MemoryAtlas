@@ -21,7 +21,8 @@ from .privacy.consent import create_grant
 from .privacy.export import export_memories
 from .privacy.revocation import BadToken, UnknownGrant
 from .profiles.registry import Registry
-from .profiles.routes import make_router
+from .profiles.limits import Budget
+from .profiles.routes import client_ip, make_router
 from .profiles.runtime import ProfileRuntime, Runtimes
 from .profiles import snapshots
 from .profiles.session import current_profile, open_runtime, resolve_runtime
@@ -125,6 +126,18 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         rt.sweep()
         return rt
 
+    app.state.budget = Budget()
+
+    def spend(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> None:
+        """Every route that calls the model costs the owner money; count it against the profile and the address."""
+        if registry is None:
+            return
+        profile = current_profile(request, registry)
+        wait = app.state.budget.check(profile.profile_id, bool(profile.demo_kind), client_ip(request))
+        if wait:
+            raise HTTPException(429, "You have used a lot of Muse calls. Try again in a little while.",
+                                headers={"Retry-After": str(int(wait) + 1)})
+
     @app.get("/health")
     def health() -> dict:
         mode = llm.mode if llm else settings.llm_mode
@@ -193,7 +206,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(409, "Adding memories needs live mode (a model key); this app is in "
                                      f"{rt.llm.mode} mode.")
 
-    @app.post("/capture/preview")
+    @app.post("/capture/preview", dependencies=[Depends(spend)])
     def capture_preview(body: PreviewBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Read an upload with Muse and return what it understood and what it still needs to
         ask. Stores nothing; the commit step does that."""
@@ -213,7 +226,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(503, str(e)) from e
         return rt.drafts.put(draft).model_dump()
 
-    @app.post("/capture/commit")
+    @app.post("/capture/commit", dependencies=[Depends(spend)])
     def capture_commit(body: CommitBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Store a confirmed draft. Consent is decided here, in code, from the answers."""
         require_live(rt)
@@ -234,7 +247,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
-    @app.post("/capture/{kind}")
+    @app.post("/capture/{kind}", dependencies=[Depends(spend)])
     def capture(kind: str, body: CaptureBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         if kind not in KINDS:
             raise HTTPException(404, f"kind must be one of {', '.join(KINDS)}")
@@ -257,7 +270,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
                              "compile_rejected": r.compiled.rejected if r.compiled else None}
                             for r in results]}
 
-    @app.post("/recall/ask")
+    @app.post("/recall/ask", dependencies=[Depends(spend)])
     def ask(body: AskBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         try:
             return rt.recall.ask(body.question)
@@ -271,7 +284,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(404, out["error"])
         return out
 
-    @app.post("/claims/{claim_id}/correct")
+    @app.post("/claims/{claim_id}/correct", dependencies=[Depends(spend)])
     def correct(claim_id: str, body: CorrectBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """The user says a remembered fact is wrong: replace it with `text`, or `retract` it. The old
         fact stays as history; answers stop using it (and anything derived only from it)."""
@@ -315,7 +328,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         profile = current_profile(request, registry)
         if not profile.demo_kind:
             raise HTTPException(403, "Only demo profiles can be reset. Use Settings to delete your profile.")
-        with rt.sweep_lock:                  # nobody sweeps this profile while its database is swapped
+        with runtimes.exclusive(profile.profile_id):         # nobody rebuilds this profile while its database is swapped
             try:
                 snapshots.restore(runtimes, profile)
             except FileNotFoundError:
@@ -326,7 +339,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
                 return rt.demo.status()
         return open_runtime(profile, runtimes).demo.status()
 
-    @app.post("/demo/load-sample")
+    @app.post("/demo/load-sample", dependencies=[Depends(spend)])
     def demo_load_sample(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Fill an empty profile with the scripted sample day, for anyone with nothing to upload yet."""
         if registry is not None:
@@ -339,7 +352,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(503, str(e)) from e
         return rt.demo.status()
 
-    @app.post("/demo/advance")
+    @app.post("/demo/advance", dependencies=[Depends(spend)])
     def demo_advance(steps: int = 1, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         try:
             played = rt.demo.advance(max(1, min(steps, 50)))
@@ -347,7 +360,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(503, str(e)) from e
         return {"played": played, **rt.demo.status()}
 
-    @app.post("/demo/live/{event_id}")
+    @app.post("/demo/live/{event_id}", dependencies=[Depends(spend)])
     def demo_live(event_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         if event_id not in rt.demo.status()["live_uploads"]:
             raise HTTPException(404, "not a live-upload event")

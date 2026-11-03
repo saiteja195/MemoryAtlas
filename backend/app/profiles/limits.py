@@ -36,3 +36,20 @@ class RateLimiter:
             if len(hits) < self.limit:
                 return 0.0
             return max(0.0, hits[0] + self.window - now)
+
+
+class Budget:
+    """How many times an address and a profile may call the model per hour. Open sign-up must not be a way to spend the
+    owner's model key. A demo profile has a public passcode, so only the address limit applies to it."""
+
+    def __init__(self, per_profile: RateLimiter | None = None, per_ip: RateLimiter | None = None):
+        self.per_profile = per_profile or RateLimiter(100, 3600)
+        self.per_ip = per_ip or RateLimiter(300, 3600)
+
+    def check(self, profile_id: str, demo: bool, ip: str) -> float:
+        """0 when allowed, else the seconds to wait."""
+        if not demo and not self.per_profile.allow(profile_id):
+            return max(1.0, self.per_profile.retry_after(profile_id))
+        if not self.per_ip.allow(ip):
+            return max(1.0, self.per_ip.retry_after(ip))
+        return 0.0
