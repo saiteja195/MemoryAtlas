@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError } from "./api/client";
+import type { LlmMode } from "./api/types";
 import { AnnouncerProvider, useAnnounce } from "./hooks/announce";
 import { useAtlas } from "./hooks/useAtlas";
+import { useSession } from "./hooks/useSession";
 import {
   atTime, buildElements, claimIdOfFact, dayCards, describeGraph, episodeOptions, moments as momentsOf,
   pathElementIds, relatedFactClaims, type FactMode, type Selection, type ViewMode,
@@ -11,6 +13,8 @@ import { AskPanel, type QA } from "./components/AskPanel";
 import { ConsentDevice } from "./components/ConsentDevice";
 import { ConsentPanel } from "./components/ConsentPanel";
 import { AddMemory } from "./components/AddMemory";
+import { AuthGate } from "./components/AuthGate";
+import { Onboarding } from "./components/Onboarding";
 import { Dialog } from "./components/Dialog";
 import { EvidenceDrawer } from "./components/Evidence";
 import { DayOverview } from "./components/DayOverview";
@@ -42,9 +46,38 @@ export function App() {
   }
   return (
     <AnnouncerProvider>
-      <Atlas />
+      <Gate />
     </AnnouncerProvider>
   );
+}
+
+/** Sign in first, then onboarding for a new profile, then the app. */
+function Gate() {
+  const session = useSession();
+  const profile = session.me?.profile;
+  const [onboarding, setOnboarding] = useState(false);
+  const [mode, setMode] = useState<LlmMode | undefined>();
+
+  // Onboarding stays on screen until the person finishes or skips the last step, even though consent
+  // (which marks the profile onboarded) comes before it.
+  useEffect(() => {
+    if (session.status === "signedIn" && profile && !profile.onboarded) setOnboarding(true);
+  }, [session.status, profile]);
+  useEffect(() => {
+    if (!onboarding) return;
+    api.health().then((h) => setMode(h.llm_mode)).catch(() => undefined);
+  }, [onboarding]);
+
+  if (session.status === "loading") {
+    return <main className="auth"><p className="muted" role="status">Loading…</p></main>;
+  }
+  if (session.status === "signedOut" || !session.me || !profile) {
+    return <AuthGate onSignedIn={session.refresh} unreachable={session.error} />;
+  }
+  if (onboarding || !profile.onboarded) {
+    return <Onboarding me={session.me} mode={mode} onChanged={session.refresh} onDone={() => setOnboarding(false)} />;
+  }
+  return <Atlas key={profile.profile_id} />;
 }
 
 type Tab = "ask" | "facts" | "consent";

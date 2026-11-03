@@ -65,7 +65,9 @@ def _profile(registry: Registry, kind: str, env: Mapping[str, str]) -> Profile:
     from .registry import NameTaken
     name, passcode = _credentials(kind, env)
     try:
-        return registry.create(name, passcode, demo_kind=kind)
+        profile = registry.create(name, passcode, demo_kind=kind, goals=["remember_day"])
+        registry.accept_consent(profile.profile_id)         # a reviewer lands on the dashboard, not onboarding
+        return registry.get(profile.profile_id) or profile
     except NameTaken:
         profile = registry.authenticate(name, passcode)          # same credentials: reuse the profile
         if profile.demo_kind != kind:

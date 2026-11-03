@@ -84,8 +84,9 @@ def test_register_creates_the_profile_without_content(tmp_path):
     seed.register("real", data_dir=str(tmp_path / "data"), env=ENV, say=lambda *_: None)
     seed.register("real", data_dir=str(tmp_path / "data"), env=ENV, say=lambda *_: None)    # idempotent
     reg = Registry(str(tmp_path / "data" / "profiles.db"))
-    assert reg.authenticate("Demo Real", "published-pass-2").demo_kind == "real"
-    assert reg.count() == 1
+    p = reg.authenticate("Demo Real", "published-pass-2")
+    assert p.demo_kind == "real" and reg.count() == 1
+    assert p.onboarded and p.goals                      # reviewers go straight to the dashboard, not onboarding
 
 
 def make_media(tmp_path):
