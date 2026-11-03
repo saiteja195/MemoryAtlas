@@ -229,3 +229,7 @@ node_modules/
 
 # runtime model-response cache (a forgetting purge cleans it)
 *.llmcache/
+
+# Demo profile snapshots are text-only and committed on purpose (see fixtures/profiles/README.md)
+!fixtures/profiles/staged.db
+!fixtures/profiles/real.db

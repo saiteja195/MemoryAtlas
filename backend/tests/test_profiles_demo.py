@@ -185,3 +185,21 @@ def test_reset_missing_snapshot_for_staged_falls_back_to_the_script(tmp_path, mo
     r = c.post("/demo/reset")
     assert r.status_code == 200 and r.json()["cursor"] == 0
     assert c.post("/demo/advance", params={"steps": 2}).status_code == 200
+
+
+def test_demo_profile_loads_its_snapshot_on_first_open(tmp_path, monkeypatch):
+    snap = build_snapshot(tmp_path)
+    monkeypatch.setattr(snapshots, "snapshot_path", lambda kind: snap)
+    app = make_app(tmp_path)
+    c = make_demo(app)
+    assert c.get("/graph").json()["nodes"]                       # content is there with no reset click
+    st = c.get("/demo/status").json()
+    assert st["cursor"] == st["total"] and c.get("/demo/grants").json()[0]["demo_token"]
+
+
+def test_a_normal_profile_never_loads_a_snapshot(tmp_path, monkeypatch):
+    snap = build_snapshot(tmp_path)
+    monkeypatch.setattr(snapshots, "snapshot_path", lambda kind: snap)
+    c = new_client(make_app(tmp_path))
+    signup(c)
+    assert c.get("/graph").json()["nodes"] == []
