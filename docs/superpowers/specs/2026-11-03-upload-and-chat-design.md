@@ -32,8 +32,7 @@ Two features:
 - No changes to the graph view, timeline, dashboard, consent panel or receipts, and no new graph
   highlight or pulse behaviour. After Save, the existing graph refresh is all that happens.
 - No change to the compiler's extraction logic, the recall investigator or the eval harness.
-- No video analysis in this slice (see Decisions, D3). The Add dialog says video is not
-  supported yet instead of failing silently.
+- No server-side video decoding and no ffmpeg (see D3: video is handled in the browser).
 - No accounts, no multi-user, no cloud storage of media.
 
 ## Anti-goals
@@ -121,19 +120,52 @@ Frontend only; the `/recall/ask` API is unchanged.
 - **D1.** Preview/commit two-phase API rather than extending `/capture/{kind}`.
 - **D2.** No EXIF library dependency beyond `Pillow` for reading EXIF. If Pillow is not
   acceptable we fall back to asking the user for time and place.
-- **D3.** Video is deferred. Muse accepts video, but the client has no video path and frame
-  extraction needs ffmpeg in the image. Photos, voice (WAV) and text first.
-- **D4.** Voice upload accepts WAV only (the ASR contract). Other formats show a clear error
-  instead of silent conversion.
+- **D3.** (Revised 2026-11-03.) Video is supported by doing the decoding in the browser: up to
+  4 evenly spaced frames (JPEG) plus the audio track (as WAV) are extracted client-side and
+  sent as a "video" preview. The backend runs `describe_image` per frame and `transcribe` on
+  the audio, so no new Muse method and no ffmpeg.
+- **D4.** (Revised.) The backend accepts WAV only (the ASR contract). The browser converts
+  anything it records or is given (webm/opus, mp4/aac) to mono 16-bit WAV at 16000 Hz
+  before upload.
 - **D5.** Drafts live in memory for 15 minutes, keyed by id, text only.
 - **D6.** Scope chips and graph pulse are out.
 - **D7.** Progress steps are time-based labels, not backend events.
+- **D8.** Replay mode cannot compile uploads, so Add memory is disabled there with an
+  explanation (instead of fixture perceptions).
+- **D9.** A visible person in a photo or video who did not consent causes the whole item to be
+  rejected, because the gateway cannot hide one face.
+- **D10.** No phone bottom sheet: the chat stays in the existing side tab to honour strict scope.
 
 ## Open for the builder
 
 - Exact `draft` JSON schema and field names.
 - File size limits (suggest 10 MB image, 32 MB audio, matching the ASR limit).
 - Test fixtures: a tiny JPEG with EXIF, a tiny WAV, fakes for Muse in `tests/`.
+
+## Capture from the device (added 2026-11-03)
+
+The Add memory dialog also lets the user **take a photo, record a voice note, or record a
+video** with the device camera and microphone, on phone or laptop.
+
+- Uses `navigator.mediaDevices.getUserMedia` and `MediaRecorder`. These need a secure context:
+  `https://` or `localhost`. The UI checks `window.isSecureContext`, and when it is false it
+  explains this instead of showing a broken button.
+- Permissions are requested only when the user presses Take photo, Record voice or Record
+  video, never on page load. Denial, no device, and in-use device each get a specific message
+  and the file picker stays available as the fallback. Streams are stopped as soon as capture
+  ends or the dialog closes, so the camera light goes off.
+- Capped length: voice 10 minutes (the ASR limit), video 60 seconds.
+- Phones: the file inputs also carry `capture` hints so the native camera can be used.
+- After capture the user sees a preview (image, audio player or video player) and can retake
+  before analyzing. Everything then follows the same preview/commit flow.
+
+## Deployment (added 2026-11-03)
+
+The user will run this on a remote VM behind a DuckDNS name. The default compose file stays
+localhost-only. A new opt-in `public` profile adds Caddy, which obtains and renews the TLS
+certificate for `$PUBLIC_HOST` and requires HTTP basic auth (`$BASIC_AUTH_USER`,
+`$BASIC_AUTH_HASH`) on every path, because the app has no accounts and exposes demo endpoints
+(reset, grant tokens). The backend and web containers publish no port in that profile.
 
 ## Verification
 
