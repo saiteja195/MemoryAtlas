@@ -4,6 +4,7 @@ Nothing here is stored in the database. Which questions get asked is decided by 
 `build_draft`, not by the model: Muse supplies perceptions and transcripts, code decides what
 is certain, what needs confirming, and what only the person can answer (especially consent).
 """
+import re
 import time
 import uuid
 from typing import Callable, Literal
@@ -15,7 +16,17 @@ from .media_info import ExifInfo
 Confidence = Literal["sure", "check", "ask"]
 Source = Literal["exif", "file", "image", "voice", "note", "user"]
 
-_PERSON_WORDS = ("person", "people", "man", "woman", "child", "boy", "girl")
+# Whole words that mean a person is in the picture. Over-asking costs one extra question; missing a
+# person stores someone who never agreed, so the list is generous and matched as whole words.
+_PERSON_WORDS = (
+    "person", "persons", "people", "man", "men", "woman", "women", "child", "children", "kid", "kids",
+    "boy", "boys", "girl", "girls", "baby", "babies", "toddler", "toddlers", "infant", "infants",
+    "teen", "teens", "teenager", "teenagers", "adult", "adults", "human", "humans", "guy", "guys",
+    "lady", "ladies", "crowd", "crowds", "family", "families", "couple", "couples", "friend", "friends",
+    "face", "faces", "customer", "customers", "diner", "diners", "passenger", "passengers",
+    "pedestrian", "pedestrians", "waiter", "waitress", "worker", "workers", "selfie", "portrait",
+)
+_PERSON_RE = re.compile(r"\b(?:" + "|".join(_PERSON_WORDS) + r")\b", re.IGNORECASE)
 _MAX_VISIBLE = 3
 
 
@@ -52,11 +63,15 @@ class Draft(BaseModel):
 
 
 def _visible_people(perception: dict) -> int:
+    """How many people the perception shows. Labels count one each; a person mentioned only in the
+    caption or scene still counts as one, because Muse does not always list people as objects."""
     count = 0
     for o in perception.get("objects") or []:
         label = (o.get("label") if isinstance(o, dict) else str(o)) or ""
-        if any(w in label.lower() for w in _PERSON_WORDS):
+        if _PERSON_RE.search(label):
             count += 1
+    if count == 0 and any(_PERSON_RE.search(str(perception.get(k) or "")) for k in ("caption", "scene")):
+        count = 1
     return count
 
 

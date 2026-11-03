@@ -332,3 +332,32 @@ def test_commit_video_person_declines_stores_nothing():
     d = c.post("/capture/preview", json=video_body(audio=False)).json()
     r = commit(c, d, people=[{"ref": "visible1", "consented": False}])
     assert r.json()["results"][0]["reason"] == "no_consent" and source_texts(c) == []
+
+
+# -- review fixes -------------------------------------------------------------------------------
+
+class Recording(FakeLLM):
+    mode = "record"
+
+
+def test_preview_and_commit_need_live_mode_so_nothing_is_cached():
+    c, fake = make(Recording())
+    r = c.post("/capture/preview", json={"kind": "note", "text": "hello there"})
+    assert r.status_code == 409 and "live" in r.json()["detail"]
+    assert c.post("/capture/commit", json={"draft_id": "x", "answers": {}}).status_code == 409
+    assert fake.described == [] and fake.transcribed == []
+
+
+def test_commit_lets_the_person_correct_the_file_date():
+    c, _ = make()
+    d = preview_photo(c, png(), file_modified_at="2026-10-30T09:00:00")
+    r = commit(c, d, when="2026-10-28T08:15:00")
+    assert r.status_code == 200 and r.json()["session_id"] == "upload-2026-10-28"
+    row = c.app.state.conn.execute("SELECT captured_at FROM sources WHERE session_id='upload-2026-10-28'").fetchone()
+    assert row["captured_at"] == "2026-10-28T08:15:00"
+
+
+def test_commit_keeps_the_draft_date_when_no_correction_is_sent():
+    c, _ = make()
+    d = preview_photo(c, png(), file_modified_at="2026-10-30T09:00:00")
+    assert commit(c, d).json()["session_id"] == "upload-2026-10-30"

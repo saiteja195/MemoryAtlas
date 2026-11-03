@@ -51,9 +51,12 @@ class _Plan(BaseModel):
 
 def plan(draft: Draft, answers: Answers, owner: str) -> _Plan:
     """Validate the answers against the draft. Raises CommitError(422); changes nothing."""
-    captured_at = draft.captured_at or local_iso(answers.when)
-    if answers.when and not draft.captured_at and local_iso(answers.when) is None:
+    # A time the person gave wins over the one Muse or the file supplied: file dates are often just the
+    # download time.
+    given = local_iso(answers.when) if answers.when else None
+    if answers.when and given is None:
         raise CommitError(422, "the time you gave could not be read")
+    captured_at = given or draft.captured_at
     if not captured_at:
         raise CommitError(422, "when this happened is required")
 

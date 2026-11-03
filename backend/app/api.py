@@ -194,10 +194,18 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     def export() -> dict:
         return export_memories(conn)
 
+    def require_live() -> None:
+        # In record mode every model response is written to the cache, including a transcript of someone
+        # who then says no. Uploads therefore run only on the live client, which keeps nothing.
+        if llm.mode != "live":
+            raise HTTPException(409, "Adding memories needs live mode (a model key); this app is in "
+                                     f"{llm.mode} mode.")
+
     @app.post("/capture/preview")
     def capture_preview(body: PreviewBody) -> dict:
         """Read an upload with Muse and return what it understood and what it still needs to
         ask. Stores nothing; the commit step does that."""
+        require_live()
         try:
             draft = build_preview(
                 llm, body.kind, data_b64=body.data_b64, frames_b64=body.frames_b64,
@@ -216,6 +224,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     @app.post("/capture/commit")
     def capture_commit(body: CommitBody) -> dict:
         """Store a confirmed draft. Consent is decided here, in code, from the answers."""
+        require_live()
         try:
             draft = drafts.peek(body.draft_id)
         except KeyError:

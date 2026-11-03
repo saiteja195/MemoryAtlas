@@ -1,5 +1,7 @@
 import io
+import struct
 import wave
+import zlib
 
 import pytest
 from PIL import Image
@@ -91,3 +93,25 @@ def test_check_wav_rejects_mp3_bytes():
 def test_check_wav_rejects_over_ten_minutes():
     with pytest.raises(MediaError, match="10 minutes"):
         check_wav(wav(601, rate=16000))
+
+
+def png_claiming(width: int, height: int) -> bytes:
+    """A valid-looking PNG whose header claims a huge size (a decompression bomb)."""
+    good = png()
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    chunk = struct.pack(">I", 13) + b"IHDR" + ihdr + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr))
+    return good[:8] + chunk + good[8 + 25:]
+
+
+def test_check_image_rejects_a_decompression_bomb_instead_of_crashing():
+    with pytest.raises(MediaError):
+        check_image(png_claiming(30000, 30000))
+
+
+def test_check_image_accepts_mpo_jpegs_from_phones():
+    buf = io.BytesIO()
+    first, second = Image.new("RGB", (8, 8), "white"), Image.new("RGB", (8, 8), "black")
+    first.save(buf, "MPO", save_all=True, append_images=[second])      # two frames: Pillow reopens it as MPO
+    with Image.open(io.BytesIO(buf.getvalue())) as reopened:
+        assert reopened.format == "MPO"
+    check_image(buf.getvalue())

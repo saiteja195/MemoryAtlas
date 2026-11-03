@@ -67,9 +67,9 @@ def check_image(image: bytes) -> None:
         with Image.open(io.BytesIO(image)) as img:
             fmt = img.format
             img.verify()
-    except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError):
         raise MediaError("That file is not a readable image. Use a JPEG or PNG.") from None
-    if fmt not in ("JPEG", "PNG"):
+    if fmt not in ("JPEG", "PNG", "MPO"):       # MPO: a JPEG with extra frames, which many phones write
         raise MediaError(f"{fmt or 'This'} images are not supported. Use a JPEG or PNG.")
 
 

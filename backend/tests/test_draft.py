@@ -168,3 +168,27 @@ def test_store_peek_does_not_remove():
     assert store.take(d.draft_id).draft_id == d.draft_id
     with pytest.raises(KeyError):
         store.peek(d.draft_id)
+
+
+def people_questions(d):
+    return [q for q in d.questions if q.kind == "consent"]
+
+
+@pytest.mark.parametrize("labels", [["two women", "crowd", "baby"], ["men"], ["kid"], ["toddler"], ["face"],
+                                    ["family"], ["couple"], ["human"], ["Friends"], ["a customer"]])
+def test_common_people_labels_ask_consent(labels):
+    p = {"caption": "A table", "ocr_text": [], "objects": [{"label": l, "attrs": {}} for l in labels], "scene": "cafe"}
+    assert len(people_questions(photo(perception=p))) >= 1
+
+
+@pytest.mark.parametrize("caption,scene", [("A man smiling at the camera", ""), ("", "a crowd at a market"),
+                                           ("Two women and a baby at a cafe", "cafe")])
+def test_a_person_in_the_caption_or_scene_asks_consent_even_without_object_labels(caption, scene):
+    p = {"caption": caption, "ocr_text": [], "objects": [], "scene": scene}
+    assert len(people_questions(photo(perception=p))) == 1
+
+
+@pytest.mark.parametrize("label", ["manhole cover", "woodland", "command line", "bowl", "wallet"])
+def test_people_words_are_matched_as_whole_words(label):
+    p = {"caption": "Things", "ocr_text": [], "objects": [{"label": label, "attrs": {}}], "scene": "street"}
+    assert people_questions(photo(perception=p)) == []
