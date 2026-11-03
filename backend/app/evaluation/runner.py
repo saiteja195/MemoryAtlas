@@ -311,8 +311,8 @@ def markdown(summary: dict[str, Any], meta: dict[str, Any], reviewed: dict[str, 
         lines += ["", "## After reading every row where the judge and the strings disagreed", "",
                   "All disagreeing rows were read by hand (see `README.md` in this folder). Where the judge said "
                   "correct and the strings said wrong, the answer was right but omitted a clock time; those now count. "
-                  "Leaks need no adjustment: they are already counted if the strings or the judge found one, and "
-                  "each judge-only leak was confirmed.", ""]
+                  "Leaks are not adjusted: a leak is counted if the strings or the judge found one, so a judge-only "
+                  "flag stays in the count even when the README says it was a false alarm (conservative).", ""]
         lines += _table(reviewed, REVIEWED_ROWS)
     facts = summary["facts"]
     probes = [f"{f['probes_passed']}/{f['probes_total']}" for f in facts]
