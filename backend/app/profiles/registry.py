@@ -86,6 +86,8 @@ def _check_goals(goals: list[str] | None) -> list[str]:
 
 
 class Registry:
+    PHANTOM_LIMIT = 10_000          # unknown names remembered, so they lock exactly like real ones
+
     def __init__(self, path: str, clock: Callable[[], float] = time.time, max_profiles: int = 500):
         self.clock, self.max_profiles = clock, max_profiles
         self.conn = sqlite3.connect(path, check_same_thread=False)
@@ -96,6 +98,7 @@ class Registry:
             self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.executescript(_SCHEMA)
         self._lock = threading.RLock()
+        self._phantom: dict[str, tuple[int, float]] = {}      # name_key -> (failures, locked_until)
 
     # -- helpers ----------------------------------------------------------------------------------
     def _profile(self, row: sqlite3.Row) -> Profile:
@@ -134,18 +137,20 @@ class Registry:
         try:
             key = name_key(name)
         except ValueError:
-            burn_hash(passcode)
+            self._fail_unknown(" ".join(name.split()).casefold()[:100], passcode)
             raise BadCredentials() from None
         with self._lock:
             row = self.conn.execute("SELECT * FROM profiles WHERE name_key=?", (key,)).fetchone()
         if row is None:
-            burn_hash(passcode)
+            self._fail_unknown(key, passcode)
             raise BadCredentials()
         now = self.clock()
         if row["locked_until"] > now:
             raise Locked(row["locked_until"] - now)
         ok = verify_passcode(passcode, row["salt"], row["passcode_hash"])
         with self._lock:
+            if not ok and row["demo_kind"]:
+                raise BadCredentials()          # a demo passcode is public, so locking it would only let anyone lock everyone out
             if ok:
                 self.conn.execute("UPDATE profiles SET failed_count=0, locked_until=0 WHERE profile_id=?",
                                   (row["profile_id"],))
@@ -162,6 +167,21 @@ class Registry:
                                   (fails, row["profile_id"]))
             self.conn.commit()
         raise BadCredentials()
+
+    def _fail_unknown(self, key: str, passcode: str) -> None:
+        """An unknown name costs one hash and locks after five tries, so it cannot be told from a real one."""
+        burn_hash(passcode)
+        with self._lock:
+            now = self.clock()
+            fails, locked_until = self._phantom.get(key, (0, 0.0))
+            if locked_until > now:
+                raise Locked(locked_until - now)
+            fails += 1
+            if fails >= MAX_FAILURES:
+                fails, locked_until = 0, now + LOCK_SECONDS
+            if key not in self._phantom and len(self._phantom) >= self.PHANTOM_LIMIT:
+                self._phantom.pop(next(iter(self._phantom)))
+            self._phantom[key] = (fails, locked_until)
 
     def get(self, profile_id: str) -> Profile | None:
         with self._lock:

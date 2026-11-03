@@ -21,6 +21,7 @@ from .privacy.consent import create_grant
 from .privacy.export import export_memories
 from .privacy.revocation import BadToken, UnknownGrant
 from .profiles.registry import Registry
+from .profiles.routes import make_router
 from .profiles.runtime import ProfileRuntime, Runtimes
 from .profiles.session import resolve_runtime
 
@@ -112,6 +113,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         app.state.conn, app.state.engine, app.state.demo, app.state.drafts = (
             default.conn, default.engine, default.demo, default.drafts)
     app.state.registry, app.state.runtimes = registry, runtimes
+    app.include_router(make_router(settings, registry, runtimes))
 
     def get_runtime(request: Request) -> ProfileRuntime:
         """The caller's own runtime. Every data route depends on this and on nothing else for its data."""

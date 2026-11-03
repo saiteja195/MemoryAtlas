@@ -162,3 +162,32 @@ def test_registry_persists_on_disk(tmp_path, clock):
     path = str(tmp_path / "profiles.db")
     p = Registry(path, clock=clock).create("Sai Teja", "secret-pass")
     assert Registry(path, clock=clock).authenticate("Sai Teja", "secret-pass").profile_id == p.profile_id
+
+
+def test_unknown_names_lock_like_real_ones(r, clock):
+    for _ in range(5):
+        with pytest.raises(BadCredentials):
+            r.authenticate("Nobody Here", "whatever-1")
+    with pytest.raises(Locked) as e:
+        r.authenticate("Nobody Here", "whatever-1")
+    assert e.value.retry_after == pytest.approx(900, abs=1)
+    clock.t += 901
+    with pytest.raises(BadCredentials):
+        r.authenticate("Nobody Here", "whatever-1")
+
+
+def test_phantom_lock_table_is_bounded(r, monkeypatch):
+    monkeypatch.setattr(reg, "burn_hash", lambda p: None)          # the hashing is not what is under test
+    r.PHANTOM_LIMIT = 20
+    for i in range(70):
+        with pytest.raises(BadCredentials):
+            r.authenticate(f"Nobody {i:06d}", "whatever-1")
+    assert len(r._phantom) <= r.PHANTOM_LIMIT
+
+
+def test_demo_profiles_never_lock(r):
+    r.create("Demo Staged", "published-pass", demo_kind="staged")      # the passcode is public on purpose
+    for _ in range(10):
+        with pytest.raises(BadCredentials):
+            r.authenticate("Demo Staged", "nope-nope")
+    assert r.authenticate("Demo Staged", "published-pass").demo_kind == "staged"
