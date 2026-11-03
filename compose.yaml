@@ -21,6 +21,10 @@ services:
       META_MODEL: ${META_MODEL:-muse-spark-1.3}
       # Keys the HMAC of consent revocation tokens. Change it for anything that is not a demo.
       MEMORYATLAS_SECRET: ${MEMORYATLAS_SECRET:-dev-only-secret}
+      # on (default): everyone signs up with a name and passcode and gets a private Atlas. off: one shared
+      # Atlas with no sign-in, for development only.
+      MEMORYATLAS_AUTH: ${MEMORYATLAS_AUTH:-on}
+      MEMORYATLAS_DATA_DIR: /data
     volumes:
       - data:/data
     networks: [memoryatlas]
@@ -36,7 +40,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    # Bound to localhost: the demo endpoints hand out revocation tokens and must not face a network.
+    # Bound to localhost by default. Expose it to the internet only through deploy/compose.public.yaml (HTTPS),
+    # where people sign in with their own profile.
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:80"
     networks: [memoryatlas]

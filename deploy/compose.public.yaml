@@ -3,7 +3,7 @@
 #   docker compose -f compose.yaml -f deploy/compose.public.yaml up -d --build
 #
 # The web container stops publishing a host port, and Caddy publishes 80 and 443 with automatic HTTPS
-# and a login. See docs/DEPLOY.md.
+# in front. People sign in with their own profile (see docs/DEPLOY.md).
 name: memoryatlas
 
 services:
@@ -17,8 +17,6 @@ services:
         condition: service_started
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST to your domain, e.g. mynotes.duckdns.org}
-      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?set BASIC_AUTH_USER}
-      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?set BASIC_AUTH_HASH (see docs/DEPLOY.md)}
     ports:
       # On a VM keep the defaults: the certificate is issued over ports 80 and 443. Change them only to
       # try this out on a machine where those ports are taken (a real domain will then not get a certificate).

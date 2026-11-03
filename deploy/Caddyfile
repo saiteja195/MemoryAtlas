@@ -1,16 +1,11 @@
 # Public HTTPS in front of MemoryAtlas, for a VM with a DuckDNS (or any) name pointing at it.
 # Caddy gets and renews the certificate by itself; ports 80 and 443 must reach this machine.
-# Every path needs the basic-auth login: the app has no accounts and exposes demo endpoints
-# (reset, grant tokens), so it must never be open to the internet unauthenticated.
+# The app protects its own data: everyone signs up with a name and passcode and sees only their own memories.
 {$PUBLIC_HOST} {
 	encode gzip
 
 	request_body {
 		max_size 100MB
-	}
-
-	basic_auth {
-		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
 	}
 
 	header {
