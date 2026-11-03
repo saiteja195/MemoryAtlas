@@ -1,6 +1,7 @@
 import type { DemoStatus, Health, Media } from "../api/types";
 import { formatBytes, truncate } from "../utils/graph";
 import type { ThemePref } from "../hooks/useTheme";
+import { ProfileMenu } from "./ProfileMenu";
 import { ThemeToggle } from "./ThemeToggle";
 
 export type Page = "dashboard" | "atlas";
@@ -17,6 +18,12 @@ type Props = {
   onReset: () => void;
   onHelp: () => void;
   onAdd: () => void;
+  /** The signed-in profile's name; null in single-user mode, where there is no profile menu. */
+  profileName: string | null;
+  onSettings: () => void;
+  onSignOut: () => void;
+  /** Only a demo profile (or single-user mode) can be reset; for anyone else the buttons are hidden. */
+  canReset: boolean;
   page: Page;
   onPage: (p: Page) => void;
   theme: ThemePref;
@@ -29,7 +36,7 @@ const MODE: Record<string, { text: string; cls: string; hint: string }> = {
   record: { text: "Recording", cls: "accent", hint: "Live calls, saved so they can be replayed later." },
 };
 
-export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp, onAdd, page, onPage, theme, onTheme }: Props) {
+export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp, onAdd, profileName, onSettings, onSignOut, canReset, page, onPage, theme, onTheme }: Props) {
   const mode = health ? MODE[health.llm_mode] : undefined;
   const nextEvent = status?.events.find((e) => e.id === status.next);
   const live = status?.events.filter((e) => e.live_upload && !e.played) ?? [];
@@ -73,7 +80,7 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
             Upload live photo · {e.at}
           </button>
         ))}
-        <button type="button" className="btn ghost" disabled={disabled} onClick={onReset}>Reset</button>
+        {canReset && <button type="button" className="btn ghost" disabled={disabled} onClick={onReset}>Reset</button>}
       </div>
       )}
 
@@ -81,6 +88,7 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
         <button type="button" className="btn" onClick={onAdd} aria-haspopup="dialog" disabled={offline}>Add memory</button>
         <button type="button" className="btn ghost" onClick={onHelp} aria-haspopup="dialog">How it works</button>
         <ThemeToggle pref={theme} onChange={onTheme} />
+        {profileName !== null && <ProfileMenu name={profileName} onSettings={onSettings} onSignOut={onSignOut} />}
       </div>
     </header>
   );

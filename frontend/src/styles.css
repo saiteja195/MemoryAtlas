@@ -740,3 +740,23 @@ dialog.add-dialog { inline-size: min(560px, calc(100vw - 32px)); }
 .onb-choice.off { cursor: default; opacity: 0.75; }
 .onb-card > section { display: grid; gap: 16px; }
 .onb-card > section > h1, .onb-card > section > p { margin: 0; }
+
+/* Profile menu and Settings */
+.profile-menu { position: relative; }
+.profile-menu > summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; }
+.profile-menu > summary::-webkit-details-marker { display: none; }
+.avatar { inline-size: 22px; block-size: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-text); font-size: 0.75rem; font-weight: 700; }
+.profile-name { max-inline-size: 14ch; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) { .profile-name { display: none; } }
+.profile-pop {
+  position: absolute; inset-inline-end: 0; inset-block-start: calc(100% + 6px); z-index: 40; min-inline-size: 160px; padding: 6px;
+  display: grid; gap: 2px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+}
+.profile-pop .btn { justify-content: flex-start; border-radius: 10px; }
+dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
+.set-body { display: grid; gap: 22px; }
+.set-body h3 { margin: 0 0 6px; font-size: 1rem; }
+.set-body section { display: grid; gap: 8px; }
+.set-consent { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; list-style: disc; }
+.set-delete { display: grid; gap: 10px; }
+@media (max-width: 640px) { dialog.settings-dialog { inline-size: 100vw; max-inline-size: 100vw; max-block-size: 100dvh; margin: 0; border-radius: 0; } }

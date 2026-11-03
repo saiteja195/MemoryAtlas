@@ -4,6 +4,7 @@ import type { LlmMode } from "./api/types";
 import { AnnouncerProvider, useAnnounce } from "./hooks/announce";
 import { useAtlas } from "./hooks/useAtlas";
 import { useSession } from "./hooks/useSession";
+import type { Me } from "./api/types";
 import {
   atTime, buildElements, claimIdOfFact, dayCards, describeGraph, episodeOptions, moments as momentsOf,
   pathElementIds, relatedFactClaims, type FactMode, type Selection, type ViewMode,
@@ -15,6 +16,7 @@ import { ConsentPanel } from "./components/ConsentPanel";
 import { AddMemory } from "./components/AddMemory";
 import { AuthGate } from "./components/AuthGate";
 import { Onboarding } from "./components/Onboarding";
+import { Settings } from "./components/Settings";
 import { Dialog } from "./components/Dialog";
 import { EvidenceDrawer } from "./components/Evidence";
 import { DayOverview } from "./components/DayOverview";
@@ -77,14 +79,19 @@ function Gate() {
   if (onboarding || !profile.onboarded) {
     return <Onboarding me={session.me} mode={mode} onChanged={session.refresh} onDone={() => setOnboarding(false)} />;
   }
-  return <Atlas key={profile.profile_id} />;
+  return <Atlas key={profile.profile_id} me={session.me} refreshMe={session.refresh} signOut={session.signOut} />;
 }
 
 type Tab = "ask" | "facts" | "consent";
 const TABS: { id: Tab; label: string }[] = [{ id: "ask", label: "Ask" }, { id: "facts", label: "Facts" }, { id: "consent", label: "Consent" }];
 
-function Atlas() {
+type AtlasProps = { me: Me; refreshMe: () => Promise<void>; signOut: () => Promise<void> };
+
+function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   const atlas = useAtlas();
+  const [settings, setSettings] = useState(false);
+  // Single-user mode has no profile; otherwise only a demo profile can be reset to its starting point.
+  const canReset = !me.auth || me.profile.demo_kind !== null;
   const announce = useAnnounce();
   const graphRef = useRef<GraphHandle>(null);
 
@@ -257,6 +264,7 @@ function Atlas() {
         health={atlas.health} media={atlas.media} status={atlas.status} busy={atlas.busy} offline={atlas.offline}
         onNext={() => void atlas.advance(1)} onAll={() => void atlas.advance(50)}
         onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} onHelp={() => setHelp(true)} onAdd={() => setAdding(true)}
+        profileName={me.auth ? me.profile.name : null} onSettings={() => setSettings(true)} onSignOut={() => void signOut()} canReset={canReset}
         page={page} onPage={setPage} theme={theme.pref} onTheme={theme.choose}
       />
 
@@ -271,7 +279,7 @@ function Atlas() {
             onAsk={(q) => { setPage("atlas"); void ask(q); }}
             onConsent={() => { setPage("atlas"); setTab("consent"); }}
             onReceipt={(id) => void openReceipt(id)}
-            onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()}
+            onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} canReset={canReset}
           />
         </main>
       ) : (
@@ -377,6 +385,10 @@ function Atlas() {
       </div>
       )}
 
+      {me.auth && (
+        <Settings open={settings} me={me} onClose={() => setSettings(false)} onChanged={refreshMe}
+                  onResetDemo={reset} onSignedOut={() => void signOut()} />
+      )}
       <AddMemory open={adding} mode={atlas.health?.llm_mode} onClose={() => setAdding(false)} onSaved={() => void atlas.refresh()} />
       <HowItWorks open={help} onClose={() => setHelp(false)} />
       <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />

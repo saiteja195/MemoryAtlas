@@ -54,12 +54,21 @@ class DemoRunner:
     def _scheduled(self) -> list[dict[str, Any]]:
         return [e for e in self.adapter.events() if not e.get("live_upload")]
 
+    def _ensure_seeded(self) -> None:
+        """A profile that has not played the day yet has no grants, so the day would be rejected. An empty
+        database is seeded here, as a fresh single-user database is at start; one with memories is left alone."""
+        if not self.conn.execute("SELECT 1 FROM consent_grants").fetchone() \
+                and not self.conn.execute("SELECT 1 FROM sources").fetchone():
+            self.reset()
+
     def play(self, event_id: str) -> list[Ingested]:
+        self._ensure_seeded()
         ev = next(e for e in self.adapter.events() if e["id"] == event_id)
         self.played.add(event_id)
         return self.engine.ingest(self.adapter.capture(ev))
 
     def advance(self, steps: int = 1) -> list[dict[str, Any]]:
+        self._ensure_seeded()
         events, played = self._scheduled(), []
         for _ in range(steps):
             if self.cursor >= len(events):

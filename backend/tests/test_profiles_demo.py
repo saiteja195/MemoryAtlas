@@ -203,3 +203,22 @@ def test_a_normal_profile_never_loads_a_snapshot(tmp_path, monkeypatch):
     c = new_client(make_app(tmp_path))
     signup(c)
     assert c.get("/graph").json()["nodes"] == []
+
+
+def test_playing_the_day_works_for_a_profile_that_skipped_the_sample(tmp_path):
+    c = new_client(make_app(tmp_path))
+    signup(c)
+    r = c.post("/demo/advance", params={"steps": 2})
+    assert r.status_code == 200
+    assert all(p["ingested"] > 0 and not p["rejected"] for p in r.json()["played"])
+    assert c.get("/graph").json()["nodes"]
+
+
+def test_playing_the_day_never_wipes_a_profile_that_has_uploads(tmp_path):
+    app = make_app(tmp_path)
+    c = new_client(app)
+    signup(c)
+    add_note(c, "Coffee at Blue Door Cafe", "2026-10-29T09:00:00")
+    before = sources(app, pid_of(c))
+    assert c.post("/demo/advance", params={"steps": 1}).status_code == 200
+    assert set(before) <= set(sources(app, pid_of(c)))
