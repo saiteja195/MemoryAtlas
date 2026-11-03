@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Draft, Question } from "../api/types";
-import { classifyFile, maxBytes, toCommitBody, unanswered, type AnswerState } from "./addMemory";
+import { classifyFile, localIso, maxBytes, toCommitBody, unanswered, type AnswerState } from "./addMemory";
 
 const file = (name: string, type: string) => ({ name, type });
 
@@ -105,5 +105,15 @@ describe("toCommitBody", () => {
   it("sends a typed place and omits people who were never answered", () => {
     const body = toCommitBody(draft([]), { where: "Mikado Ramen", people: { B: { name: "", consented: null } } });
     expect(body.answers).toEqual({ where: "Mikado Ramen", people: [] });
+  });
+});
+
+describe("localIso", () => {
+  it("formats a time as naive local ISO seconds, with no zone", () => {
+    const ms = new Date(2026, 9, 29, 12, 42, 10).getTime();      // local time, whatever the machine's zone
+    expect(localIso(ms)).toBe("2026-10-29T12:42:10");
+  });
+  it("pads single digits", () => {
+    expect(localIso(new Date(2026, 0, 5, 3, 4, 5).getTime())).toBe("2026-01-05T03:04:05");
   });
 });

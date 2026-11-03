@@ -619,3 +619,35 @@ dialog.drawer { z-index: 40; }
 .rec-dot { display: inline-block; inline-size: 9px; block-size: 9px; border-radius: 50%; background: var(--bad); margin-inline-end: 4px; animation: rec-pulse 1.2s ease-in-out infinite; }
 @keyframes rec-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } .capture-meter i { transition: none; } }
+
+/* --- Add memory dialog ------------------------------------------------------------------------ */
+dialog.add-dialog { inline-size: min(560px, calc(100vw - 32px)); }
+.add-step { display: grid; gap: 12px; }
+.add-step h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 6px 0 0; }
+.add-drop { border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 22px 16px; text-align: center; background: var(--surface-2); display: grid; gap: 6px; justify-items: center; }
+.add-drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.add-drop p { margin: 0; }
+.add-file { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; }
+.add-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.add-file .btn { margin-inline-start: auto; }
+.add-label { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.add-note { inline-size: 100%; resize: vertical; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; }
+.add-note:disabled { opacity: 0.55; }
+.add-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
+.add-found { list-style: none; margin: 0; padding: 0; display: grid; }
+.add-found li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-block-end: 1px solid var(--border); }
+.add-found li:last-child { border-block-end: 0; }
+.add-found .k { inline-size: 56px; flex: none; font-size: 0.8rem; color: var(--muted); }
+.add-found .v { flex: 1; min-inline-size: 0; font-weight: 500; overflow-wrap: anywhere; }
+.add-found .chip { flex: none; }
+.add-q { border: 0; margin: 0; padding: 14px; border-radius: 14px; background: var(--surface-2); display: grid; gap: 10px; min-inline-size: 0; }
+.add-q.done { background: var(--ok-soft); }
+.add-q legend { float: left; inline-size: 100%; padding: 0; font-weight: 600; margin-block-end: 8px; }
+.add-q legend + * { clear: both; }
+.add-q input[type="text"], .add-q input[type="datetime-local"] { inline-size: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; }
+.add-q .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.add-q .opts .btn { border-radius: 999px; }
+@media (max-width: 640px) {
+  dialog.add-dialog { inline-size: 100vw; max-inline-size: 100vw; max-block-size: 100dvh; margin: 0; border-radius: 0; }
+  .add-actions .btn { flex: 1; }
+}

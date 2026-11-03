@@ -67,3 +67,10 @@ export function toCommitBody(draft: Draft, a: AnswerState): { draft_id: string; 
   }
   return { draft_id: draft.draft_id, answers };
 }
+
+/** A file's modified time as naive local ISO seconds, the form the API expects. */
+export function localIso(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
