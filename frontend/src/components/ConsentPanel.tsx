@@ -4,15 +4,24 @@ import { personName, sessionLabel } from "./Badges";
 type Props = {
   grants: Grant[];
   onSimulate: (grantId: string) => void;
+  onExpire: (grantId: string) => void;
   onReceipt: (receiptId: string) => void;
 };
 
-export function ConsentPanel({ grants, onSimulate, onReceipt }: Props) {
+/** "until 3:30 PM", or "until 3:30 PM tomorrow" when it is not today. */
+function until(iso: string): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? `until ${time}` : `until ${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
+}
+
+export function ConsentPanel({ grants, onSimulate, onExpire, onReceipt }: Props) {
   return (
     <>
       <p className="small muted">
         Everyone in a recording has to agree to it. If one person withdraws, MemoryAtlas removes every memory that rested
-        only on that agreement and keeps the ones other sources still support.
+        only on that agreement and keeps the ones other sources still support. A consent can also have an end time; when
+        it passes, the same removal happens by itself.
       </p>
       {grants.length === 0 && <p className="muted small">No consent has been given yet. Play the day to start.</p>}
       <ul style={{ display: "grid", gap: 10 }}>
@@ -21,8 +30,8 @@ export function ConsentPanel({ grants, onSimulate, onReceipt }: Props) {
             <div className="top">
               <span className="who">{personName(g.grantor)}</span>
               <span className="muted small">{sessionLabel(g.scope_ref)}</span>
-              {g.revoked_at ? <span className="chip bad" style={{ marginInlineStart: "auto" }}>Withdrawn</span>
-                            : <span className="chip ok" style={{ marginInlineStart: "auto" }}>Active</span>}
+              {g.revoked_at ? <span className="chip bad" style={{ marginInlineStart: "auto" }}>{g.ended_reason === "expired" ? "Expired" : "Withdrawn"}</span>
+                            : <span className="chip ok" style={{ marginInlineStart: "auto" }}>Active{g.expires_at ? ` · ${until(g.expires_at)}` : ""}</span>}
             </div>
             <div className="actions">
               {g.revoked_at ? (
@@ -32,6 +41,8 @@ export function ConsentPanel({ grants, onSimulate, onReceipt }: Props) {
                   <button type="button" className="btn small danger" onClick={() => onSimulate(g.grant_id)}>
                     {g.grantor === "me" ? "Withdraw my consent…" : `${personName(g.grantor)} withdraws…`}
                   </button>
+                  <button type="button" className="btn small ghost" onClick={() => onExpire(g.grant_id)}
+                          title="Demo: skip ahead to the moment this consent runs out">Let it expire now (demo)</button>
                   <a className="btn small" href={`?as=device&grant=${encodeURIComponent(g.grant_id)}`} target="_blank" rel="noopener">
                     Open on {g.grantor === "me" ? "my" : `${personName(g.grantor)}'s`} phone (new tab)
                   </a>

@@ -204,6 +204,10 @@ def red_team(conn: sqlite3.Connection, llm: LLMClient | None, questions: list[st
         return ProbeResult(6, "Red team: adversarial questions leak nothing", SKIPPED,
                            {"reason": f"model unavailable: {str(e)[:120]}",
                             "completed": len(answered)})
+    except Exception as e:      # the check could not run: say so (a skipped check never counts as passed)
+        return ProbeResult(6, "Red team: adversarial questions leak nothing", SKIPPED,
+                           {"reason": f"the red-team run failed: {type(e).__name__}",
+                            "completed": len(answered)})
     return _result(6, "Red team: adversarial questions leak nothing", leaks,
                    questions=len(questions), statuses=answered)
 

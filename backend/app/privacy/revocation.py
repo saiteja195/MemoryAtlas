@@ -35,9 +35,10 @@ from ..compiler.derive import Deriver
 from ..compiler.episodes import _label as episode_label, episode_extent, episode_id_for, reconstruct_contrib
 from ..embed import counts, to_blob
 from ..llm.base import LLMClient
+from . import clock
 from .consent import verify_token
 from .filter import authorized_claim_ids, valid_source_ids
-from .probes import PASS, FAIL, SKIPPED, run_probes
+from .probes import PASS, FAIL, SKIPPED, ProbeResult, run_probes
 from .terms import distinctive_terms, rare_terms, term_digest
 
 REDACTED_CHAT = "[removed: this relied on information that was forgotten]"
@@ -80,31 +81,57 @@ class RevocationEngine:
     # -- public ------------------------------------------------------------------------------
 
     def revoke(self, grant_id: str, token: str, run_red_team: bool = True) -> dict[str, Any]:
+        """The person withdraws consent. The token proves it is them."""
         grant = self.conn.execute("SELECT * FROM consent_grants WHERE grant_id=?",
                                   (grant_id,)).fetchone()
         if grant is None:
             raise UnknownGrant(grant_id)
         if not verify_token(self.secret, token, grant["token_hash"]):
             raise BadToken(grant_id)
+        return self._end(grant, "withdrawn", run_red_team)
+
+    def due(self) -> list[str]:
+        """Grants whose consent has lapsed and whose data has not been purged yet."""
+        return [r["grant_id"] for r in self.conn.execute(
+            "SELECT grant_id FROM consent_grants WHERE revoked_at IS NULL AND expires_at IS NOT NULL"
+            " AND expires_at <= ? ORDER BY expires_at, grant_id", (clock.now_iso(),))]
+
+    def sweep(self, run_red_team: bool = True) -> list[dict[str, Any]]:
+        """Forget everything that rested only on a grant that has expired, by the same purge as a
+        withdrawal. Nothing is read from an expired grant even before this runs (the filter refuses
+        it); this is what removes the data. Returns one receipt per grant ended."""
+        out = []
+        for gid in self.due():
+            grant = self.conn.execute("SELECT * FROM consent_grants WHERE grant_id=?", (gid,)).fetchone()
+            out.append(self._end(grant, "expired", run_red_team))
+        return out
+
+    def _end(self, grant: sqlite3.Row, reason: str, run_red_team: bool) -> dict[str, Any]:
+        grant_id = grant["grant_id"]
         if grant["revoked_at"]:                      # idempotent: same receipt, nothing changes
             row = self.conn.execute("SELECT report_json FROM forgetting_receipts WHERE grant_id=?"
                                     " ORDER BY created_at LIMIT 1", (grant_id,)).fetchone()
             if row:
                 return {**self._hydrate(json.loads(row["report_json"])), "already_revoked": True}
         try:
-            plan = self._purge(grant)
+            plan = self._purge(grant, reason)
         except Exception:
             self.conn.rollback()
             raise
         self._clean_storage()
         cache_removed = self._clear_model_cache()
-        probes = run_probes(
-            self.conn, terms=plan["terms"], removed_texts=plan["removed_texts"],
-            removed_entity_ids=plan["removed_entities"], db_path=self.db_path,
-            media_dirs=[self._data_dir()] if self._data_dir() else [], cache_dir=self.cache_dir,
-            llm=self.llm, red_team_questions=self.red_team_questions,
-            red_team_terms=plan["rare_terms"], run_red_team=run_red_team)
-        receipt = self._receipt(grant, plan, cache_removed, probes)
+        # The purge has committed. Whatever happens while verifying it, a receipt must still be written, and
+        # a verification that could not run is a failure, never a pass.
+        try:
+            probes = run_probes(
+                self.conn, terms=plan["terms"], removed_texts=plan["removed_texts"],
+                removed_entity_ids=plan["removed_entities"], db_path=self.db_path,
+                media_dirs=[self._data_dir()] if self._data_dir() else [], cache_dir=self.cache_dir,
+                llm=self.llm, red_team_questions=self.red_team_questions,
+                red_team_terms=plan["rare_terms"], run_red_team=run_red_team)
+        except Exception as e:
+            probes = [ProbeResult(0, "Verification could not run", FAIL, {"error": type(e).__name__})]
+        receipt = self._receipt(grant, plan, cache_removed, probes, reason)
         self.conn.execute("INSERT INTO forgetting_receipts(receipt_id, grant_id, created_at,"
                           " report_json) VALUES (?,?,?,?)",
                           (receipt["receipt_id"], grant_id, receipt["created_at"],
@@ -140,7 +167,7 @@ class RevocationEngine:
 
     # -- the transaction ---------------------------------------------------------------------
 
-    def _purge(self, grant: sqlite3.Row) -> dict[str, Any]:
+    def _purge(self, grant: sqlite3.Row, reason: str = "withdrawn") -> dict[str, Any]:
         c = self.conn
         gid = grant["grant_id"]
         now = datetime.now(timezone.utc).isoformat()
@@ -157,7 +184,7 @@ class RevocationEngine:
         revoked_ids = [r["source_id"] for r in revoked]
         removed_texts = [r["text"] for r in revoked if r["text"]]
 
-        c.execute("UPDATE consent_grants SET revoked_at=? WHERE grant_id=?", (now, gid))
+        c.execute("UPDATE consent_grants SET revoked_at=?, ended_reason=? WHERE grant_id=?", (now, reason, gid))
         _delete_in(c, "UPDATE sources SET status='revoked' WHERE source_id IN ({})", revoked_ids)
 
         # -- who dies, who survives and what each survivor lost ------------------------------
@@ -501,7 +528,7 @@ class RevocationEngine:
     # -- receipt -----------------------------------------------------------------------------
 
     def _receipt(self, grant: sqlite3.Row, plan: dict[str, Any], cache_removed: int,
-                 probes: list[Any]) -> dict[str, Any]:
+                 probes: list[Any], reason: str = "withdrawn") -> dict[str, Any]:
         results = [p.as_dict() for p in probes]
         passed = sum(p["status"] == PASS for p in results)
         failed = sum(p["status"] == FAIL for p in results)
@@ -509,6 +536,7 @@ class RevocationEngine:
         return {
             "receipt_id": "rcpt-" + uuid.uuid4().hex[:12],
             "grant_id": grant["grant_id"], "grantor": grant["grantor"],
+            "reason": reason,                       # "withdrawn" by the person, or "expired"
             "created_at": plan["now"], "already_revoked": False,
             "removed": {
                 "sources_blanked": len(plan["revoked_sources"]),

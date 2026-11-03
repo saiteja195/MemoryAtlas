@@ -13,6 +13,7 @@ from typing import Any
 from .capture.models import RawCapture
 from .compiler.contradiction import contradiction_pass
 from .engine import MemoryEngine
+from .privacy import clock
 from .privacy.filter import PURPOSE, READABLE, authorized_claim_ids
 
 
@@ -29,7 +30,8 @@ def _owner_session(conn: sqlite3.Connection, owner: str) -> str | None:
     on their own consent, never anyone else's."""
     for r in conn.execute(
             "SELECT scope_ref, purposes FROM consent_grants WHERE grantor=? AND scope='capture_session'"
-            " AND revoked_at IS NULL ORDER BY granted_at DESC, grant_id", (owner,)):
+            " AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)"
+            " ORDER BY granted_at DESC, grant_id", (owner, clock.now_iso())):
         if PURPOSE in json.loads(r["purposes"]):
             return r["scope_ref"]
     return None

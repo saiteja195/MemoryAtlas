@@ -14,8 +14,10 @@ export function ReceiptDialog({ receipt, onClose }: { receipt: Receipt | null; o
       {r && (
         <>
           <p>
-            <strong>{personName(r.grantor)}</strong> withdrew consent. Everything that depended only on that permission was removed;
-            everything with other support was kept.
+            {r.reason === "expired"
+              ? <><strong>{personName(r.grantor)}</strong>'s consent expired.</>
+              : <><strong>{personName(r.grantor)}</strong> withdrew consent.</>}{" "}
+            Everything that depended only on that permission was removed; everything with other support was kept.
           </p>
           <div className="row" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span className={`chip ${r.summary.all_passed ? "ok" : r.summary.probes_failed ? "bad" : "warn"}`}>

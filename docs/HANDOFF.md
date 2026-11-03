@@ -191,3 +191,27 @@ pinned because it is part of the request). Limits: an episode summary derived fr
 but not regenerated; a correction text that yields no replacement for the same subject is recorded as a note but
 changes nothing. **Not built:** the `WS /events` live-update stream (the UI still refreshes after each action and
 polls consent changes).
+
+
+## 10. Consent expiry
+
+A grant can carry an end time (`consent_grants.expires_at`, UTC). `POST /consent/grants` takes
+`valid_for_hours` (omitted: until withdrawn); `script.yaml` grants accept the same key as `valid_for_hours`.
+Past its end time a grant counts as withdrawn:
+
+- **Reads are refused at once.** `valid_source_ids`, new captures (`active_grant`), corrections and the answer
+  cache key all ignore a lapsed grant, so nothing resting on it can be read even before the purge has run.
+- **The data is then purged by the same code as a withdrawal** (`RevocationEngine.sweep`): claims, indexes, caches,
+  receipts, seven probes. The receipt has `reason: "expired"` and the grant `ended_reason: "expired"`. Expiring a
+  recording participant's grant removes the whole recording, like a withdrawal (a test checks the two leave identical
+  state).
+- **When it runs:** on app start, before every request except `/health`, and on `POST /consent/expire-due` (call it
+  from a scheduler if the app may sit idle). A purge does not run in the background on its own.
+- **Demo:** `POST /demo/grants/{id}/expire` (demo only) makes a grant lapse now; the Consent tab has a "Let it
+  expire now (demo)" button. Replay mode serves it from the recorded forgetting run (`tests/test_replay_expiry.py`).
+
+Verification is fail-safe: if the probes crash after a purge, the receipt is still written, with a failed check.
+
+Limits: the first request after a grant lapses runs the purge and its red-team probe, which can take about a
+minute with the live model; the purge shares the database connection with request threads, as a withdrawal always
+has; a grant with no expiry never lapses; there is no UI yet to choose a lifetime when granting (the API has it).

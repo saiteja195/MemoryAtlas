@@ -107,6 +107,10 @@ export function useAtlas() {
   const uploadLive = useCallback(
     (id: string) => run("Uploading the photo", () => api.uploadLive(id)), [run]);
 
+  /** DEMO ONLY: let a grant lapse now. The receipt arrives through the normal refresh. */
+  const expire = useCallback(
+    (grantId: string) => run("Letting the consent expire", () => api.expire(grantId)), [run]);
+
   /** Correct or set aside a remembered fact. Returns true when the server accepted it. */
   const correct = useCallback(async (claimId: string, body: { text?: string; retract?: boolean; at?: string }) => {
     const out = await run("Recording the correction", () => api.correct(claimId, body));
@@ -132,6 +136,6 @@ export function useAtlas() {
   return {
     health, status, media, graph, dataKey, grants, busy, notice, setNotice, offline, loaded,
     receipt, closeReceipt: () => setReceipt(null), openReceipt: (r: Receipt) => setReceipt(r),
-    pulse, refresh, advance, uploadLive, correct, reset, revoke,
+    pulse, refresh, advance, uploadLive, correct, expire, reset, revoke,
   };
 }

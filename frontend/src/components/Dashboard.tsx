@@ -179,7 +179,7 @@ export function Dashboard(p: Props) {
               {p.grants.map((g) => (
                 <li key={g.grant_id}>
                   <span><strong>{personName(g.grantor)}</strong> <span className="muted small">{sessionLabel(g.scope_ref)}</span></span>
-                  {g.revoked_at ? <span className="chip bad">Withdrawn</span> : <span className="chip ok">Active</span>}
+                  {g.revoked_at ? <span className="chip bad">{g.ended_reason === "expired" ? "Expired" : "Withdrawn"}</span> : <span className="chip ok">Active</span>}
                 </li>
               ))}
             </ul>

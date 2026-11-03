@@ -1,10 +1,12 @@
 """Deterministic demo control: reset, advance through the scripted day, upload the live frame."""
 import sqlite3
+from datetime import timedelta
 from typing import Any
 
 from . import db
 from .capture.adapters import MockDayAdapter
 from .engine import Ingested, MemoryEngine
+from .privacy import clock
 from .privacy.consent import create_grant
 
 
@@ -25,7 +27,9 @@ class DemoRunner:
         self.played = set()
         self.tokens = {}
         for g in self.adapter.grants():
-            _, token = create_grant(self.conn, self.secret, g["grantor"], g["session"])
+            hours = g.get("valid_for_hours")
+            expires = clock.now() + timedelta(hours=hours) if hours else None
+            _, token = create_grant(self.conn, self.secret, g["grantor"], g["session"], expires_at=expires)
             self.tokens[f"{g['grantor']}:{g['session']}"] = token
         self.engine.compiler.resolver.ensure_owner(self.adapter.names.get(self.adapter.owner, "Me"))
         self.conn.commit()

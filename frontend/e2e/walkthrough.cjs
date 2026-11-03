@@ -168,6 +168,33 @@ async function audit(page, label) {
   check(/Monday/.test(promised) && !/Friday/.test(promised), `after the correction: the answer says Monday and no longer Friday (got: ${promised})`);
   await audit(page, "after a correction");
 
+  // Consent that lapses. Start again from a clean day: expiry runs the same purge as a withdrawal, so the
+  // recorded forgetting run serves it, but only on the graph it was recorded against.
+  await page.request.post(`${BASE}/api/demo/reset`);
+  await page.reload();
+  await page.waitForSelector("text=Replay mode");
+  await page.getByRole("button", { name: "Atlas", exact: true }).click();
+  await page.getByRole("button", { name: "Play the day", exact: true }).click();
+  await page.waitForSelector("text=Day played");
+  await page.getByRole("button", { name: /Upload live photo/ }).click();
+  await page.waitForSelector(".event:not(.future) >> text=17:45");
+  await page.getByRole("tab", { name: "Consent" }).click();
+  const alexCard = page.locator("li.grant", { hasText: "Alex" });
+  await alexCard.getByRole("button", { name: /Let it expire now/ }).click();
+  await page.waitForSelector("dialog[open] >> text=Forgetting receipt", { timeout: 20000 });
+  const lapsed = await page.locator("dialog[open]").innerText();
+  check(/consent expired/i.test(lapsed) && !/withdrew/i.test(lapsed), "the receipt says the consent expired, not that it was withdrawn");
+  check(await page.locator("dialog[open] >> text=7 of 7 checks passed").isVisible(), "an expiry shows 7 of 7 checks passed");
+  check(!/pastor|proposal|Friday/i.test(lapsed), "the expiry receipt repeats nothing that was forgotten");
+  await audit(page, "expiry receipt open");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  check(await alexCard.locator(".chip", { hasText: "Expired" }).isVisible(), "Alex's grant now shows as Expired");
+  await page.getByRole("tab", { name: "Ask" }).click();
+  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a');
+  check(/no record/i.test(await page.locator(".qa .a").first().innerText()), "after the expiry, 'What did Alex promise me?' says there is no record");
+
   check(problems.length === 0, `no console errors or warnings${problems.length ? ": " + problems.join(" | ") : ""}`);
   await browser.close();
   console.log(failures === 0 ? "\nAll steps held." : `\n${failures} step(s) failed.`);

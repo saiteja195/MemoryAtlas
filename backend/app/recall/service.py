@@ -7,6 +7,7 @@ from typing import Any
 
 from ..compiler.resolve import norm
 from ..llm.base import LLMClient
+from ..privacy import clock
 from ..privacy.filter import authorized_claim_ids
 from .investigator import Answer, Investigator
 from .tools import RecallTools
@@ -20,9 +21,11 @@ def graph_version(conn: sqlite3.Connection) -> str:
         h.update(f"{r['claim_id']}{r['status']}{r['s']}".encode())
     for r in conn.execute("SELECT source_id, status FROM sources ORDER BY source_id"):
         h.update(f"{r['source_id']}{r['status']}".encode())
-    for r in conn.execute("SELECT grant_id, COALESCE(revoked_at,'') x FROM consent_grants"
-                          " ORDER BY grant_id"):
-        h.update(f"{r['grant_id']}{r['x']}".encode())
+    # A grant that has lapsed changes what may be read, so it changes the version even before the purge runs.
+    for r in conn.execute("SELECT grant_id, COALESCE(revoked_at,'') x, CASE WHEN expires_at IS NOT NULL"
+                          " AND expires_at <= ? THEN 'expired' ELSE '' END e FROM consent_grants"
+                          " ORDER BY grant_id", (clock.now_iso(),)):
+        h.update(f"{r['grant_id']}{r['x']}{r['e']}".encode())
     return h.hexdigest()
 
 

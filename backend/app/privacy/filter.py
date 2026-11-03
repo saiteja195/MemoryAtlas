@@ -11,6 +11,8 @@ removes revoked material from the stores, and this filter still refuses anything
 import json
 import sqlite3
 
+from . import clock
+
 PURPOSE = "personal_recall"
 READABLE = ("active", "disputed")
 HISTORY = ("active", "disputed", "superseded")
@@ -18,9 +20,11 @@ HISTORY = ("active", "disputed", "superseded")
 
 def valid_source_ids(conn: sqlite3.Connection, purpose: str = PURPOSE) -> set[str]:
     """Sources that may be used: active, and every grant they depend on is unrevoked and covers
-    the purpose. (Rows written before `source_consents` existed depend on their own grant only.)"""
+    the purpose. A grant past its expiry no longer counts, even before the purge has run.
+    (Rows written before `source_consents` existed depend on their own grant only.)"""
     good = {r["grant_id"] for r in conn.execute(
-        "SELECT grant_id, purposes FROM consent_grants WHERE revoked_at IS NULL")
+        "SELECT grant_id, purposes FROM consent_grants WHERE revoked_at IS NULL"
+        " AND (expires_at IS NULL OR expires_at > ?)", (clock.now_iso(),))
             if purpose in json.loads(r["purposes"])}
     needs: dict[str, set[str]] = {}
     for r in conn.execute("SELECT source_id, grant_id FROM source_consents"):

@@ -151,7 +151,7 @@ function Atlas() {
 
   useEffect(() => {
     if (!atlas.receipt) return;
-    announce(`Consent withdrawn. ${atlas.receipt.removed.claims_deleted} facts removed, ${atlas.receipt.kept.claims_surviving} kept. ` +
+    announce(`${atlas.receipt.reason === "expired" ? "Consent expired." : "Consent withdrawn."} ${atlas.receipt.removed.claims_deleted} facts removed, ${atlas.receipt.kept.claims_surviving} kept. ` +
       `${atlas.receipt.summary.probes_passed} of ${atlas.receipt.summary.probes_total} checks passed.`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atlas.receipt]);
@@ -336,7 +336,7 @@ function Atlas() {
             <FactsPanel view={view} selectedClaim={selection?.kind === "claim" ? selection.id : null} onSelect={cite} />
           </div>
           <div role="tabpanel" id="panel-consent" aria-labelledby="tab-consent" hidden={tab !== "consent"} tabIndex={0}>
-            <ConsentPanel grants={atlas.grants} onSimulate={setSimulate} onReceipt={(id) => void openReceipt(id)} />
+            <ConsentPanel grants={atlas.grants} onSimulate={setSimulate} onExpire={(id) => void atlas.expire(id)} onReceipt={(id) => void openReceipt(id)} />
           </div>
         </aside>
       </div>

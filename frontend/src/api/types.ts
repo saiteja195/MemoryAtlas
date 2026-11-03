@@ -108,6 +108,9 @@ export type Grant = {
   scope_ref: string;
   granted_at: string;
   revoked_at: string | null;
+  /** When the consent lapses by itself; null means until it is withdrawn. */
+  expires_at: string | null;
+  ended_reason: "withdrawn" | "expired" | null;
   receipt_id: string | null;
   demo_token?: string | null;
 };
@@ -118,6 +121,8 @@ export type Receipt = {
   receipt_id: string;
   grant_id: string;
   grantor: string;
+  /** Why the grant ended: the person withdrew it, or it lapsed. Older receipts have no reason. */
+  reason?: "withdrawn" | "expired";
   created_at: string;
   already_revoked: boolean;
   removed: {
