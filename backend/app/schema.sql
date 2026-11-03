@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS consent_grants (
   purposes    TEXT NOT NULL,
   token_hash  TEXT NOT NULL,
   granted_at  TEXT NOT NULL,
-  revoked_at  TEXT
+  revoked_at  TEXT,
+  -- Consent can lapse: past this moment the grant counts as withdrawn (the same purge runs).
+  expires_at  TEXT,
+  ended_reason TEXT CHECK (ended_reason IN ('withdrawn', 'expired'))
 );
 
 -- One row per observation that passed the gateway. Text only, never raw media.

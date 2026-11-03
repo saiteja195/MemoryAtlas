@@ -11,7 +11,7 @@ def export_memories(conn: sqlite3.Connection) -> dict[str, Any]:
         "SELECT source_id, kind, captured_at, text FROM sources WHERE status='active'"
         " ORDER BY captured_at, source_id")]
     grants = [dict(r) for r in conn.execute(
-        "SELECT grant_id, grantor, scope_ref, granted_at, revoked_at FROM consent_grants"
+        "SELECT grant_id, grantor, scope_ref, granted_at, expires_at, revoked_at FROM consent_grants"
         " ORDER BY granted_at, grant_id")]
     return {"graph": build_graph(conn, include_history=True), "sources": sources,
             "grants": grants}

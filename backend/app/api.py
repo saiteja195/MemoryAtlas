@@ -1,9 +1,12 @@
 import base64
+import logging
 import os
+import threading
+from datetime import timedelta
 from dataclasses import replace
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import db
@@ -18,6 +21,7 @@ from .engine import MemoryEngine
 from .graph import build_graph
 from .llm.base import LLMClient, LLMUnavailable
 from .llm.factory import build_client
+from .privacy import clock
 from .privacy.consent import create_grant
 from .privacy.export import export_memories
 from .privacy.revocation import BadToken, RevocationEngine, UnknownGrant
@@ -60,6 +64,9 @@ class GrantBody(BaseModel):
     grantor: str
     session_id: str
     purposes: list[str] | None = None
+    # How long the consent lasts. Omitted: until the person withdraws it. When it lapses, everything that
+    # rested only on it is forgotten, exactly as if they had withdrawn it.
+    valid_for_hours: float | None = Field(default=None, gt=0, le=8760)
 
 
 def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -> FastAPI:
@@ -80,10 +87,27 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         conn, settings.revocation_secret, llm, adapter.owner,
         db_path=None if settings.db_path == ":memory:" else os.path.abspath(settings.db_path),
         cache_dir=settings.runtime_cache_dir, red_team_questions=red_team)
+    sweep_lock = threading.Lock()
+    log = logging.getLogger("memoryatlas")
+
+    def sweep() -> list[dict]:
+        """Purge grants that have expired. Safe to call at any time; one at a time."""
+        with sweep_lock:
+            try:
+                return revoker.sweep()
+            except Exception:       # a failed purge must not take the API down; the filter still refuses the data
+                log.exception("expiry sweep failed")
+                return []
+
+    def sweep_before_request(request: Request) -> None:
+        if request.url.path != "/health":       # the health check must stay instant
+            sweep()
+
     data_dir = None if settings.db_path == ":memory:" else os.path.dirname(os.path.abspath(
         settings.db_path))
 
-    app = FastAPI(title="MemoryAtlas")
+    sweep()                                     # anything that lapsed while the app was off
+    app = FastAPI(title="MemoryAtlas", dependencies=[Depends(sweep_before_request)])
     app.state.conn, app.state.engine, app.state.demo = conn, engine, demo
 
     @app.get("/health")
@@ -104,9 +128,11 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
 
     @app.post("/consent/grants")
     def grant(body: GrantBody) -> dict:
+        expires = clock.now() + timedelta(hours=body.valid_for_hours) if body.valid_for_hours else None
         gid, token = create_grant(conn, settings.revocation_secret, body.grantor,
-                                  body.session_id, body.purposes)
-        return {"grant_id": gid, "revocation_token": token}
+                                  body.session_id, body.purposes, expires_at=expires)
+        return {"grant_id": gid, "revocation_token": token,
+                "expires_at": clock.iso(expires) if expires else None}
 
     @app.get("/consent/grants")
     def grants() -> list[dict]:
@@ -114,6 +140,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         # which receipt to show, without the two pages talking to each other directly.
         return [dict(r) for r in conn.execute(
             "SELECT g.grant_id, g.grantor, g.scope, g.scope_ref, g.granted_at, g.revoked_at,"
+            " g.expires_at, g.ended_reason,"
             " (SELECT r.receipt_id FROM forgetting_receipts r WHERE r.grant_id = g.grant_id"
             "  ORDER BY r.created_at LIMIT 1) AS receipt_id"
             " FROM consent_grants g ORDER BY g.granted_at, g.grant_id")]
@@ -128,6 +155,13 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(404, "unknown grant") from None
         except BadToken:
             raise HTTPException(403, "wrong revocation token") from None
+
+    @app.post("/consent/expire-due")
+    def expire_due() -> dict:
+        """Forget what rested on grants that have lapsed. The API does this by itself before each request;
+        call this from a scheduler to do it on time even when nobody is using the app."""
+        receipts = sweep()
+        return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/receipts/{receipt_id}")
     def receipt(receipt_id: str) -> dict:
@@ -196,6 +230,20 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         for g in grants():
             out.append({**g, "demo_token": demo.tokens.get(f"{g['grantor']}:{g['scope_ref']}")})
         return out
+
+    @app.post("/demo/grants/{grant_id}/expire")
+    def demo_expire(grant_id: str) -> dict:
+        """DEMO ONLY: let a grant lapse now, so the demo can show expiry without waiting. Never expose this
+        outside a demo."""
+        if not conn.execute("SELECT 1 FROM consent_grants WHERE grant_id=? AND revoked_at IS NULL",
+                            (grant_id,)).fetchone():
+            raise HTTPException(404, "unknown or already ended grant")
+        with sweep_lock:
+            conn.execute("UPDATE consent_grants SET expires_at=? WHERE grant_id=?",
+                         (clock.iso(clock.now() - timedelta(seconds=1)), grant_id))
+            conn.commit()
+        receipts = sweep()
+        return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/demo/status")
     def demo_status() -> dict:

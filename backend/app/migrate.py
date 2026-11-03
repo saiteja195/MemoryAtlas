@@ -12,9 +12,22 @@ import sqlite3
 
 
 def upgrade(conn: sqlite3.Connection) -> None:
+    add_grant_expiry_columns(conn)
     backfill_source_consents(conn)
     backfill_episode_provenance(conn)
     conn.commit()
+
+
+def add_grant_expiry_columns(conn: sqlite3.Connection) -> None:
+    """Grants written before expiry existed get the columns; they never expire. A grant that was already
+    withdrawn is recorded as withdrawn."""
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(consent_grants)")}
+    if "expires_at" not in have:
+        conn.execute("ALTER TABLE consent_grants ADD COLUMN expires_at TEXT")
+    if "ended_reason" not in have:
+        conn.execute("ALTER TABLE consent_grants ADD COLUMN ended_reason TEXT")
+    conn.execute("UPDATE consent_grants SET ended_reason='withdrawn' WHERE revoked_at IS NOT NULL"
+                 " AND ended_reason IS NULL")
 
 
 def backfill_source_consents(conn: sqlite3.Connection) -> int:
