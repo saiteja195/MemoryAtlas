@@ -157,3 +157,66 @@ export type Receipt = {
   };
   notes: string[];
 };
+
+// --- Adding a memory (POST /capture/preview, POST /capture/commit) ---------------------------------
+
+export type Confidence = "sure" | "check" | "ask";
+
+export type DraftField = {
+  key: "when" | "where" | "doing" | "people";
+  value: string | null;
+  /** Where the value came from: exif, file, image, voice, note or user. */
+  source: string | null;
+  confidence: Confidence;
+};
+
+export type Question = {
+  id: string;
+  field: string;
+  prompt: string;
+  kind: "datetime" | "text" | "choice" | "consent";
+  options: string[];
+  ref: string | null;
+};
+
+export type Draft = {
+  draft_id: string;
+  kind: "frame" | "audio" | "note" | "video";
+  fields: DraftField[];
+  questions: Question[];
+  captured_at: string | null;
+  lat: number | null;
+  lon: number | null;
+  place_name: string | null;
+  text: string | null;
+  perceptions: unknown[];
+  frame_offsets_ms: number[];
+  turns: unknown[] | null;
+  speakers: string[];
+};
+
+export type PreviewBody = {
+  kind: Draft["kind"];
+  data_b64?: string;
+  frames_b64?: string[];
+  frame_offsets_ms?: number[];
+  audio_b64?: string;
+  text?: string;
+  /** The file's own time, local, naive ISO. */
+  file_modified_at?: string;
+};
+
+export type PersonAnswer = { ref: string; name?: string | null; consented: boolean };
+
+export type Answers = {
+  when?: string | null;
+  where?: string | null;
+  owner_speaker?: string | null;
+  people: PersonAnswer[];
+};
+
+export type CommitResult = {
+  session_id: string;
+  results: { status: string; reason: string | null; source_id: string | null; claims: number; compile_rejected: unknown }[];
+  grants: { person: string; grant_id: string; revocation_token: string }[];
+};
