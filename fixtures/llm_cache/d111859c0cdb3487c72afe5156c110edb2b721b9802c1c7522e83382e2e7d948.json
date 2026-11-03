@@ -1,0 +1,7 @@
+{
+  "action": "tool",
+  "args": {
+    "entity_id": "episode:20261029-1230"
+  },
+  "tool": "neighbors"
+}

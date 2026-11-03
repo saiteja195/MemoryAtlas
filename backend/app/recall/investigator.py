@@ -22,6 +22,12 @@ RESULT_CHARS = 12000
 CLAIM_ID_RE = re.compile(r"clm-[0-9a-f]{12}")
 LAST_SEEN_RE = re.compile(r"\blast (confirmed )?(sighting|seen)\b", re.I)
 TIME_RE = re.compile(r"\b\d{1,2}:\d{2}\b")
+# A question that only compares when two things happened ("did I see X before or after Y?") is not asking where
+# anything is, so it needs no "last confirmed sighting" wording. Anything that asks where, whether something was
+# left, moved or is still somewhere keeps the strict phrasing: when in doubt the check applies.
+ORDER_RE = re.compile(r"\b(before|after|earlier|later|first|sooner|prior to|ahead of|preceded|followed)\b", re.I)
+PLACE_RE = re.compile(r"\b(where|left|leave|leaving|still|find|found|located|location|moved|move|put|keep|kept|"
+                      r"whereabouts|sighting|last (?:see|saw|seen))\b", re.I)
 
 SYSTEM = """You answer questions about the user's own day using a graph of remembered claims.
 You can only learn facts by calling tools. Every step, reply with ONE JSON object, either
@@ -173,6 +179,8 @@ class Investigator:
         # Only when the question is about where that very object is.
         located = [r for r in rows.values() if r["predicate"] == "located_at" and
                    self._is_object(r["subject_id"]) and self._named_in(r["subject_id"], question)]
+        if located and _only_compares_time(question):
+            located = []
         if located and not (LAST_SEEN_RE.search(step.answer) and TIME_RE.search(step.answer)):
             return ('Object locations must be phrased as "Last confirmed sighting at HH:MM at '
                     '<place>", never in the present tense.')
@@ -200,6 +208,10 @@ class Investigator:
             return Answer("abstained", step.answer or "I don't have a record that answers that.",
                           [], note, tools.trace, steps, checks)
         return Answer(status, step.answer.strip(), cited, note.strip(), tools.trace, steps, checks)
+
+
+def _only_compares_time(question: str) -> bool:
+    return bool(ORDER_RE.search(question)) and not PLACE_RE.search(question)
 
 
 def _clip(result: Any) -> Any:

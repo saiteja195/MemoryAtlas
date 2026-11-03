@@ -1,0 +1,1083 @@
+{
+ "runs": 3,
+ "systems": {
+  "memoryatlas": {
+   "overall_good": {
+    "mean": 39.67,
+    "min": 39,
+    "max": 40,
+    "of": 40
+   },
+   "overall_good_new": {
+    "mean": 21,
+    "min": 21,
+    "max": 21,
+    "of": 21
+   },
+   "overall_good_seen": {
+    "mean": 18.67,
+    "min": 18,
+    "max": 19,
+    "of": 19
+   },
+   "answerable_correct": {
+    "mean": 28,
+    "min": 28,
+    "max": 28,
+    "of": 28
+   },
+   "judge_correct": {
+    "mean": 31.33,
+    "min": 30,
+    "max": 33,
+    "of": 34
+   },
+   "multi_source": {
+    "mean": 10,
+    "min": 10,
+    "max": 10,
+    "of": 10
+   },
+   "timing": {
+    "mean": 8,
+    "min": 8,
+    "max": 8,
+    "of": 8
+   },
+   "correction": {
+    "mean": 6,
+    "min": 6,
+    "max": 6,
+    "of": 6
+   },
+   "refuse_ok": {
+    "mean": 6,
+    "min": 6,
+    "max": 6,
+    "of": 6
+   },
+   "unsupported_confident": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 6
+   },
+   "wrong_confident": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 28
+   },
+   "leaked": {
+    "mean": 0.33,
+    "min": 0,
+    "max": 1,
+    "of": 6
+   },
+   "leaked_by_string": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 6
+   },
+   "facts_lost": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 4
+   },
+   "errors": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 40
+   },
+   "latency_median_s": {
+    "mean": 13.52,
+    "min": 11.1,
+    "max": 17.93
+   },
+   "latency_p95_s": {
+    "mean": 32.27,
+    "min": 27.88,
+    "max": 35.73
+   },
+   "llm_calls_per_question": {
+    "mean": 3.75,
+    "min": 3.65,
+    "max": 3.88
+   },
+   "judge_disagreements": {
+    "mean": 3,
+    "min": 2,
+    "max": 4
+   }
+  },
+  "baseline_stale": {
+   "overall_good": {
+    "mean": 24,
+    "min": 23,
+    "max": 26,
+    "of": 40
+   },
+   "overall_good_new": {
+    "mean": 15.33,
+    "min": 14,
+    "max": 16,
+    "of": 21
+   },
+   "overall_good_seen": {
+    "mean": 8.67,
+    "min": 7,
+    "max": 10,
+    "of": 19
+   },
+   "answerable_correct": {
+    "mean": 17.67,
+    "min": 17,
+    "max": 19,
+    "of": 28
+   },
+   "judge_correct": {
+    "mean": 29,
+    "min": 27,
+    "max": 31,
+    "of": 34
+   },
+   "multi_source": {
+    "mean": 9,
+    "min": 8,
+    "max": 10,
+    "of": 10
+   },
+   "timing": {
+    "mean": 4.67,
+    "min": 4,
+    "max": 5,
+    "of": 8
+   },
+   "correction": {
+    "mean": 1,
+    "min": 0,
+    "max": 2,
+    "of": 6
+   },
+   "refuse_ok": {
+    "mean": 6,
+    "min": 6,
+    "max": 6,
+    "of": 6
+   },
+   "unsupported_confident": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 6
+   },
+   "wrong_confident": {
+    "mean": 8.67,
+    "min": 8,
+    "max": 10,
+    "of": 28
+   },
+   "leaked": {
+    "mean": 5.67,
+    "min": 5,
+    "max": 6,
+    "of": 6
+   },
+   "leaked_by_string": {
+    "mean": 5.67,
+    "min": 5,
+    "max": 6,
+    "of": 6
+   },
+   "facts_lost": {
+    "mean": 1,
+    "min": 1,
+    "max": 1,
+    "of": 4
+   },
+   "errors": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 40
+   },
+   "latency_median_s": {
+    "mean": 9.14,
+    "min": 7.68,
+    "max": 10.61
+   },
+   "latency_p95_s": {
+    "mean": 15.29,
+    "min": 11.69,
+    "max": 20.17
+   },
+   "llm_calls_per_question": {
+    "mean": 1,
+    "min": 1,
+    "max": 1
+   },
+   "judge_disagreements": {
+    "mean": 8,
+    "min": 7,
+    "max": 9
+   }
+  },
+  "baseline_rebuilt": {
+   "overall_good": {
+    "mean": 30,
+    "min": 29,
+    "max": 32,
+    "of": 40
+   },
+   "overall_good_new": {
+    "mean": 17,
+    "min": 16,
+    "max": 18,
+    "of": 21
+   },
+   "overall_good_seen": {
+    "mean": 13,
+    "min": 11,
+    "max": 15,
+    "of": 19
+   },
+   "answerable_correct": {
+    "mean": 18,
+    "min": 17,
+    "max": 20,
+    "of": 28
+   },
+   "judge_correct": {
+    "mean": 28.67,
+    "min": 27,
+    "max": 31,
+    "of": 34
+   },
+   "multi_source": {
+    "mean": 9,
+    "min": 8,
+    "max": 10,
+    "of": 10
+   },
+   "timing": {
+    "mean": 4.67,
+    "min": 4,
+    "max": 5,
+    "of": 8
+   },
+   "correction": {
+    "mean": 1,
+    "min": 0,
+    "max": 2,
+    "of": 6
+   },
+   "refuse_ok": {
+    "mean": 6,
+    "min": 6,
+    "max": 6,
+    "of": 6
+   },
+   "unsupported_confident": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 6
+   },
+   "wrong_confident": {
+    "mean": 8.33,
+    "min": 7,
+    "max": 10,
+    "of": 28
+   },
+   "leaked": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 6
+   },
+   "leaked_by_string": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 6
+   },
+   "facts_lost": {
+    "mean": 0.67,
+    "min": 0,
+    "max": 1,
+    "of": 4
+   },
+   "errors": {
+    "mean": 0,
+    "min": 0,
+    "max": 0,
+    "of": 40
+   },
+   "latency_median_s": {
+    "mean": 8.64,
+    "min": 7.33,
+    "max": 9.78
+   },
+   "latency_p95_s": {
+    "mean": 14.79,
+    "min": 11.04,
+    "max": 20.17
+   },
+   "llm_calls_per_question": {
+    "mean": 1,
+    "min": 1,
+    "max": 1
+   },
+   "judge_disagreements": {
+    "mean": 6,
+    "min": 5,
+    "max": 8
+   }
+  }
+ },
+ "facts": [
+  {
+   "revocation_s": 113.32,
+   "probes_passed": 7,
+   "probes_total": 7,
+   "probes": [
+    {
+     "id": 1,
+     "name": "Graph: no claim or episode rests on removed support",
+     "status": "pass"
+    },
+    {
+     "id": 2,
+     "name": "Search index: removed phrases return nothing",
+     "status": "pass"
+    },
+    {
+     "id": 3,
+     "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+     "status": "pass"
+    },
+    {
+     "id": 4,
+     "name": "Caches: answer cache, chat log, receipts and model-response cache are clean",
+     "status": "pass"
+    },
+    {
+     "id": 5,
+     "name": "Export: a regenerated export mentions nothing removed",
+     "status": "pass"
+    },
+    {
+     "id": 6,
+     "name": "Red team: adversarial questions leak nothing",
+     "status": "pass"
+    },
+    {
+     "id": 7,
+     "name": "Disk: no media files, and the database file holds no removed text",
+     "status": "pass"
+    }
+   ],
+   "store_scan": {
+    "baseline_stale": {
+     "chunks": [],
+     "summary": [
+      "friday",
+      "pastor",
+      "proposal",
+      "taco place"
+     ]
+    },
+    "baseline_rebuilt": {
+     "chunks": [],
+     "summary": []
+    }
+   },
+   "leak_terms": [
+    "friday",
+    "pastor",
+    "proposal",
+    "taco place"
+   ],
+   "raw_media_bytes": 0,
+   "llm_calls_total": 229
+  },
+  {
+   "revocation_s": 122.559,
+   "probes_passed": 7,
+   "probes_total": 7,
+   "probes": [
+    {
+     "id": 1,
+     "name": "Graph: no claim or episode rests on removed support",
+     "status": "pass"
+    },
+    {
+     "id": 2,
+     "name": "Search index: removed phrases return nothing",
+     "status": "pass"
+    },
+    {
+     "id": 3,
+     "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+     "status": "pass"
+    },
+    {
+     "id": 4,
+     "name": "Caches: answer cache, chat log, receipts and model-response cache are clean",
+     "status": "pass"
+    },
+    {
+     "id": 5,
+     "name": "Export: a regenerated export mentions nothing removed",
+     "status": "pass"
+    },
+    {
+     "id": 6,
+     "name": "Red team: adversarial questions leak nothing",
+     "status": "pass"
+    },
+    {
+     "id": 7,
+     "name": "Disk: no media files, and the database file holds no removed text",
+     "status": "pass"
+    }
+   ],
+   "store_scan": {
+    "baseline_stale": {
+     "chunks": [],
+     "summary": [
+      "friday",
+      "pastor",
+      "proposal",
+      "taco place"
+     ]
+    },
+    "baseline_rebuilt": {
+     "chunks": [],
+     "summary": []
+    }
+   },
+   "leak_terms": [
+    "friday",
+    "pastor",
+    "proposal",
+    "taco place"
+   ],
+   "raw_media_bytes": 0,
+   "llm_calls_total": 233
+  },
+  {
+   "revocation_s": 134.456,
+   "probes_passed": 7,
+   "probes_total": 7,
+   "probes": [
+    {
+     "id": 1,
+     "name": "Graph: no claim or episode rests on removed support",
+     "status": "pass"
+    },
+    {
+     "id": 2,
+     "name": "Search index: removed phrases return nothing",
+     "status": "pass"
+    },
+    {
+     "id": 3,
+     "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+     "status": "pass"
+    },
+    {
+     "id": 4,
+     "name": "Caches: answer cache, chat log, receipts and model-response cache are clean",
+     "status": "pass"
+    },
+    {
+     "id": 5,
+     "name": "Export: a regenerated export mentions nothing removed",
+     "status": "pass"
+    },
+    {
+     "id": 6,
+     "name": "Red team: adversarial questions leak nothing",
+     "status": "pass"
+    },
+    {
+     "id": 7,
+     "name": "Disk: no media files, and the database file holds no removed text",
+     "status": "pass"
+    }
+   ],
+   "store_scan": {
+    "baseline_stale": {
+     "chunks": [],
+     "summary": [
+      "friday",
+      "pastor",
+      "proposal",
+      "taco place"
+     ]
+    },
+    "baseline_rebuilt": {
+     "chunks": [],
+     "summary": []
+    }
+   },
+   "leak_terms": [
+    "friday",
+    "pastor",
+    "proposal",
+    "taco place"
+   ],
+   "raw_media_bytes": 0,
+   "llm_calls_total": 240
+  }
+ ],
+ "reviewed": {
+  "runs": 3,
+  "systems": {
+   "memoryatlas": {
+    "overall_good": {
+     "mean": 39.67,
+     "min": 39,
+     "max": 40,
+     "of": 40
+    },
+    "overall_good_new": {
+     "mean": 21,
+     "min": 21,
+     "max": 21,
+     "of": 21
+    },
+    "overall_good_seen": {
+     "mean": 18.67,
+     "min": 18,
+     "max": 19,
+     "of": 19
+    },
+    "answerable_correct": {
+     "mean": 28,
+     "min": 28,
+     "max": 28,
+     "of": 28
+    },
+    "judge_correct": {
+     "mean": 31.33,
+     "min": 30,
+     "max": 33,
+     "of": 34
+    },
+    "multi_source": {
+     "mean": 10,
+     "min": 10,
+     "max": 10,
+     "of": 10
+    },
+    "timing": {
+     "mean": 8,
+     "min": 8,
+     "max": 8,
+     "of": 8
+    },
+    "correction": {
+     "mean": 6,
+     "min": 6,
+     "max": 6,
+     "of": 6
+    },
+    "refuse_ok": {
+     "mean": 6,
+     "min": 6,
+     "max": 6,
+     "of": 6
+    },
+    "unsupported_confident": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 6
+    },
+    "wrong_confident": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 28
+    },
+    "leaked": {
+     "mean": 0.33,
+     "min": 0,
+     "max": 1,
+     "of": 6
+    },
+    "leaked_by_string": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 6
+    },
+    "facts_lost": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 4
+    },
+    "errors": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 40
+    },
+    "latency_median_s": {
+     "mean": 13.52,
+     "min": 11.1,
+     "max": 17.93
+    },
+    "latency_p95_s": {
+     "mean": 32.27,
+     "min": 27.88,
+     "max": 35.73
+    },
+    "llm_calls_per_question": {
+     "mean": 3.75,
+     "min": 3.65,
+     "max": 3.88
+    },
+    "judge_disagreements": {
+     "mean": 3,
+     "min": 2,
+     "max": 4
+    }
+   },
+   "baseline_stale": {
+    "overall_good": {
+     "mean": 30,
+     "min": 29,
+     "max": 32,
+     "of": 40
+    },
+    "overall_good_new": {
+     "mean": 18.33,
+     "min": 17,
+     "max": 19,
+     "of": 21
+    },
+    "overall_good_seen": {
+     "mean": 11.67,
+     "min": 10,
+     "max": 13,
+     "of": 19
+    },
+    "answerable_correct": {
+     "mean": 23.67,
+     "min": 23,
+     "max": 25,
+     "of": 28
+    },
+    "judge_correct": {
+     "mean": 29,
+     "min": 27,
+     "max": 31,
+     "of": 34
+    },
+    "multi_source": {
+     "mean": 9,
+     "min": 8,
+     "max": 10,
+     "of": 10
+    },
+    "timing": {
+     "mean": 5.67,
+     "min": 5,
+     "max": 6,
+     "of": 8
+    },
+    "correction": {
+     "mean": 5,
+     "min": 4,
+     "max": 6,
+     "of": 6
+    },
+    "refuse_ok": {
+     "mean": 6,
+     "min": 6,
+     "max": 6,
+     "of": 6
+    },
+    "unsupported_confident": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 6
+    },
+    "wrong_confident": {
+     "mean": 2.67,
+     "min": 2,
+     "max": 4,
+     "of": 28
+    },
+    "leaked": {
+     "mean": 5.67,
+     "min": 5,
+     "max": 6,
+     "of": 6
+    },
+    "leaked_by_string": {
+     "mean": 5.67,
+     "min": 5,
+     "max": 6,
+     "of": 6
+    },
+    "facts_lost": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 4
+    },
+    "errors": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 40
+    },
+    "latency_median_s": {
+     "mean": 9.14,
+     "min": 7.68,
+     "max": 10.61
+    },
+    "latency_p95_s": {
+     "mean": 15.29,
+     "min": 11.69,
+     "max": 20.17
+    },
+    "llm_calls_per_question": {
+     "mean": 1,
+     "min": 1,
+     "max": 1
+    },
+    "judge_disagreements": {
+     "mean": 8,
+     "min": 7,
+     "max": 9
+    }
+   },
+   "baseline_rebuilt": {
+    "overall_good": {
+     "mean": 35.33,
+     "min": 34,
+     "max": 37,
+     "of": 40
+    },
+    "overall_good_new": {
+     "mean": 20,
+     "min": 19,
+     "max": 21,
+     "of": 21
+    },
+    "overall_good_seen": {
+     "mean": 15.33,
+     "min": 14,
+     "max": 17,
+     "of": 19
+    },
+    "answerable_correct": {
+     "mean": 23.33,
+     "min": 22,
+     "max": 25,
+     "of": 28
+    },
+    "judge_correct": {
+     "mean": 28.67,
+     "min": 27,
+     "max": 31,
+     "of": 34
+    },
+    "multi_source": {
+     "mean": 9,
+     "min": 8,
+     "max": 10,
+     "of": 10
+    },
+    "timing": {
+     "mean": 5.67,
+     "min": 5,
+     "max": 6,
+     "of": 8
+    },
+    "correction": {
+     "mean": 5,
+     "min": 4,
+     "max": 6,
+     "of": 6
+    },
+    "refuse_ok": {
+     "mean": 6,
+     "min": 6,
+     "max": 6,
+     "of": 6
+    },
+    "unsupported_confident": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 6
+    },
+    "wrong_confident": {
+     "mean": 3,
+     "min": 2,
+     "max": 5,
+     "of": 28
+    },
+    "leaked": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 6
+    },
+    "leaked_by_string": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 6
+    },
+    "facts_lost": {
+     "mean": 0.33,
+     "min": 0,
+     "max": 1,
+     "of": 4
+    },
+    "errors": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "of": 40
+    },
+    "latency_median_s": {
+     "mean": 8.64,
+     "min": 7.33,
+     "max": 9.78
+    },
+    "latency_p95_s": {
+     "mean": 14.79,
+     "min": 11.04,
+     "max": 20.17
+    },
+    "llm_calls_per_question": {
+     "mean": 1,
+     "min": 1,
+     "max": 1
+    },
+    "judge_disagreements": {
+     "mean": 6,
+     "min": 5,
+     "max": 8
+    }
+   }
+  },
+  "facts": [
+   {
+    "revocation_s": 113.32,
+    "probes_passed": 7,
+    "probes_total": 7,
+    "probes": [
+     {
+      "id": 1,
+      "name": "Graph: no claim or episode rests on removed support",
+      "status": "pass"
+     },
+     {
+      "id": 2,
+      "name": "Search index: removed phrases return nothing",
+      "status": "pass"
+     },
+     {
+      "id": 3,
+      "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+      "status": "pass"
+     },
+     {
+      "id": 4,
+      "name": "Caches: answer cache, chat log, receipts and model-response cache are clean",
+      "status": "pass"
+     },
+     {
+      "id": 5,
+      "name": "Export: a regenerated export mentions nothing removed",
+      "status": "pass"
+     },
+     {
+      "id": 6,
+      "name": "Red team: adversarial questions leak nothing",
+      "status": "pass"
+     },
+     {
+      "id": 7,
+      "name": "Disk: no media files, and the database file holds no removed text",
+      "status": "pass"
+     }
+    ],
+    "store_scan": {
+     "baseline_stale": {
+      "chunks": [],
+      "summary": [
+       "friday",
+       "pastor",
+       "proposal",
+       "taco place"
+      ]
+     },
+     "baseline_rebuilt": {
+      "chunks": [],
+      "summary": []
+     }
+    },
+    "leak_terms": [
+     "friday",
+     "pastor",
+     "proposal",
+     "taco place"
+    ],
+    "raw_media_bytes": 0,
+    "llm_calls_total": 229
+   },
+   {
+    "revocation_s": 122.559,
+    "probes_passed": 7,
+    "probes_total": 7,
+    "probes": [
+     {
+      "id": 1,
+      "name": "Graph: no claim or episode rests on removed support",
+      "status": "pass"
+     },
+     {
+      "id": 2,
+      "name": "Search index: removed phrases return nothing",
+      "status": "pass"
+     },
+     {
+      "id": 3,
+      "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+      "status": "pass"
+     },
+     {
+      "id": 4,
+      "name": "Caches: answer cache, chat log, receipts and model-response cache are clean",
+      "status": "pass"
+     },
+     {
+      "id": 5,
+      "name": "Export: a regenerated export mentions nothing removed",
+      "status": "pass"
+     },
+     {
+      "id": 6,
+      "name": "Red team: adversarial questions leak nothing",
+      "status": "pass"
+     },
+     {
+      "id": 7,
+      "name": "Disk: no media files, and the database file holds no removed text",
+      "status": "pass"
+     }
+    ],
+    "store_scan": {
+     "baseline_stale": {
+      "chunks": [],
+      "summary": [
+       "friday",
+       "pastor",
+       "proposal",
+       "taco place"
+      ]
+     },
+     "baseline_rebuilt": {
+      "chunks": [],
+      "summary": []
+     }
+    },
+    "leak_terms": [
+     "friday",
+     "pastor",
+     "proposal",
+     "taco place"
+    ],
+    "raw_media_bytes": 0,
+    "llm_calls_total": 233
+   },
+   {
+    "revocation_s": 134.456,
+    "probes_passed": 7,
+    "probes_total": 7,
+    "probes": [
+     {
+      "id": 1,
+      "name": "Graph: no claim or episode rests on removed support",
+      "status": "pass"
+     },
+     {
+      "id": 2,
+      "name": "Search index: removed phrases return nothing",
+      "status": "pass"
+     },
+     {
+      "id": 3,
+      "name": "Vectors: no orphan vectors, neighbours of removed text are clean",
+      "status": "pass"
+     },
+     {
+      "id": 4,
+      "name": "Caches: answer cache, chat log, receipts and model-response cache are clean",
+      "status": "pass"
+     },
+     {
+      "id": 5,
+      "name": "Export: a regenerated export mentions nothing removed",
+      "status": "pass"
+     },
+     {
+      "id": 6,
+      "name": "Red team: adversarial questions leak nothing",
+      "status": "pass"
+     },
+     {
+      "id": 7,
+      "name": "Disk: no media files, and the database file holds no removed text",
+      "status": "pass"
+     }
+    ],
+    "store_scan": {
+     "baseline_stale": {
+      "chunks": [],
+      "summary": [
+       "friday",
+       "pastor",
+       "proposal",
+       "taco place"
+      ]
+     },
+     "baseline_rebuilt": {
+      "chunks": [],
+      "summary": []
+     }
+    },
+    "leak_terms": [
+     "friday",
+     "pastor",
+     "proposal",
+     "taco place"
+    ],
+    "raw_media_bytes": 0,
+    "llm_calls_total": 240
+   }
+  ]
+ },
+ "meta": {
+  "label": "after-temporal-fix-2026-11-03",
+  "model": "muse-spark-1.3",
+  "questions": 40,
+  "commit": "5110c53",
+  "date": "2026-11-03"
+ }
+}

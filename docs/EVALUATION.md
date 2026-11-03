@@ -56,6 +56,12 @@ answered), confident wrong answers, forgotten facts recoverable from answers, fa
 and model calls per question. For the baseline, the stores are also scanned for the forgotten words after
 the deletion; for MemoryAtlas the seven leak probes run (including a disk-level scan of the database).
 
+## Runs so far
+
+- `eval/results/full-2026-11-02/`: the first full run.
+- `eval/results/after-temporal-fix-2026-11-03/`: the same questions after the ordering-question fix. Its README
+  says which numbers are a re-test of a fix made after seeing failures, and not evidence on unseen questions.
+
 ## How to reproduce
 
 ```bash

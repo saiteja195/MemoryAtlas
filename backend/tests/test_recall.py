@@ -41,7 +41,8 @@ def test_search_filters_and_hides_bookkeeping_claims(played):
                for h in t.run("search_claims", {"query": "episode", "k": 12}))
     only = t.run("search_claims", {"query": "wallet", "predicate": "located_at"})
     assert only and {h["predicate"] for h in only} == {"located_at"}
-    assert t.run("search_claims", {"query": "wallet", "time_from": "2026-10-29T20:00:00"}) == []
+    after = t.run("search_claims", {"query": "wallet", "time_from": "2026-10-29T20:00:00"})
+    assert after["results"] == [] and "only covers" in after["note"]        # nothing after the memory ends
 
 
 def test_find_entity_resolves_the_alias(played):
@@ -290,3 +291,63 @@ def test_provenance_endpoint(client):
     assert tree["justifications"][0]["rule"] == "spatial_referent_resolution"
     assert client.get("/claims/clm-nope/provenance").status_code == 404
     assert client.post("/recall/ask", json={"question": "hi"}).status_code == 422
+
+
+# -- two reasoning defects found by the evaluation ----------------------------------------------
+
+def wallet_claim(full_day):
+    return RecallTools(full_day.conn).run("last_seen", {"object_id": "object:wallet"})["latest"]["claim_id"]
+
+
+@pytest.mark.parametrize("q", [
+    "Did I see my wallet before or after my meeting with Alex?",
+    "Which came first, my wallet at the café or the meeting with Alex?",
+    "Did I see my wallet earlier than the meeting?",
+])
+def test_a_question_that_only_compares_times_is_not_forced_into_last_sighting_wording(full_day, q):
+    """Order questions ask about when, not about where the wallet is, so the answer is judged on its content."""
+    car = wallet_claim(full_day)
+    _, a = ask(full_day, [tool("last_seen", object_id="object:wallet"),
+                          final(answer="Before: I saw the wallet at the café at 09:10, ahead of the meeting.", cited=[car])],
+               q=q)
+    assert a.status == "answered" and a.checks == []
+
+
+@pytest.mark.parametrize("q", [
+    "Where was my wallet before my meeting with Alex?",
+    "Did I leave my wallet at the café before my meeting?",
+    "Is my wallet still in the car after the meeting?",
+    "Where did I first see my wallet?",
+    "Where is my wallet?",
+])
+def test_any_question_about_where_something_is_keeps_the_strict_phrasing(full_day, q):
+    car = wallet_claim(full_day)
+    _, a = ask(full_day, [tool("last_seen", object_id="object:wallet"),
+                          final(answer="It is in the car.", cited=[car]),
+                          final(answer="Last confirmed sighting at 17:45 in the car.", cited=[car])], q=q)
+    assert a.status == "answered" and "Last confirmed sighting" in a.answer and "present tense" in a.checks[0]
+
+
+def test_a_date_window_outside_the_memory_says_what_the_memory_covers(full_day):
+    t = RecallTools(full_day.conn)
+    out = t.run("timeline", {"entity_id": "object:wallet", "time_from": "2026-11-02T00:00:00",
+                             "time_to": "2026-11-02T12:00:00"})
+    assert out["results"] == []
+    assert "2026-10-29 09:10 to 2026-10-29 17:45" in out["note"] and "current date" in out["note"]
+    assert t.run("search_claims", {"query": "wallet", "time_from": "2026-11-02T00:00:00"})["results"] == []
+
+
+def test_an_empty_window_inside_the_memory_is_left_alone(full_day):
+    t = RecallTools(full_day.conn)
+    assert t.run("timeline", {"entity_id": "object:wallet", "time_from": "2026-10-29T10:00:00",
+                              "time_to": "2026-10-29T11:00:00"}) == []
+
+
+def test_the_coverage_hint_never_reveals_the_span_of_forgotten_claims(full_day):
+    from app.privacy.revocation import RevocationEngine
+    from .fakes import FakeLLM
+    alex = full_day.conn.execute("SELECT grant_id FROM consent_grants WHERE grantor='alex'").fetchone()[0]
+    RevocationEngine(full_day.conn, "test-secret", FakeLLM(), "me").revoke(
+        alex, full_day.tokens["alex:sync-alex"], run_red_team=False)
+    out = RecallTools(full_day.conn).run("timeline", {"entity_id": "object:wallet", "time_from": "2027-01-01T00:00:00"})
+    assert "12:30" not in out["note"] and "12:35" not in out["note"]          # the withdrawn conversation's times
