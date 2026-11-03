@@ -22,6 +22,11 @@ class Settings:
     runtime_cache_dir: str = os.getenv("MEMORYATLAS_RUNTIME_CACHE", "")
     # Keys the HMAC of consent revocation tokens (simulated authenticated action).
     revocation_secret: str = os.getenv("MEMORYATLAS_SECRET", "dev-only-secret")
+    # Profiles: on means every person signs in and gets a private database; off is the single-user
+    # mode used by development and the older tests.
+    auth: bool = os.getenv("MEMORYATLAS_AUTH", "on") != "off"
+    # Where the profile registry and each profile's database live. "" means: next to `db_path`.
+    data_dir: str = os.getenv("MEMORYATLAS_DATA_DIR", "")
 
 
 def runtime_cache_path(s: Settings) -> str:

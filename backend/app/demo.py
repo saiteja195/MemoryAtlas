@@ -11,13 +11,13 @@ from .privacy.consent import create_grant
 
 
 class DemoRunner:
-    def __init__(self, engine: MemoryEngine, adapter: MockDayAdapter, secret: str):
+    def __init__(self, engine: MemoryEngine, adapter: MockDayAdapter, secret: str, seed: bool = True):
         self.engine, self.adapter, self.secret = engine, adapter, secret
         self.conn: sqlite3.Connection = engine.conn
         self.cursor = 0
         self.played: set[str] = set()      # ids of events already ingested (scheduled or live)
         self.tokens: dict[str, str] = {}   # grantor:session -> revocation token (demo only)
-        if not self.conn.execute("SELECT 1 FROM consent_grants").fetchone():
+        if seed and not self.conn.execute("SELECT 1 FROM consent_grants").fetchone():
             self.reset()   # seed a fresh database; never wipe one that already has data
 
     def reset(self) -> None:

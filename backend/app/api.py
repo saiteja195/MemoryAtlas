@@ -1,35 +1,28 @@
 import base64
-import logging
 import os
-import threading
+import tempfile
 from datetime import timedelta
-from dataclasses import replace
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from . import db
-from .capture.adapters import MockDayAdapter
 from .capture.audit import media_bytes_on_disk
 from .capture.commit import Answers, CommitError, commit as commit_draft, plan as plan_commit
-from .capture.draft import DraftStore
 from .capture.media_info import MediaError
 from .capture.models import KINDS, RawCapture
 from .capture.preview import BadRequest, TooLarge, build_preview
+from .config import Settings
 from .corrections import CorrectionError, correct_claim
-from .config import Settings, runtime_cache_path
-from .demo import DemoRunner
-from .demo_acts import load_acts
-from .engine import MemoryEngine
 from .graph import build_graph
 from .llm.base import LLMClient, LLMUnavailable
-from .llm.factory import build_client
 from .privacy import clock
 from .privacy.consent import create_grant
 from .privacy.export import export_memories
-from .privacy.revocation import BadToken, RevocationEngine, UnknownGrant
-from .recall.service import RecallService
+from .privacy.revocation import BadToken, UnknownGrant
+from .profiles.registry import Registry
+from .profiles.runtime import ProfileRuntime, Runtimes
+from .profiles.session import resolve_runtime
 
 
 class CaptureBody(BaseModel):
@@ -88,127 +81,123 @@ class GrantBody(BaseModel):
     valid_for_hours: float | None = Field(default=None, gt=0, le=8760)
 
 
+def _grants(conn) -> list[dict]:
+    # receipt_id lets another browser tab (the person withdrawing consent) tell this one
+    # which receipt to show, without the two pages talking to each other directly.
+    return [dict(r) for r in conn.execute(
+        "SELECT g.grant_id, g.grantor, g.scope, g.scope_ref, g.granted_at, g.revoked_at,"
+        " g.expires_at, g.ended_reason,"
+        " (SELECT r.receipt_id FROM forgetting_receipts r WHERE r.grant_id = g.grant_id"
+        "  ORDER BY r.created_at LIMIT 1) AS receipt_id"
+        " FROM consent_grants g ORDER BY g.granted_at, g.grant_id")]
+
+
 def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -> FastAPI:
     settings = settings or Settings()
-    # One runtime model-response cache, shared by the client and the forgetting purge.
-    settings = replace(settings, runtime_cache_dir=runtime_cache_path(settings))
-    conn = db.connect(settings.db_path)
-    llm = llm or build_client(settings)
-    adapter = MockDayAdapter(settings.demo_script)
-    engine = MemoryEngine(conn, llm, adapter.owner, adapter.names)
-    demo = DemoRunner(engine, adapter, settings.revocation_secret)
-    recall = RecallService(conn, llm)
-    try:
-        red_team = [q["question"] for q in load_acts().get("red_team", [])]
-    except OSError:
-        red_team = []
-    revoker = RevocationEngine(
-        conn, settings.revocation_secret, llm, adapter.owner,
-        db_path=None if settings.db_path == ":memory:" else os.path.abspath(settings.db_path),
-        cache_dir=settings.runtime_cache_dir, red_team_questions=red_team)
-    sweep_lock = threading.Lock()
-    log = logging.getLogger("memoryatlas")
+    app = FastAPI(title="MemoryAtlas")
+    registry: Registry | None = None
+    if settings.auth:
+        if settings.data_dir:
+            root = settings.data_dir
+        elif settings.db_path == ":memory:":
+            root = tempfile.mkdtemp(prefix="memoryatlas-profiles-")
+        else:
+            root = os.path.dirname(os.path.abspath(settings.db_path))
+        os.makedirs(root, exist_ok=True)
+        registry = Registry(os.path.join(root, "profiles.db"))
+        runtimes = Runtimes(settings, llm, root)
+    else:
+        runtimes = Runtimes(settings, llm, None)
+        default = runtimes.get("local", "Local", True)       # seeded exactly as before profiles existed
+        app.state.conn, app.state.engine, app.state.demo, app.state.drafts = (
+            default.conn, default.engine, default.demo, default.drafts)
+    app.state.registry, app.state.runtimes = registry, runtimes
 
-    def sweep() -> list[dict]:
-        """Purge grants that have expired. Safe to call at any time; one at a time."""
-        with sweep_lock:
-            try:
-                return revoker.sweep()
-            except Exception:       # a failed purge must not take the API down; the filter still refuses the data
-                log.exception("expiry sweep failed")
-                return []
-
-    def sweep_before_request(request: Request) -> None:
-        if request.url.path != "/health":       # the health check must stay instant
-            sweep()
-
-    data_dir = None if settings.db_path == ":memory:" else os.path.dirname(os.path.abspath(
-        settings.db_path))
-
-    sweep()                                     # anything that lapsed while the app was off
-    app = FastAPI(title="MemoryAtlas", dependencies=[Depends(sweep_before_request)])
-    drafts = DraftStore()
-    app.state.conn, app.state.engine, app.state.demo, app.state.drafts = conn, engine, demo, drafts
+    def get_runtime(request: Request) -> ProfileRuntime:
+        """The caller's own runtime. Every data route depends on this and on nothing else for its data."""
+        if registry is None:
+            rt = runtimes.get("local", "Local", True)
+        else:
+            rt = resolve_runtime(request, registry, runtimes)
+        rt.sweep()
+        return rt
 
     @app.get("/health")
     def health() -> dict:
-        return {"status": "ok", "llm_mode": llm.mode}
+        mode = llm.mode if llm else settings.llm_mode
+        return {"status": "ok", "llm_mode": mode, "auth": settings.auth}
 
     @app.get("/graph")
-    def graph(at: str | None = None, include: str | None = None) -> dict:
-        return build_graph(conn, at, include_history=include == "history")
+    def graph(at: str | None = None, include: str | None = None,
+              rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        return build_graph(rt.conn, at, include_history=include == "history")
 
     @app.get("/privacy/media")
-    def media() -> dict:
-        retained = conn.execute("SELECT COALESCE(SUM(media_bytes_retained),0) FROM sources"
-                                ).fetchone()[0]
-        on_disk = media_bytes_on_disk(*( [data_dir] if data_dir else []), recursive=False)
-        on_disk += media_bytes_on_disk(settings.cache_dir, settings.runtime_cache_dir)
+    def media(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        retained = rt.conn.execute("SELECT COALESCE(SUM(media_bytes_retained),0) FROM sources"
+                                   ).fetchone()[0]
+        data_dir = None if rt.db_path is None else os.path.dirname(rt.db_path)
+        on_disk = media_bytes_on_disk(*([data_dir] if data_dir else []), recursive=False)
+        on_disk += media_bytes_on_disk(rt.settings.cache_dir, rt.cache_dir)
         return {"raw_media_bytes_retained": retained, "media_bytes_on_disk": on_disk}
 
     @app.post("/consent/grants")
-    def grant(body: GrantBody) -> dict:
+    def grant(body: GrantBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         expires = clock.now() + timedelta(hours=body.valid_for_hours) if body.valid_for_hours else None
-        gid, token = create_grant(conn, settings.revocation_secret, body.grantor,
+        gid, token = create_grant(rt.conn, rt.settings.revocation_secret, body.grantor,
                                   body.session_id, body.purposes, expires_at=expires)
         return {"grant_id": gid, "revocation_token": token,
                 "expires_at": clock.iso(expires) if expires else None}
 
     @app.get("/consent/grants")
-    def grants() -> list[dict]:
-        # receipt_id lets another browser tab (the person withdrawing consent) tell this one
-        # which receipt to show, without the two pages talking to each other directly.
-        return [dict(r) for r in conn.execute(
-            "SELECT g.grant_id, g.grantor, g.scope, g.scope_ref, g.granted_at, g.revoked_at,"
-            " g.expires_at, g.ended_reason,"
-            " (SELECT r.receipt_id FROM forgetting_receipts r WHERE r.grant_id = g.grant_id"
-            "  ORDER BY r.created_at LIMIT 1) AS receipt_id"
-            " FROM consent_grants g ORDER BY g.granted_at, g.grant_id")]
+    def grants(rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
+        return _grants(rt.conn)
 
     @app.post("/consent/grants/{grant_id}/revoke")
-    def revoke(grant_id: str, body: RevokeBody, red_team: bool = True) -> dict:
+    def revoke(grant_id: str, body: RevokeBody, red_team: bool = True,
+               rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Withdraw consent: forget everything only this grant supported. The token is the
         proof that the person who consented is the one asking."""
         try:
-            return revoker.revoke(grant_id, body.token, run_red_team=red_team)
+            return rt.revoker.revoke(grant_id, body.token, run_red_team=red_team)
         except UnknownGrant:
             raise HTTPException(404, "unknown grant") from None
         except BadToken:
             raise HTTPException(403, "wrong revocation token") from None
 
     @app.post("/consent/expire-due")
-    def expire_due() -> dict:
+    def expire_due(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Forget what rested on grants that have lapsed. The API does this by itself before each request;
         call this from a scheduler to do it on time even when nobody is using the app."""
-        receipts = sweep()
+        receipts = rt.sweep()
         return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/receipts/{receipt_id}")
-    def receipt(receipt_id: str) -> dict:
-        found = revoker.get_receipt(receipt_id)
+    def receipt(receipt_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        found = rt.revoker.get_receipt(receipt_id)
         if found is None:
             raise HTTPException(404, "unknown receipt")
         return found
 
     @app.get("/export")
-    def export() -> dict:
-        return export_memories(conn)
+    def export(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        return export_memories(rt.conn)
 
-    def require_live() -> None:
+    def require_live(rt: ProfileRuntime) -> None:
         # In record mode every model response is written to the cache, including a transcript of someone
         # who then says no. Uploads therefore run only on the live client, which keeps nothing.
-        if llm.mode != "live":
+        if rt.llm.mode != "live":
             raise HTTPException(409, "Adding memories needs live mode (a model key); this app is in "
-                                     f"{llm.mode} mode.")
+                                     f"{rt.llm.mode} mode.")
 
     @app.post("/capture/preview")
-    def capture_preview(body: PreviewBody) -> dict:
+    def capture_preview(body: PreviewBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Read an upload with Muse and return what it understood and what it still needs to
         ask. Stores nothing; the commit step does that."""
-        require_live()
+        require_live(rt)
         try:
             draft = build_preview(
-                llm, body.kind, data_b64=body.data_b64, frames_b64=body.frames_b64,
+                rt.llm, body.kind, data_b64=body.data_b64, frames_b64=body.frames_b64,
                 frame_offsets_ms=body.frame_offsets_ms, audio_b64=body.audio_b64, text=body.text,
                 file_modified_at=body.file_modified_at)
         except TooLarge as e:
@@ -219,31 +208,31 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(415, str(e)) from None
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
-        return drafts.put(draft).model_dump()
+        return rt.drafts.put(draft).model_dump()
 
     @app.post("/capture/commit")
-    def capture_commit(body: CommitBody) -> dict:
+    def capture_commit(body: CommitBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Store a confirmed draft. Consent is decided here, in code, from the answers."""
-        require_live()
+        require_live(rt)
         try:
-            draft = drafts.peek(body.draft_id)
+            draft = rt.drafts.peek(body.draft_id)
         except KeyError:
             raise HTTPException(404, "draft expired or unknown") from None
         try:
-            decided = plan_commit(draft, body.answers, engine.gateway.owner)
+            decided = plan_commit(draft, body.answers, rt.engine.gateway.owner)
         except CommitError as e:
             raise HTTPException(e.status, e.message) from None
         try:
-            drafts.take(body.draft_id)          # from here on a second call gets 404
+            rt.drafts.take(body.draft_id)          # from here on a second call gets 404
         except KeyError:
             raise HTTPException(404, "draft expired or unknown") from None
         try:
-            return commit_draft(conn, engine, settings.revocation_secret, draft, decided)
+            return commit_draft(rt.conn, rt.engine, rt.settings.revocation_secret, draft, decided)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
     @app.post("/capture/{kind}")
-    def capture(kind: str, body: CaptureBody) -> dict:
+    def capture(kind: str, body: CaptureBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         if kind not in KINDS:
             raise HTTPException(404, f"kind must be one of {', '.join(KINDS)}")
         cap = RawCapture(
@@ -255,7 +244,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             image=base64.b64decode(body.image_b64) if body.image_b64 else None,
             audio=base64.b64decode(body.audio_b64) if body.audio_b64 else None)
         try:
-            results = engine.ingest(cap)
+            results = rt.engine.ingest(cap)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
         return {"results": [{"status": r.ingest.status, "reason": r.ingest.reason,
@@ -266,76 +255,74 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
                             for r in results]}
 
     @app.post("/recall/ask")
-    def ask(body: AskBody) -> dict:
+    def ask(body: AskBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         try:
-            return recall.ask(body.question)
+            return rt.recall.ask(body.question)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
     @app.get("/claims/{claim_id}/provenance")
-    def provenance(claim_id: str) -> dict:
-        out = recall.provenance(claim_id)
+    def provenance(claim_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        out = rt.recall.provenance(claim_id)
         if "error" in out:
             raise HTTPException(404, out["error"])
         return out
 
     @app.post("/claims/{claim_id}/correct")
-    def correct(claim_id: str, body: CorrectBody) -> dict:
+    def correct(claim_id: str, body: CorrectBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """The user says a remembered fact is wrong: replace it with `text`, or `retract` it. The old
         fact stays as history; answers stop using it (and anything derived only from it)."""
         try:
-            return correct_claim(engine, claim_id, body.text, body.retract, body.at)
+            return correct_claim(rt.engine, claim_id, body.text, body.retract, body.at)
         except CorrectionError as e:
             raise HTTPException(e.code, e.message) from None
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
     @app.get("/demo/grants")
-    def demo_grants() -> list[dict]:
+    def demo_grants(rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
         """DEMO ONLY: the revocation tokens a real person would hold on their own device, so
         the demo can act as 'Alex scans the QR code'. Never expose this outside a demo."""
-        out = []
-        for g in grants():
-            out.append({**g, "demo_token": demo.tokens.get(f"{g['grantor']}:{g['scope_ref']}")})
-        return out
+        return [{**g, "demo_token": rt.demo.tokens.get(f"{g['grantor']}:{g['scope_ref']}")}
+                for g in _grants(rt.conn)]
 
     @app.post("/demo/grants/{grant_id}/expire")
-    def demo_expire(grant_id: str) -> dict:
+    def demo_expire(grant_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """DEMO ONLY: let a grant lapse now, so the demo can show expiry without waiting. Never expose this
         outside a demo."""
-        if not conn.execute("SELECT 1 FROM consent_grants WHERE grant_id=? AND revoked_at IS NULL",
-                            (grant_id,)).fetchone():
+        if not rt.conn.execute("SELECT 1 FROM consent_grants WHERE grant_id=? AND revoked_at IS NULL",
+                               (grant_id,)).fetchone():
             raise HTTPException(404, "unknown or already ended grant")
-        with sweep_lock:
-            conn.execute("UPDATE consent_grants SET expires_at=? WHERE grant_id=?",
-                         (clock.iso(clock.now() - timedelta(seconds=1)), grant_id))
-            conn.commit()
-        receipts = sweep()
+        with rt.sweep_lock:
+            rt.conn.execute("UPDATE consent_grants SET expires_at=? WHERE grant_id=?",
+                            (clock.iso(clock.now() - timedelta(seconds=1)), grant_id))
+            rt.conn.commit()
+        receipts = rt.sweep()
         return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/demo/status")
-    def demo_status() -> dict:
-        return {**demo.status(), "llm_mode": llm.mode}
+    def demo_status(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        return {**rt.demo.status(), "llm_mode": rt.llm.mode}
 
     @app.post("/demo/reset")
-    def demo_reset() -> dict:
-        demo.reset()
-        return demo.status()
+    def demo_reset(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        rt.demo.reset()
+        return rt.demo.status()
 
     @app.post("/demo/advance")
-    def demo_advance(steps: int = 1) -> dict:
+    def demo_advance(steps: int = 1, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         try:
-            played = demo.advance(max(1, min(steps, 50)))
+            played = rt.demo.advance(max(1, min(steps, 50)))
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
-        return {"played": played, **demo.status()}
+        return {"played": played, **rt.demo.status()}
 
     @app.post("/demo/live/{event_id}")
-    def demo_live(event_id: str) -> dict:
-        if event_id not in demo.status()["live_uploads"]:
+    def demo_live(event_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        if event_id not in rt.demo.status()["live_uploads"]:
             raise HTTPException(404, "not a live-upload event")
         try:
-            results = demo.play(event_id)
+            results = rt.demo.play(event_id)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
         return {"ingested": sum(r.ingest.status == "ingested" for r in results)}

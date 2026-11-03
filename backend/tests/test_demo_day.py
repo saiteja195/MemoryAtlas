@@ -98,7 +98,7 @@ def test_replaying_the_day_changes_nothing(played):
 
 
 def test_api_flow_with_no_media_on_disk(tmp_path):
-    s = Settings(db_path=str(tmp_path / "m.db"), llm_mode="live", cache_dir=str(tmp_path / "c"))
+    s = Settings(auth=False, db_path=str(tmp_path / "m.db"), llm_mode="live", cache_dir=str(tmp_path / "c"))
     client = TestClient(create_app(s, FakeLLM()))
     assert client.get("/demo/status").json()["next"] == "F1"
     r = client.post("/demo/advance", params={"steps": 10}).json()
@@ -118,7 +118,7 @@ def test_api_flow_with_no_media_on_disk(tmp_path):
 
 
 def test_capture_endpoint_enforces_consent(tmp_path):
-    s = Settings(db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path))
+    s = Settings(auth=False, db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path))
     client = TestClient(create_app(s, FakeLLM()))
     body = {"session_id": "nobody-consented", "captured_at": "2026-10-29T10:00:00",
             "text": "remember the milk"}
@@ -130,7 +130,7 @@ def test_capture_endpoint_enforces_consent(tmp_path):
 
 
 def test_demo_status_lists_every_event_and_what_has_been_played(tmp_path):
-    s = Settings(db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path))
+    s = Settings(auth=False, db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path))
     client = TestClient(create_app(s, FakeLLM()))
     st = client.get("/demo/status").json()
     assert [e["id"] for e in st["events"]] == ["F1", "F2", "C1", "A1", "F3", "F4"]

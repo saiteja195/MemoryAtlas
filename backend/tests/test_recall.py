@@ -259,7 +259,7 @@ def test_questions_are_stateless(played):
 @pytest.fixture
 def client(tmp_path):
     llm = FakeLLM()
-    c = TestClient(create_app(Settings(db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path)), llm))
+    c = TestClient(create_app(Settings(auth=False, db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path)), llm))
     c.llm = llm
     c.post("/demo/advance", params={"steps": 10})
     return c

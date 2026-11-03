@@ -17,7 +17,7 @@ def b64(data: bytes) -> str:
 
 def make(fake=None):
     fake = fake or FakeLLM()
-    c = TestClient(create_app(Settings(db_path=":memory:", llm_mode="live"), fake))
+    c = TestClient(create_app(Settings(auth=False, db_path=":memory:", llm_mode="live"), fake))
     return c, fake
 
 
