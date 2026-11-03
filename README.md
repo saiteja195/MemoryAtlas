@@ -28,7 +28,19 @@ With Docker instead (separate `web` and `backend` services on one network, no lo
 `docker compose up --build`, then open <http://localhost:8080>. See [`docs/DOCKER.md`](docs/DOCKER.md).
 
 Full guide, including the copy-and-paste demo and live mode: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
-Adding your own photos, voice, video and notes: [Adding your own memories](docs/LOCAL_SETUP.md#adding-your-own-memories). Running it on a VM with HTTPS so a phone can use the camera: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+Everyone signs in with a name and passcode and gets a private Atlas; to look around without signing up, use a demo profile (below). Adding your own photos, voice, video and notes: [Adding your own memories](docs/LOCAL_SETUP.md#adding-your-own-memories). Running it on a VM with HTTPS so a phone can use the camera: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+## Demo profiles for reviewers
+
+Sign in at the running app with one of these (they hold only demo content, and **Settings > Reset demo data** puts
+them back as they were). Or create your own profile: every profile is private.
+
+| Profile | Name | Passcode | What it holds |
+|---|---|---|---|
+| Staged day | _to be published_ | _to be published_ | the scripted "A Day You Forgot" |
+| Real photos | _to be published_ | _to be published_ | a real day, from the owner's own photos |
+
+How they are built and what is checked before they are published: [`fixtures/profiles/README.md`](fixtures/profiles/README.md).
 
 ## Contributing
 

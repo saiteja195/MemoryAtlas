@@ -1,7 +1,8 @@
 // End-to-end check of the whole demo in a real browser. Optional: it needs Playwright, which is
 // not a project dependency (it downloads browsers).
 //
-//   1. Start the backend in replay mode (no API key needed):   make api
+//   1. Start the backend in replay mode with profiles off (no API key, no sign-in):
+//        cd backend && MEMORYATLAS_AUTH=off make api       (profiles are covered by e2e/profiles.cjs)
 //   2. Start the web UI:                                        make web
 //   3. Install Playwright once:   cd frontend && npm install --no-save playwright && npx playwright install chromium
 //   4. Run:                       cd frontend && npm run e2e

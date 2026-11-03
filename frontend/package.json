@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "check": "tsc --noEmit && vitest run",
-    "e2e": "node e2e/walkthrough.cjs"
+    "e2e": "node e2e/walkthrough.cjs",
+    "e2e:profiles": "node e2e/profiles.cjs"
   },
   "dependencies": {
     "cytoscape": "3.30.2",
