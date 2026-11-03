@@ -23,7 +23,8 @@ from .privacy.revocation import BadToken, UnknownGrant
 from .profiles.registry import Registry
 from .profiles.routes import make_router
 from .profiles.runtime import ProfileRuntime, Runtimes
-from .profiles.session import resolve_runtime
+from .profiles import snapshots
+from .profiles.session import current_profile, open_runtime, resolve_runtime
 
 
 class CaptureBody(BaseModel):
@@ -307,8 +308,35 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         return {**rt.demo.status(), "llm_mode": rt.llm.mode}
 
     @app.post("/demo/reset")
-    def demo_reset(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
-        rt.demo.reset()
+    def demo_reset(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        if registry is None:
+            rt.demo.reset()
+            return rt.demo.status()
+        profile = current_profile(request, registry)
+        if not profile.demo_kind:
+            raise HTTPException(403, "Only demo profiles can be reset. Use Settings to delete your profile.")
+        with rt.sweep_lock:                  # nobody sweeps this profile while its database is swapped
+            try:
+                snapshots.restore(runtimes, profile)
+            except FileNotFoundError:
+                if profile.demo_kind != "staged":
+                    raise HTTPException(
+                        503, f"The {profile.demo_kind} demo snapshot is not installed on this server.") from None
+                rt.demo.reset()              # no snapshot yet: replay the script into the profile
+                return rt.demo.status()
+        return open_runtime(profile, runtimes).demo.status()
+
+    @app.post("/demo/load-sample")
+    def demo_load_sample(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        """Fill an empty profile with the scripted sample day, for anyone with nothing to upload yet."""
+        if registry is not None:
+            if rt.conn.execute("SELECT 1 FROM sources LIMIT 1").fetchone():
+                raise HTTPException(409, "This profile already has memories")
+            rt.demo.reset()
+        try:
+            rt.demo.advance(50)
+        except LLMUnavailable as e:
+            raise HTTPException(503, str(e)) from e
         return rt.demo.status()
 
     @app.post("/demo/advance")

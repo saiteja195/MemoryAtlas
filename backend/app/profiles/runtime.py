@@ -36,6 +36,7 @@ class ProfileRuntime:
     db_path: str | None
     cache_dir: str
     settings: Settings
+    demo_ready: bool = False        # a demo profile's runtime has been prepared (tokens, played state)
 
     def sweep(self) -> list[dict]:
         """Purge grants that have expired. Safe to call at any time; one at a time. A failed purge must
