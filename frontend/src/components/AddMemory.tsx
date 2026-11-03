@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "r
 import { api, ApiError } from "../api/client";
 import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question } from "../api/types";
 import {
-  classifyFile, localIso, maxBytes, toCommitBody, unanswered, type AnswerState, type FileKind,
+  addAvailability, classifyFile, localIso, maxBytes, toCommitBody, unanswered, whenInputValue,
+  type AnswerState, type FileKind,
 } from "../utils/addMemory";
 import { extractVideo, toBase64, toWav16k } from "../utils/media";
 import { CaptureButtons, type Captured } from "./CaptureButtons";
@@ -49,12 +50,13 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const [answers, setAnswers] = useState<AnswerState>({ people: {} });
   const [placeChoice, setPlaceChoice] = useState<"yes" | "other" | null>(null);
   const [outcome, setOutcome] = useState<{ text: string; saved: boolean } | null>(null);
+  const [grants, setGrants] = useState<CommitResult["grants"]>([]);
   const [hover, setHover] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setSource(null); setNote(""); setStep("add"); setError(null); setDraft(null);
-    setAnswers({ people: {} }); setPlaceChoice(null); setOutcome(null); setHover(false);
+    setAnswers({ people: {} }); setPlaceChoice(null); setOutcome(null); setGrants([]); setHover(false);
   };
   useEffect(() => { if (!open) reset(); }, [open]);
 
@@ -63,7 +65,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
     if ("unsupported" in c) { setError(c.unsupported); return; }
     if (file.size > maxBytes(c.kind)) { setError(`That file is ${fmtBytes(file.size)}, over the ${fmtBytes(maxBytes(c.kind))} limit.`); return; }
     setError(null);
-    setSource({ kind: c.kind, blob: file, name: file.name, modifiedAt: file.lastModified || Date.now() });
+    setSource({ kind: c.kind, blob: file, name: file.name, modifiedAt: file.lastModified || 0 });
   };
   const onPick = (e: ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) take(f); };
   const onDrop = (e: DragEvent) => { e.preventDefault(); setHover(false); const f = e.dataTransfer.files[0]; if (f) take(f); };
@@ -79,7 +81,8 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
     try {
       let body: PreviewBody;
       if (source) {
-        const when = localIso(source.modifiedAt);
+        // A file with no modified time sends none, so Muse asks when it happened instead of guessing.
+        const when = source.modifiedAt ? localIso(source.modifiedAt) : undefined;
         if (source.kind === "frame") {
           body = { kind: "frame", data_b64: await toBase64(source.blob), file_modified_at: when };
         } else if (source.kind === "audio") {
@@ -109,7 +112,9 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
     setError(null);
     setStep("saving");
     try {
-      const r = outcomeText(await api.commitCapture(toCommitBody(draft, answers)));
+      const result = await api.commitCapture(toCommitBody(draft, answers));
+      const r = outcomeText(result);
+      setGrants(result.grants);
       setOutcome(r);
       setStep("saved");
       if (r.saved) onSaved();
@@ -121,17 +126,14 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
 
   const open_ = draft ? unanswered(draft, answers) : [];
   const declined = Object.values(answers.people).some((p) => p.consented === false);
+  const avail = addAvailability(mode);
   const canAnalyze = (source !== null || note.trim().length > 0) && step === "add";
 
   return (
     <Dialog open={open} onClose={onClose} title="Add a memory" className="add-dialog" initialFocus="[data-autofocus]">
-      {open && mode === "replay" && (
-        <div className="notice warn" role="status">
-          Adding memories needs live Muse. Run with a model key (see docs/LOCAL_SETUP.md) to turn this on.
-        </div>
-      )}
+      {open && !avail.ok && <div className="notice warn" role="status">{avail.message}</div>}
 
-      {open && mode !== "replay" && (step === "add" || step === "reading") && (
+      {open && avail.ok && (step === "add" || step === "reading") && (
         <div className="add-step">
           <CaptureButtons disabled={step === "reading"} onCaptured={onCaptured} />
 
@@ -188,6 +190,14 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
             ))}
           </ul>
 
+          {draft.fields.some((f) => f.key === "when" && f.confidence === "check") && (
+            <label className="add-when">
+              <span className="add-label">Change the time if it is wrong</span>
+              <input type="datetime-local" value={whenInputValue(draft, answers)}
+                     onChange={(e) => setAnswers({ ...answers, when: e.target.value ? `${e.target.value}:00` : undefined })} />
+            </label>
+          )}
+
           {draft.questions.length > 0 && <h3>A few questions</h3>}
           {draft.questions.map((q) => {
             if (q.kind === "consent" && q.ref === answers.ownerSpeaker) return null;
@@ -215,6 +225,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
       {open && step === "saved" && outcome && (
         <div className="add-step" role="status">
           <div className={`notice ${outcome.saved ? "info" : "warn"}`}>{outcome.text}</div>
+          {outcome.saved && grants.length > 0 && <WithdrawCodes grants={grants} />}
           <div className="add-actions">
             <button type="button" className="btn" onClick={reset}>Add another</button>
             <button type="button" className="btn primary" data-autofocus onClick={onClose}>Done</button>
@@ -222,6 +233,29 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** Each consent record made by this upload, with the code that withdraws it. Shown once; the server keeps only a hash. */
+function WithdrawCodes({ grants }: { grants: CommitResult["grants"] }) {
+  const copy = (text: string) => { try { void navigator.clipboard?.writeText(text); } catch { /* the code is on screen */ } };
+  return (
+    <div className="add-codes">
+      <h3>Withdrawing consent later</h3>
+      <p className="small muted">
+        Each person has a consent record. Keep its code: it is shown only now, and it is what lets that person
+        withdraw their consent and have what rests on it forgotten.
+      </p>
+      <ul>
+        {grants.map((g) => (
+          <li key={g.grant_id}>
+            <span><strong>{g.person === "me" ? "You" : g.person}</strong> <span className="small muted">{g.grant_id}</span></span>
+            <code>{g.revocation_token}</code>
+            <button type="button" className="btn small" onClick={() => copy(g.revocation_token)} aria-label={`Copy the code for ${g.person}`}>Copy</button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  captureSupport, describeMediaError, MAX_SECONDS, pickRecorderMime, type CaptureKind,
+  captureSupport, describeMediaError, MAX_SECONDS, pickRecorderMime, startGuard, type CaptureKind,
 } from "../utils/capture";
 
 export type Captured = { kind: CaptureKind; blob: Blob; name: string };
@@ -41,6 +41,7 @@ export function CaptureButtons({ disabled, onCaptured }: Props) {
   const raf = useRef<number>(0);
   const audioCtx = useRef<AudioContext | null>(null);
   const reviewUrl = useRef<string | null>(null);
+  const guard = useRef(startGuard());
 
   const env = {
     isSecureContext: typeof window !== "undefined" && window.isSecureContext,
@@ -69,7 +70,9 @@ export function CaptureButtons({ disabled, onCaptured }: Props) {
   }, []);
 
   useEffect(() => () => {
-    recorder.current?.state === "recording" && recorder.current.stop();
+    guard.current.cancel();                  // a permission prompt that resolves after this must not keep the camera
+    if (recorder.current) recorder.current.onstop = null;
+    if (recorder.current?.state === "recording") recorder.current.stop();
     release();
     if (reviewUrl.current) URL.revokeObjectURL(reviewUrl.current);
   }, [release]);
@@ -107,9 +110,11 @@ export function CaptureButtons({ disabled, onCaptured }: Props) {
     dropReview();
     setKind(k);
     setPhase("starting");
+    const mine = guard.current.begin();
     try {
       const s = await navigator.mediaDevices.getUserMedia(
         k === "voice" ? { audio: true } : { video: { facingMode: face }, audio: k === "video" });
+      if (!guard.current.isCurrent(mine)) { s.getTracks().forEach((t) => t.stop()); return; }
       stream.current = s;
       if (k !== "voice" && video.current) {
         video.current.srcObject = s;
@@ -118,6 +123,7 @@ export function CaptureButtons({ disabled, onCaptured }: Props) {
       if (k === "voice") meter(s);
       setPhase("live");
     } catch (e) {
+      if (!guard.current.isCurrent(mine)) return;
       release();
       setKind(null);
       setPhase("idle");
@@ -126,6 +132,7 @@ export function CaptureButtons({ disabled, onCaptured }: Props) {
   };
 
   const cancel = () => {
+    guard.current.cancel();
     if (recorder.current?.state === "recording") { recorder.current.onstop = null; recorder.current.stop(); }
     release();
     dropReview();

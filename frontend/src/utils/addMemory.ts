@@ -1,6 +1,6 @@
 // Pure helpers for the Add memory dialog: what a file is, which questions are still open, and
 // the body to send when the person presses Save. No DOM here, so all of it is unit tested.
-import type { Answers, Draft } from "../api/types";
+import type { Answers, Draft, LlmMode } from "../api/types";
 
 export type FileKind = "frame" | "audio" | "video";
 
@@ -73,4 +73,16 @@ export function localIso(ms: number): string {
   const d = new Date(ms);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** Adding memories sends data to Muse, so it runs only on the live client (record mode would cache transcripts). */
+export function addAvailability(mode: LlmMode | undefined): { ok: true } | { ok: false; message: string } {
+  if (mode === "live") return { ok: true };
+  if (mode === undefined) return { ok: false, message: "Checking how the app is running…" };
+  return { ok: false, message: `Adding memories needs live Muse, and this app is in ${mode} mode. Run with a model key (see docs/LOCAL_SETUP.md) to turn this on.` };
+}
+
+/** The value for the "when" box: the person's own answer, else what Muse or the file gave, to the minute. */
+export function whenInputValue(draft: Draft, a: AnswerState): string {
+  return (a.when ?? draft.captured_at ?? "").slice(0, 16);
 }

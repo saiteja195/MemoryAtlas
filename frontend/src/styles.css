@@ -671,3 +671,9 @@ dialog.add-dialog { inline-size: min(560px, calc(100vw - 32px)); }
   dialog.add-dialog { inline-size: 100vw; max-inline-size: 100vw; max-block-size: 100dvh; margin: 0; border-radius: 0; }
   .add-actions .btn { flex: 1; }
 }
+.add-when { display: grid; gap: 6px; }
+.add-when input { inline-size: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; }
+.add-codes { display: grid; gap: 8px; }
+.add-codes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.add-codes li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; }
+.add-codes code { flex: 1 1 12ch; min-inline-size: 0; overflow-wrap: anywhere; }

@@ -50,3 +50,13 @@ const MIMES = {
 export function pickRecorderMime(isSupported: (mime: string) => boolean, kind: "voice" | "video"): string | undefined {
   return MIMES[kind].find(isSupported);
 }
+
+/**
+ * getUserMedia can resolve long after the person gave up (Cancel, or the dialog closing, while the
+ * permission prompt was open). A start is only current until the next start or a cancel; a stale one
+ * must stop the stream it receives, or the camera light stays on.
+ */
+export function startGuard() {
+  let n = 0;
+  return { begin: () => ++n, cancel: () => { n++; }, isCurrent: (id: number) => id === n };
+}

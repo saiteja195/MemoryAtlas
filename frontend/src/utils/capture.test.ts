@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureSupport, describeMediaError, MAX_SECONDS, pickRecorderMime } from "./capture";
+import { captureSupport, describeMediaError, MAX_SECONDS, pickRecorderMime, startGuard } from "./capture";
 
 const ok = { isSecureContext: true, hasMediaDevices: true, hasMediaRecorder: true };
 
@@ -52,5 +52,26 @@ describe("limits and formats", () => {
   });
   it("returns undefined when nothing is supported", () => {
     expect(pickRecorderMime(() => false, "video")).toBeUndefined();
+  });
+});
+
+describe("startGuard", () => {
+  it("treats the latest start as current", () => {
+    const g = startGuard();
+    const a = g.begin();
+    expect(g.isCurrent(a)).toBe(true);
+  });
+  it("a cancel makes a pending start stale, so its stream must be stopped when it arrives", () => {
+    const g = startGuard();
+    const pending = g.begin();
+    g.cancel();                       // Cancel pressed, or the dialog closed, while the permission prompt was open
+    expect(g.isCurrent(pending)).toBe(false);
+  });
+  it("a newer start makes the older one stale", () => {
+    const g = startGuard();
+    const first = g.begin();
+    const second = g.begin();
+    expect(g.isCurrent(first)).toBe(false);
+    expect(g.isCurrent(second)).toBe(true);
   });
 });

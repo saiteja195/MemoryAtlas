@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Draft, Question } from "../api/types";
-import { classifyFile, localIso, maxBytes, toCommitBody, unanswered, type AnswerState } from "./addMemory";
+import { addAvailability, classifyFile, localIso, maxBytes, toCommitBody, unanswered, whenInputValue, type AnswerState } from "./addMemory";
 
 const file = (name: string, type: string) => ({ name, type });
 
@@ -115,5 +115,35 @@ describe("localIso", () => {
   });
   it("pads single digits", () => {
     expect(localIso(new Date(2026, 0, 5, 3, 4, 5).getTime())).toBe("2026-01-05T03:04:05");
+  });
+});
+
+describe("addAvailability", () => {
+  it("is available only in live mode", () => {
+    expect(addAvailability("live")).toEqual({ ok: true });
+  });
+  it("explains replay and record mode", () => {
+    for (const mode of ["replay", "record"] as const) {
+      const r = addAvailability(mode);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.message).toMatch(/live/i);
+    }
+  });
+  it("waits while the mode is still unknown", () => {
+    const r = addAvailability(undefined);
+    expect(r.ok === false && r.message).toMatch(/checking/i);
+  });
+});
+
+describe("whenInputValue", () => {
+  const d = (captured_at: string | null) => draft([], { captured_at });
+  it("shows the person's own answer first", () => {
+    expect(whenInputValue(d("2026-10-30T09:00:00"), { when: "2026-10-28T08:15:00", people: {} })).toBe("2026-10-28T08:15");
+  });
+  it("falls back to the time Muse or the file gave, trimmed to minutes", () => {
+    expect(whenInputValue(d("2026-10-30T09:00:00"), { people: {} })).toBe("2026-10-30T09:00");
+  });
+  it("is empty when nothing is known", () => {
+    expect(whenInputValue(d(null), { people: {} })).toBe("");
   });
 });

@@ -84,8 +84,8 @@ section under it. The header always shows the model mode and **Raw media kept: 0
 
 ### Adding your own memories
 
-Press **Add memory** in the header. It needs **live mode** (a model key); in replay mode the dialog says so and
-stays off.
+Press **Add memory** in the header. It needs **live mode** (a model key). In replay or record mode the dialog says
+so and stays off, because those modes cache model responses, including transcripts of people who might say no.
 
 - **What you can add:** a photo (JPEG or PNG), a voice recording, a video, or a typed note. You can drop or pick a
   file, or capture one with the device: **Take photo**, **Record voice**, **Record video**. Voice is limited to
@@ -96,7 +96,10 @@ stays off.
   whether anyone else in it agreed to be in your Atlas. Nothing is stored until you press **Save to Atlas**.
 - **Consent is decided by code, not by the model.** If anyone else is in a recording or picture, you must say
   whether they agreed. A "no" means the whole memory is dropped and no consent record is created. A person
-  who agrees gets their own revocable consent grant, like in the demo.
+  who agrees gets their own consent grant. After saving, the page shows each grant's **withdrawal code once**;
+  keep it. To withdraw later, call `POST /consent/grants/<grant id>/revoke` with `{"token": "<code>"}`.
+  A photo's time comes from its metadata when it has any; otherwise it is the file's date, marked *Check*, and you
+  can change it before saving.
 - **Video** is split in your browser into up to four frames plus its audio track; each frame goes to Muse vision
   and the audio to Voice Transcribe. Audio is converted to mono 16-bit WAV in the browser, because that is what
   the speech service accepts. The original photo, audio or video is never stored (**Raw media kept** stays 0 B).
