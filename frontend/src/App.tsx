@@ -25,6 +25,8 @@ import { GraphView, type GraphHandle } from "./components/GraphView";
 import { Header, type Page } from "./components/Header";
 import { Dashboard } from "./components/Dashboard";
 import { useTheme } from "./hooks/useTheme";
+import { useDay } from "./hooks/useDay";
+import { useAssistant } from "./hooks/useAssistant";
 import { HowItWorks } from "./components/HowItWorks";
 import { Welcome } from "./components/Welcome";
 import { Legend } from "./components/Legend";
@@ -106,14 +108,13 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   const [focus, setFocus] = useState<string[] | null>(null);
   const [evidence, setEvidence] = useState<string[] | null>(null);
   const [tab, setTab] = useState<Tab>("ask");
-  const [qas, setQas] = useState<QA[]>([]);
-  const [asking, setAsking] = useState(false);
   const [simulate, setSimulate] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
   const [page, setPage] = useState<Page>("dashboard");
   const theme = useTheme();
-  const qaId = useRef(0);
+  // One day and one conversation for every page: the dashboard, the Atlas and the assistant read these.
+  const dayState = useDay(atlas.dataKey);
 
   // Theme: the canvas needs real colour strings, so re-read them when the system theme flips.
   useEffect(() => {
@@ -204,25 +205,19 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   }, [atlas.pulse]);
 
   // --- actions ----------------------------------------------------------------------------------
-  const ask = useCallback(async (question: string) => {
-    const id = ++qaId.current;
-    setTab("ask");
-    setAsking(true);
-    try {
-      const a = await api.ask(question);
-      setQas((q) => [{ id, question, answer: a }, ...q]);
+  const assistant = useAssistant(dayState.day, {
+    onAnswer: (a) => {
       setSelection(null);
       setScrubAt(null);
       setFocus(a.cited_claim_ids.length ? a.cited_claim_ids : null);
       if (a.cited_claim_ids.length) setMode("entities");
       announce(`${a.status === "abstained" ? "No record." : "Answer."} ${a.answer}`);
-    } catch (e) {
-      const err = e instanceof ApiError ? e : null;
-      setQas((q) => [{ id, question, error: { text: e instanceof Error ? e.message : String(e), notRecorded: !!err?.isNotRecorded } }, ...q]);
-    } finally {
-      setAsking(false);
-    }
-  }, [announce]);
+    },
+  });
+  const ask = useCallback(async (question: string) => {
+    setTab("ask");
+    await assistant.ask(question);
+  }, [assistant.ask]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const cite = (claimId: string) => {
     setMode("entities");
@@ -248,7 +243,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
 
   const reset = async () => {
     await atlas.reset();
-    setQas([]); setSelection(null); setFocus(null); setEvidence(null); setScrubAt(null);
+    assistant.clear(); setSelection(null); setFocus(null); setEvidence(null); setScrubAt(null);
     setPlaying(false); setEpisode(null);
   };
 
@@ -372,7 +367,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
         <aside className="side" aria-label="Ask and consent">
           <TabBar tab={tab} onTab={setTab} />
           <div role="tabpanel" id="panel-ask" aria-labelledby="tab-ask" hidden={tab !== "ask"} tabIndex={0}>
-            <AskPanel qas={qas} asking={asking} forgotten={forgotten} mode={atlas.health?.llm_mode}
+            <AskPanel qas={assistant.turns} asking={assistant.asking} forgotten={forgotten} mode={atlas.health?.llm_mode}
                       onAsk={(q) => void ask(q)} onCite={cite} onWhy={why} />
           </div>
           <div role="tabpanel" id="panel-facts" aria-labelledby="tab-facts" hidden={tab !== "facts"} tabIndex={0}>

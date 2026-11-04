@@ -100,6 +100,8 @@ export type Answer = {
   steps: number;
   checks: string[];
   cached: boolean;
+  /** Set when the answer came from the models' usage or the day's coverage rather than from memories. */
+  cited_tools?: string[];
 };
 
 export type Provenance = ClaimView & {
@@ -270,4 +272,33 @@ export type Insights = {
   days: string[];
   coverage: Coverage | null;
   usage: UsageSummary;
+  todos_open: number;
+};
+
+/** One saved message of the conversation, as `GET /chat` returns it (oldest first). */
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  /** The day the question was about (YYYY-MM-DD). */
+  as_of: string | null;
+  status: "answered" | "partial" | "abstained" | null;
+  cited_claim_ids: string[];
+  /** Only the memories that may still be read; a forgotten one is gone. */
+  citations: ClaimView[];
+  cited_tools: string[];
+  redacted: boolean;
+};
+
+export type TodoState = "open" | "done" | "dismissed";
+export type Todo = {
+  claim_id: string;
+  kind: "promise" | "request";
+  /** The person's own words. */
+  text: string;
+  who: string | null;
+  when: string | null;
+  source_label: string;
+  state: TodoState;
+  citations: ClaimView[];
 };

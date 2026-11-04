@@ -2,16 +2,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Answer, LlmMode } from "../api/types";
 import { clock } from "../utils/graph";
 import { followUps, oldestFirst, PHASES, phaseAt } from "../utils/chat";
+import type { Turn } from "../utils/assistant";
 import { prefersReducedMotion } from "../utils/theme";
 import { EvidenceChip } from "./Badges";
 import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "../utils/suggest";
 
-export type QA = {
-  id: number;
-  question: string;
-  answer?: Answer;
-  error?: { text: string; notRecorded: boolean };
-};
+/** One question with its answer: the thread is a list of these, newest first. */
+export type QA = Turn;
 
 type Props = {
   qas: QA[];
