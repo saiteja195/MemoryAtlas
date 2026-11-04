@@ -117,7 +117,9 @@ select, input[type="text"] {
 /* ------------------------------------------------------------------------------------------
    Layout
    ------------------------------------------------------------------------------------------ */
-.app { display: grid; grid-template-rows: auto 1fr; min-block-size: 100%; }
+/* The assistant launcher is fixed in the bottom-right corner (16px in, about 43px tall). Leave room under the page so the last
+   thing on it, such as the Background activity panel and its Review button, scrolls clear of the launcher. */
+.app { display: grid; grid-template-rows: auto 1fr; min-block-size: 100%; padding-block-end: 76px; }
 .header {
   position: sticky; inset-block-start: 0; z-index: 20;
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px clamp(12px, 2vw, 24px);
