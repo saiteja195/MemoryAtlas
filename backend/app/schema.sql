@@ -99,7 +99,9 @@ CREATE TABLE IF NOT EXISTS answer_cache (
   question_hash TEXT PRIMARY KEY, answer_json TEXT NOT NULL, claim_ids TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS chat_messages (
   msg_id TEXT PRIMARY KEY, role TEXT NOT NULL, text TEXT NOT NULL,
-  claim_ids TEXT NOT NULL DEFAULT '[]', redacted INTEGER NOT NULL DEFAULT 0);
+  claim_ids TEXT NOT NULL DEFAULT '[]', redacted INTEGER NOT NULL DEFAULT 0,
+  -- The day the question was asked about, the answer's status, and the stats tools it cited.
+  as_of TEXT, status TEXT, cited_tools TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS forgetting_receipts (
   receipt_id TEXT PRIMARY KEY, grant_id TEXT NOT NULL,
   created_at TEXT NOT NULL, report_json TEXT NOT NULL);

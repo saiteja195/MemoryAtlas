@@ -327,6 +327,11 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
+    @app.get("/chat")
+    def chat(rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
+        """The conversation so far, so the assistant shows the same thread after a reload and on every page."""
+        return rt.recall.history()
+
     @app.get("/claims/{claim_id}/provenance")
     def provenance(claim_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         out = rt.recall.provenance(claim_id)

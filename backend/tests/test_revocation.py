@@ -381,7 +381,7 @@ def test_cache_probe_catches_a_stale_answer_chat_and_model_file(forgotten, tmp_p
     demo, terms = forgotten
     c = demo.conn
     c.execute("INSERT INTO answer_cache VALUES ('h','{\"answer\":\"try the al pastor\"}','[]')")
-    c.execute("INSERT INTO chat_messages VALUES ('m1','assistant','best al pastor','[]',0)")
+    c.execute("INSERT INTO chat_messages(msg_id, role, text, claim_ids, redacted) VALUES ('m1','assistant','best al pastor','[]',0)")
     (tmp_path / "x.json").write_text('{"summary": "alex promised the proposal"}')
     r = probes.caches_and_chat(c, terms, str(tmp_path))
     assert r.status == "fail"

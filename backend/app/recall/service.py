@@ -59,7 +59,7 @@ class RecallService:
             # graph version changing (ruling R-C). Such answers are never written, so this is a guard.
             if cached.get("graph_version") == version and not cached.get("cited_tools"):
                 cached["cached"] = True
-                self._log(question, cached)
+                self._log(question, cached, as_of)
                 return cached
         ans: Answer = self.investigator.ask(question, as_of)
         out = ans.as_dict()
@@ -69,7 +69,7 @@ class RecallService:
             self.conn.execute("INSERT OR REPLACE INTO answer_cache(question_hash, answer_json,"
                               " claim_ids) VALUES (?,?,?)",
                               (qhash, json.dumps(out), json.dumps(ans.cited_claim_ids)))
-        self._log(question, out)
+        self._log(question, out, as_of)
         return out
 
     def _citations(self, claim_ids: list[str]) -> list[dict[str, Any]]:
@@ -82,13 +82,26 @@ class RecallService:
                 rows.append(tools.view(r))
         return rows
 
-    def _log(self, question: str, out: dict[str, Any]) -> None:
-        self.conn.execute("INSERT INTO chat_messages(msg_id, role, text, claim_ids) VALUES (?,?,?,?)",
-                          (uuid.uuid4().hex, "user", question, "[]"))
-        self.conn.execute("INSERT INTO chat_messages(msg_id, role, text, claim_ids) VALUES (?,?,?,?)",
-                          (uuid.uuid4().hex, "assistant", out["answer"],
-                           json.dumps(out["cited_claim_ids"])))
+    def _log(self, question: str, out: dict[str, Any], as_of: str | None) -> None:
+        cols = "(msg_id, role, text, claim_ids, as_of, status, cited_tools)"
+        self.conn.execute(f"INSERT INTO chat_messages{cols} VALUES (?,?,?,?,?,?,?)",
+                          (uuid.uuid4().hex, "user", question, "[]", as_of, None, "[]"))
+        self.conn.execute(f"INSERT INTO chat_messages{cols} VALUES (?,?,?,?,?,?,?)",
+                          (uuid.uuid4().hex, "assistant", out["answer"], json.dumps(out["cited_claim_ids"]),
+                           as_of, out["status"], json.dumps(out.get("cited_tools", []))))
         self.conn.commit()
+
+    def history(self) -> list[dict[str, Any]]:
+        """The whole conversation, oldest first. A citation is shown only while its claim may still be read;
+        a message the forgetting code redacted has no citations and its stored text is the redaction notice."""
+        readable = authorized_claim_ids(self.conn)
+        out = []
+        for r in self.conn.execute("SELECT * FROM chat_messages ORDER BY rowid").fetchall():
+            ids = [c for c in json.loads(r["claim_ids"]) if c in readable]
+            out.append({"id": r["msg_id"], "role": r["role"], "text": r["text"], "as_of": r["as_of"],
+                        "status": r["status"], "cited_claim_ids": ids, "citations": self._citations(ids),
+                        "cited_tools": json.loads(r["cited_tools"] or "[]"), "redacted": bool(r["redacted"])})
+        return out
 
     def provenance(self, claim_id: str) -> dict[str, Any]:
         tools = RecallTools(self.conn)

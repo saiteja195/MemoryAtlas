@@ -13,6 +13,7 @@ import sqlite3
 
 def upgrade(conn: sqlite3.Connection) -> None:
     add_grant_expiry_columns(conn)
+    add_chat_columns(conn)
     backfill_source_consents(conn)
     backfill_episode_provenance(conn)
     conn.commit()
@@ -28,6 +29,17 @@ def add_grant_expiry_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE consent_grants ADD COLUMN ended_reason TEXT")
     conn.execute("UPDATE consent_grants SET ended_reason='withdrawn' WHERE revoked_at IS NOT NULL"
                  " AND ended_reason IS NULL")
+
+
+def add_chat_columns(conn: sqlite3.Connection) -> None:
+    """Messages written before the conversation kept its day, status and cited tools get the columns."""
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)")}
+    if "as_of" not in have:
+        conn.execute("ALTER TABLE chat_messages ADD COLUMN as_of TEXT")
+    if "status" not in have:
+        conn.execute("ALTER TABLE chat_messages ADD COLUMN status TEXT")
+    if "cited_tools" not in have:
+        conn.execute("ALTER TABLE chat_messages ADD COLUMN cited_tools TEXT NOT NULL DEFAULT '[]'")
 
 
 def backfill_source_consents(conn: sqlite3.Connection) -> int:
