@@ -18,9 +18,9 @@ log = logging.getLogger(__name__)
 # Full controlled vocabulary (docs/IMPLEMENTATION_PLAN.md section 3).
 PREDICATES = ["observed_at", "located_at", "met_with", "attended", "said", "recommended",
               "committed_to", "has_attribute", "near", "across_from", "part_of_episode",
-              "same_as", "summary_of"]
+              "same_as", "summary_of", "requested"]
 # The subset the extraction step may emit. The rest are written by deterministic code or by
-# the derivation rules in Phase 2.
+# the derivation rules in Phase 2 (`requested` comes from the to-do scan, compiler/todo_scan.py).
 EXTRACTABLE = ("observed_at", "located_at", "met_with", "attended", "said", "recommended",
                "committed_to", "has_attribute", "near", "across_from")
 EntityType = Literal["person", "place", "object", "org", "item"]

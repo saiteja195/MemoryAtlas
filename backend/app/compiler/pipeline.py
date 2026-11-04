@@ -12,11 +12,15 @@ from .episodes import bind_episode
 from .extract import ExtractedClaim, ExtractionRejected, extract_claims
 from .resolve import EntityResolver
 from .store import ClaimWriter
+from .todo_scan import scan_todos
 
 log = logging.getLogger(__name__)
 
 DIRECT_CONFIDENCE = 0.95    # direct_observation = model confidence x 0.95
 CONFIRMED_CONFIDENCE = 0.99
+# What the to-do scan reads: conversation segments and typed notes (a note is stored as a
+# `user_confirmation` source). Never photos, calendar entries or location fixes.
+TODO_SCAN_KINDS = ("transcript_segment", "user_confirmation")
 
 
 @dataclass
@@ -37,7 +41,8 @@ class Compiler:
         self.writer = ClaimWriter(conn)
         self.deriver = Deriver(conn, llm, owner)
 
-    def compile(self, obs: Observation) -> CompileResult:
+    def compile(self, obs: Observation, todo_scan: bool = True) -> CompileResult:
+        """`todo_scan=False` skips the promise-and-request pass (a correction is not scanned)."""
         res = CompileResult(obs.source_id)
         self.resolver.ensure_owner()
         res.episode_id = bind_episode(self.conn, obs)
@@ -53,6 +58,11 @@ class Compiler:
             res.rejected = str(e)
             self.conn.commit()   # the episode binding stays; the source has no claims
             return res
+        if todo_scan and obs.kind in TODO_SCAN_KINDS:
+            # A second, optional pass. It returns [] when the model is unavailable or keeps
+            # replying out of schema, so it never rejects the observation. Identical claims
+            # merge in the store, so a promise both passes found is stored once.
+            extracted = [*extracted, *scan_todos(self.llm, obs, known)]
 
         mentioned: dict[str, float] = {}
         subjects: set[str] = set()
@@ -111,7 +121,7 @@ class Compiler:
             evidence, conf = "direct_observation", round(c.confidence * DIRECT_CONFIDENCE, 3)
         cid, _ = self.writer.write(
             subject_id=subject_id, predicate=c.predicate, object_id=object_id,
-            object_value=None if object_id else c.value, event_time=event_time,
+            object_value=_object_value(c, object_id), event_time=event_time,
             evidence_type=evidence, confidence=conf, episode_id=episode_id, text=c.text.strip(),
             source_id=obs.source_id,
             valid_from=event_time if c.predicate == "located_at" else None)
@@ -127,3 +137,11 @@ class Compiler:
             confidence=round(conf * DIRECT_CONFIDENCE, 3), episode_id=episode_id,
             text=f"{name} was part of {episode_name}", source_id=obs.source_id)
         return cid
+
+
+def _object_value(c: ExtractedClaim, object_id: str | None) -> str | None:
+    """Literal text is kept only when there is no object entity, except for a request, which
+    needs both: who was asked (the object) and what they were asked to do (the value)."""
+    if object_id is None or c.predicate == "requested":
+        return c.value
+    return None

@@ -31,7 +31,9 @@ class MemoryEngine:
         try:
             with usage_purpose("read_memory", cap.captured_at[:10]):
                 for res in self.gateway.ingest(cap):
-                    compiled = self.compiler.compile(res.observation) if res.observation else None
+                    # A correction is a confirmation of one fact, not a new conversation: no to-do scan.
+                    compiled = (self.compiler.compile(res.observation, todo_scan=res.ref != "correction")
+                                if res.observation else None)
                     out.append(Ingested(res, compiled))
         finally:
             # Usage rows are held back while the request is mid-transaction; this is where they go out.

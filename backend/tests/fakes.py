@@ -64,6 +64,7 @@ class FakeLLM:
         self.transcribed: list[bytes] = []
         self.described: list[bytes] = []
         self.extraction_replies: list[Any] | None = None   # force replies, in order
+        self.todo_replies: list[Any] = []      # scripted to-do scan replies (an exception is raised)
 
     def complete_json(self, system, user, schema):
         self.calls.append((system, user))
@@ -79,6 +80,11 @@ class FakeLLM:
         if system.startswith("Write one factual paragraph"):
             return {"summary": f"Summary of {user.count(chr(10)) + 1} claims: "
                             + user.replace("\n", " ")[:120]}
+        if system.startswith("You find promises and requests"):
+            reply = self.todo_replies.pop(0) if self.todo_replies else {"claims": []}
+            if isinstance(reply, Exception):
+                raise reply
+            return reply
         if self.extraction_replies is not None:
             return self.extraction_replies.pop(0)
         text = json.loads(user.split("\n\nYour previous")[0])["observation"]["text"]
