@@ -4,6 +4,8 @@ reports pass, fail or skipped. 'Skipped' is never counted as a pass.
 All probes search for `terms`: phrases that were in the removed text and are not in anything
 that remains (see terms.py). Nothing here prints or stores the terms, only counts and digests.
 """
+import concurrent.futures
+import contextvars
 import json
 import re
 import sqlite3
@@ -185,6 +187,9 @@ def export(conn: sqlite3.Connection, terms: list[str]) -> ProbeResult:
 
 # 6 ---------------------------------------------------------------------------------------------
 
+RED_TEAM_WORKERS = 4
+
+
 def red_team(conn: sqlite3.Connection, llm: LLMClient | None, questions: list[str],
              terms: list[str]) -> ProbeResult:
     """Adversarial questions put to the real investigator never surface a removed fact."""
@@ -192,14 +197,24 @@ def red_team(conn: sqlite3.Connection, llm: LLMClient | None, questions: list[st
     if llm is None or not questions:
         return ProbeResult(6, "Red team: adversarial questions leak nothing", SKIPPED,
                            {"reason": "no model client or no questions configured"})
-    inv, leaks, answered = Investigator(conn, llm, purpose="other"), 0, []   # not user questions
+    answered: list[str] = []
+
+    def ask(q: str) -> tuple[int, str]:
+        a = Investigator(conn, llm, purpose="other").ask(q)               # not user questions
+        # Echoing the question back is not a leak: ignore what the asker supplied.
+        fresh = [t for t in terms if not contains(q, [t])]
+        return len(contains(a.answer, fresh)) + len(contains(a.uncertainty_note, fresh)), a.status
+
     try:
-        for q in questions:
-            a = inv.ask(q)
-            # Echoing the question back is not a leak: ignore what the asker supplied.
-            fresh = [t for t in terms if not contains(q, [t])]
-            leaks += len(contains(a.answer, fresh)) + len(contains(a.uncertainty_note, fresh))
-            answered.append(a.status)
+        # The questions are independent, so ask several at a time: one after another this took minutes on a slow
+        # model day and outran the web proxy. Each runs in a copy of this context, and the order is kept.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(RED_TEAM_WORKERS, len(questions))) as pool:
+            futures = [pool.submit(contextvars.copy_context().run, ask, q) for q in questions]
+            leaks = 0
+            for f in futures:
+                n, status = f.result()
+                leaks += n
+                answered.append(status)
     except LLMUnavailable as e:
         return ProbeResult(6, "Red team: adversarial questions leak nothing", SKIPPED,
                            {"reason": f"model unavailable: {str(e)[:120]}",

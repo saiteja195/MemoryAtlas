@@ -21,6 +21,7 @@ export function ConsentDevice({ grantId, onRevoke, onDone }: Props) {
   const [grant, setGrant] = useState<Grant | null>(null);
   const [step, setStep] = useState<"ask" | "pin" | "working" | "done">("ask");
   const [pin, setPin] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
@@ -29,12 +30,13 @@ export function ConsentDevice({ grantId, onRevoke, onDone }: Props) {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [grantId]);
 
-  const confirm = async () => {
-    if (!grant?.demo_token) return;
+  const confirm = async (given?: string) => {
+    const token = grant?.demo_token ?? given;
+    if (!grant || !token) return;
     setStep("working");
     setError(null);
     try {
-      const r = await onRevoke(grant.grant_id, grant.demo_token);
+      const r = await onRevoke(grant.grant_id, token);
       setReceipt(r);
       setStep("done");
       onDone?.(r);
@@ -48,6 +50,8 @@ export function ConsentDevice({ grantId, onRevoke, onDone }: Props) {
     return <div className="phone">{error ? <p className="notice error" role="alert">{error}</p> : <progress aria-label="Loading" />}</div>;
   }
   const who = personName(grant.grantor);
+  // A consent given with an upload has no demo code: the person keeps the code shown when it was saved.
+  const needsCode = !grant.demo_token;
 
   return (
     <div className="phone" aria-label={`${who}'s phone (simulated)`}>
@@ -74,12 +78,22 @@ export function ConsentDevice({ grantId, onRevoke, onDone }: Props) {
             <button type="button" className="btn danger" onClick={() => setStep("pin")}>Withdraw my consent…</button>
           )}
           {(step === "pin" || step === "working") && (
-            <form onSubmit={(e) => { e.preventDefault(); if (pin === DEMO_PIN) void confirm(); else setError("That PIN is not right."); }}>
-              <label htmlFor="pin" className="small">Unlock to confirm <span className="muted">(demo PIN: {DEMO_PIN})</span></label>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (needsCode) void confirm(code.trim());
+              else if (pin === DEMO_PIN) void confirm();
+              else setError("That PIN is not right.");
+            }}>
+              {needsCode
+                ? <label htmlFor="code" className="small">Enter the withdrawal code that was shown when this was saved</label>
+                : <label htmlFor="pin" className="small">Unlock to confirm <span className="muted">(demo PIN: {DEMO_PIN})</span></label>}
               <div className="pin">
-                <input id="pin" type="text" inputMode="numeric" autoComplete="off" maxLength={4} value={pin}
-                       onChange={(e) => setPin(e.target.value)} data-autofocus disabled={step === "working"} />
-                <button type="submit" className="btn danger" disabled={step === "working" || pin.length < 4}>
+                {needsCode
+                  ? <input id="code" type="text" autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)}
+                           data-autofocus disabled={step === "working"} />
+                  : <input id="pin" type="text" inputMode="numeric" autoComplete="off" maxLength={4} value={pin}
+                           onChange={(e) => setPin(e.target.value)} data-autofocus disabled={step === "working"} />}
+                <button type="submit" className="btn danger" disabled={step === "working" || (needsCode ? code.trim().length < 6 : pin.length < 4)}>
                   {step === "working" ? "Forgetting…" : "Withdraw"}
                 </button>
               </div>

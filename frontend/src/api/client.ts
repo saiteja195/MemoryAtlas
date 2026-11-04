@@ -103,6 +103,9 @@ export const api = {
   correct: (claimId: string, body: { text?: string; retract?: boolean; at?: string }) =>
     post<{ corrected: string; replacement: string | null; also_superseded: string[] }>(
       `/claims/${encodeURIComponent(claimId)}/correct`, body),
+  /** The signed-in owner withdraws their own consent: no code needed. */
+  withdraw: (grantId: string, redTeam = true) =>
+    post<Receipt>(`/consent/grants/${encodeURIComponent(grantId)}/withdraw?red_team=${redTeam}`),
   revoke: (grantId: string, token: string, redTeam = true) =>
     post<Receipt>(`/consent/grants/${encodeURIComponent(grantId)}/revoke?red_team=${redTeam}`, { token }),
 };

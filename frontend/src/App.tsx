@@ -111,6 +111,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   const [evidence, setEvidence] = useState<string[] | null>(null);
   const [tab, setTab] = useState<Tab>("facts");
   const [simulate, setSimulate] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState<{ grantId: string; busy: boolean; error: string | null } | null>(null);
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
   const [page, setPage] = useState<Page>("dashboard");
@@ -384,7 +385,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
             <FactsPanel view={view} selectedClaim={selection?.kind === "claim" ? selection.id : null} onSelect={cite} />
           </div>
           <div role="tabpanel" id="panel-consent" aria-labelledby="tab-consent" hidden={tab !== "consent"} tabIndex={0}>
-            <ConsentPanel grants={atlas.grants} onSimulate={setSimulate} onExpire={(id) => void atlas.expire(id)} onReceipt={(id) => void openReceipt(id)} />
+            <ConsentPanel grants={atlas.grants} onSimulate={setSimulate} onWithdraw={(id) => setWithdrawing({ grantId: id, busy: false, error: null })} onExpire={(id) => void atlas.expire(id)} onReceipt={(id) => void openReceipt(id)} busy={atlas.busy} />
           </div>
         </aside>
       </div>
@@ -400,6 +401,23 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
       <HowItWorks open={help} onClose={() => setHelp(false)} />
       <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />
       <ReceiptDialog receipt={atlas.receipt} onClose={atlas.closeReceipt} />
+      <Dialog open={withdrawing !== null} onClose={() => { if (!withdrawing?.busy) setWithdrawing(null); }} title="Withdraw your consent?" initialFocus="[data-autofocus]">
+        {withdrawing && (
+          <div className="add-step">
+            <p>MemoryAtlas will forget every memory that rested only on this consent, and keep the ones other sources still support. You will get a receipt that proves it. Checking can take a minute or two.</p>
+            {withdrawing.error && <p className="notice error" role="alert">{withdrawing.error}</p>}
+            {withdrawing.busy && <progress aria-label="Forgetting and checking" />}
+            <div className="add-actions">
+              <button type="button" className="btn ghost" disabled={withdrawing.busy} onClick={() => setWithdrawing(null)}>Cancel</button>
+              <button type="button" className="btn danger" data-autofocus disabled={withdrawing.busy} onClick={async () => {
+                setWithdrawing({ ...withdrawing, busy: true, error: null });
+                try { await atlas.withdraw(withdrawing.grantId); setWithdrawing(null); }
+                catch (e) { setWithdrawing({ ...withdrawing, busy: false, error: e instanceof Error ? e.message : String(e) }); }
+              }}>{withdrawing.busy ? "Forgetting…" : "Withdraw and forget"}</button>
+            </div>
+          </div>
+        )}
+      </Dialog>
       <Dialog open={simulate !== null} onClose={() => setSimulate(null)} title="Simulated device" initialFocus="[data-autofocus]">
         {simulate && (
           <ConsentDevice

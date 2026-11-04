@@ -622,3 +622,32 @@ def test_the_grants_list_says_which_receipt_belongs_to_a_revoked_grant(client):
     assert after[a["grant_id"]]["receipt_id"] == receipt["receipt_id"]
     assert after[a["grant_id"]]["revoked_at"]
     assert [g for g in after.values() if g["grant_id"] != a["grant_id"] and g["receipt_id"]] == []
+
+
+def test_red_team_questions_are_asked_at_the_same_time(forgotten):
+    """Forgetting ends with a dozen questions to the model. One after another that took minutes on a slow day and
+    outran the web proxy, so they run several at a time; the answers still line up with the questions."""
+    import threading
+    import time
+    demo, terms = forgotten
+    qs = [f"Question {i}?" for i in range(6)]
+
+    class Slow(FakeLLM):
+        def __init__(self):
+            super().__init__()
+            self.lock, self.active, self.peak = threading.Lock(), 0, 0
+
+        def complete_json(self, system, user, schema=None, *a, **k):
+            with self.lock:
+                self.active += 1
+                self.peak = max(self.peak, self.active)
+            time.sleep(0.15)
+            with self.lock:
+                self.active -= 1
+            return {"action": "final", "status": "answered" if "Question 3?" in user else "abstained",
+                    "answer": "No record.", "cited_claim_ids": [], "uncertainty_note": ""}
+
+    llm = Slow()
+    r = probes.red_team(demo.conn, llm, qs, terms)
+    assert llm.peak >= 3
+    assert r.status in ("pass", "fail") and r.detail["questions"] == 6 and len(r.detail["statuses"]) == 6
