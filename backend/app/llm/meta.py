@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 import httpx
 
+from ..tracking import parse_boxes
 from .base import LLMUnavailable
 
 _RETRY_STATUS = {429, 500, 502, 503, 504}
@@ -28,11 +29,12 @@ class MetaClient:
     mode = "live"
 
     def __init__(self, base_url: str, api_key: str, model: str,
-                 asr_model: str = "muse-voice-transcribe-1.0",
+                 asr_model: str = "muse-voice-transcribe-1.0", sam_model: str = "sam-3.1",
                  http: httpx.Client | None = None, attempts: int = 3,
                  sleep: Callable[[float], None] = time.sleep):
         self.base_url = (base_url or "https://api.meta.ai").rstrip("/")
         self.api_key, self.model, self.asr_model = api_key, model or "muse-spark-1.3", asr_model
+        self.sam_model = sam_model
         self._http = http or httpx.Client(timeout=120)
         self._attempts, self._sleep = attempts, sleep
         self._local = threading.local()   # per-thread: the client is shared by overlapping requests
@@ -144,6 +146,20 @@ class MetaClient:
         return self._parse_json(self._responses_text(
             "You describe photos for a memory system. Respond with a single JSON object only.",
             parts))
+
+    # -- objects -----------------------------------------------------------------------------
+
+    def detect_objects(self, image: bytes, phrase: str) -> list[dict[str, int]]:
+        """Boxes for `phrase` in one image, from SAM 3.1. An empty reply means the object is not there. The pixel
+        masks in the reply are dropped here and never leave this method."""
+        mime = "image/png" if image[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
+        url = f"data:{mime};base64,{base64.b64encode(image).decode()}"
+        body = {"model": self.sam_model, "stream": False, "input": [{"role": "user", "content": [
+            {"type": "input_text", "text": phrase}, {"type": "input_image", "image_url": url}]}]}
+        data = self._post("/v1/responses", json=body)
+        text = "".join(c.get("text", "") for item in data.get("output", []) if item.get("type") == "message"
+                       for c in item.get("content", []) if c.get("type") == "output_text")
+        return parse_boxes(text)
 
     # -- speech ------------------------------------------------------------------------------
 

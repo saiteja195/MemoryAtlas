@@ -2,7 +2,7 @@ import base64
 import os
 import re
 import tempfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -20,17 +20,19 @@ from .graph import build_graph
 from .insights.coverage import coverage, memory_days
 from .insights.usage import usage_summary
 from .llm.base import LLMClient, LLMUnavailable
+from .llm.metered import usage_purpose
 from .privacy import clock
-from .privacy.consent import create_grant
+from .privacy.consent import active_grant, create_grant
 from .privacy.export import export_memories
 from .privacy.revocation import BadToken, UnknownGrant
 from .profiles.registry import Registry
-from .profiles.limits import Budget
+from .profiles.limits import Budget, RateLimiter
 from .profiles.routes import client_ip, make_router
 from .profiles.runtime import ProfileRuntime, Runtimes
 from .profiles import snapshots
 from .profiles.session import current_profile, open_runtime, resolve_runtime
 from .todos import count_open, list_todos, set_todo_state
+from .tracking import MAX_FRAMES, MAX_FRAME_BYTES, PhraseError, clean_phrases, follow_objects, perception_for
 
 _DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
@@ -73,6 +75,40 @@ class PreviewBody(BaseModel):
 class CommitBody(BaseModel):
     draft_id: str
     answers: Answers = Field(default_factory=Answers)
+
+
+class TrackBody(BaseModel):
+    """A few evenly spaced frames from a video, and the objects to look for in them. Nothing is stored until the
+    objects have been found, and only words are kept."""
+    frames_b64: list[str] = Field(min_length=1, max_length=MAX_FRAMES)
+    offsets_ms: list[int] = Field(min_length=1, max_length=MAX_FRAMES)
+    phrases: list[str] = Field(min_length=1, max_length=8)
+    clip_start: str
+    duration_ms: int = Field(ge=0, le=24 * 3600 * 1000)
+
+    @field_validator("clip_start")
+    @classmethod
+    def _when(cls, v: str) -> str:
+        try:
+            datetime.fromisoformat(v)
+        except ValueError as e:
+            raise ValueError("clip_start must be a date and time like 2026-10-29T12:42:10") from e
+        return v
+
+    @field_validator("phrases")
+    @classmethod
+    def _words(cls, v: list[str]) -> list[str]:
+        try:
+            return clean_phrases(v)
+        except PhraseError as e:
+            raise ValueError(str(e)) from e
+
+    @field_validator("offsets_ms")
+    @classmethod
+    def _offsets(cls, v: list[int]) -> list[int]:
+        if any(o < 0 for o in v) or v != sorted(v):
+            raise ValueError("offsets_ms must be increasing, from the start of the clip")
+        return v
 
 
 class AskBody(BaseModel):
@@ -326,6 +362,51 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         if job is None:
             raise HTTPException(404, "unknown save")
         return JobBoard.status(job)
+
+    track_limit = app.state.track_limit = RateLimiter(5, 3600.0)      # five videos an hour per profile
+
+    @app.post("/capture/track", status_code=202, dependencies=[Depends(spend)])
+    def capture_track(body: TrackBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        """Opt-in: look for named objects in a video's frames (SAM 3.1, one image at a time) and keep a text note of
+        when each was visible. Runs in the background like a save; poll `GET /capture/commit/jobs/{job_id}`."""
+        if len(body.frames_b64) != len(body.offsets_ms):
+            raise HTTPException(422, "send one offset for each frame")
+        if rt.llm.mode != "live":
+            raise HTTPException(409, "Object tracking needs the live model, and this copy is not connected to it.")
+        try:
+            frames = [base64.b64decode(f, validate=True) for f in body.frames_b64]
+        except ValueError:
+            raise HTTPException(422, "frames must be base64") from None
+        if any(not f or len(f) > MAX_FRAME_BYTES for f in frames):
+            raise HTTPException(422, "each frame must be a JPEG or PNG under 2 MB")
+        if jobs.busy(rt.profile_id):
+            raise HTTPException(409, "Something is already being saved. Wait for it to finish.")
+        if not track_limit.allow(rt.profile_id):
+            raise HTTPException(429, "You have tracked a lot of videos. Try again in a little while.",
+                                headers={"Retry-After": str(int(track_limit.retry_after(rt.profile_id)) + 1)})
+        day = body.clip_start[:10]
+
+        def work() -> dict:
+            with usage_purpose("read_memory", day):
+                objects = follow_objects(rt.llm, frames, body.offsets_ms, body.phrases)
+            found = [o for o in objects if o["found"]]
+            grants: list[dict] = []
+            if found:
+                session = f"upload-{day}"
+                owner = rt.engine.gateway.owner
+                if not active_grant(rt.conn, owner, session):
+                    gid, token = create_grant(rt.conn, rt.settings.revocation_secret, owner, session)
+                    grants.append({"person": owner, "grant_id": gid, "revocation_token": token})
+                with usage_purpose("read_memory", day):
+                    rt.engine.ingest(RawCapture(kind="frame", session_id=session, captured_at=body.clip_start,
+                                                perception=perception_for(objects)))
+            return {"objects": objects, "stored": bool(found), "grants": grants}
+
+        try:
+            job = jobs.start(rt.profile_id, work)
+        except Busy:
+            raise HTTPException(409, "Something is already being saved. Wait for it to finish.") from None
+        return {"job_id": job.job_id}
 
     @app.post("/capture/{kind}", dependencies=[Depends(spend)])
     def capture(kind: str, body: CaptureBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:

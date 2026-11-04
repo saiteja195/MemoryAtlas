@@ -15,6 +15,7 @@ class Settings:
     llm_api_key: str = os.getenv("MODEL_API_KEY", "")
     llm_model: str = os.getenv("META_MODEL", "muse-spark-1.3")
     asr_model: str = os.getenv("META_ASR_MODEL", "muse-voice-transcribe-1.0")
+    sam_model: str = os.getenv("META_SAM_MODEL", "sam-3.1")
     cache_dir: str = os.getenv("MEMORYATLAS_CACHE_DIR", str(ROOT / "fixtures" / "llm_cache"))
     demo_script: str = os.getenv("MEMORYATLAS_DEMO_SCRIPT",
                                  str(ROOT / "fixtures" / "demo_day" / "script.yaml"))

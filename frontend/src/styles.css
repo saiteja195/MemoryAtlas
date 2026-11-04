@@ -607,8 +607,8 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); backdrop-filter: blur(6px); }
 .mini-moments time { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
 .mini-moments span > span { display: block; }
 
-/* The non-modal drawer sits in the page, not the top layer: keep it above the sticky header. */
-dialog.drawer { z-index: 40; }
+/* Evidence opens above the assistant (41), while native modal dialogs keep the top layer. */
+dialog.drawer { z-index: 42; }
 
 /* Ask panel: recorded-question guidance */
 .mode-note { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); }
@@ -656,6 +656,13 @@ dialog.add-dialog { inline-size: min(560px, calc(100vw - 32px)); }
 .add-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .add-file .btn { margin-inline-start: auto; }
 .add-label { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.add-track { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 12px; }
+.add-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.add-track-input { inline-size: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; }
+.add-track-input[aria-invalid="true"] { border-color: var(--warn); }
+.add-track-input:disabled { opacity: 0.55; }
+.warn-text { color: var(--warn); }
+.add-track-found { margin: 0; padding-inline-start: 18px; display: grid; gap: 2px; }
 .add-note { inline-size: 100%; resize: vertical; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; }
 .add-note:disabled { opacity: 0.55; }
 .add-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }

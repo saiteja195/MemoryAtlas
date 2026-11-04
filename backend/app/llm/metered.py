@@ -77,13 +77,18 @@ class MeteredLLM:
         return self._run("vision", "describe_image", (image, prompt),
                          words_in=_words(prompt), images=1)
 
+    def detect_objects(self, image: bytes, phrase: str) -> list[dict[str, int]]:
+        """SAM 3.1: where `phrase` is in one image. Logged as a vision call by its own model, one image each."""
+        return self._run("vision", "detect_objects", (image, phrase), words_in=_words(phrase), images=1, model_key="sam")
+
     def transcribe(self, audio: bytes, keywords: list[str] | None = None) -> list[dict[str, Any]]:
         return self._run("asr", "transcribe", (audio, keywords),
                          words_in=sum(_words(k) for k in keywords or []))
 
     # -- internals ---------------------------------------------------------------------------
 
-    def _run(self, kind: str, method: str, args: tuple, *, words_in: int, images: int = 0) -> Any:
+    def _run(self, kind: str, method: str, args: tuple, *, words_in: int, images: int = 0,
+             model_key: str | None = None) -> Any:
         started, ok, result, miss = time.perf_counter(), 0, None, False
         progress.call_started()
         try:
@@ -100,7 +105,7 @@ class MeteredLLM:
             if not miss:
                 self._note(kind, elapsed / 1000, ok)
                 try:
-                    self._write(self._row(kind, elapsed, ok, result, words_in, images))
+                    self._write(self._row(kind, elapsed, ok, result, words_in, images, model_key))
                 except Exception as e:  # noqa: BLE001  metering must never fail a model call
                     log.warning("could not log model call: %s", type(e).__name__)
 
@@ -117,7 +122,7 @@ class MeteredLLM:
             pass
 
     def _row(self, kind: str, duration_ms: int, ok: int, result: Any,
-             words_in: int, images: int) -> tuple:
+             words_in: int, images: int, model_key: str | None = None) -> tuple:
         # Read the per-call labels first, on this thread, before anything else can overwrite them.
         purpose, memory_day = _purpose.get()
         served = getattr(self._inner, "last_served", "live")
@@ -128,7 +133,7 @@ class MeteredLLM:
             audio_ms = max((int(t.get("end_ms") or 0) for t in turns), default=0)
         else:
             words_out, audio_ms = _result_words(result), 0
-        model = self._models["asr" if kind == "asr" else "text"]
+        model = self._models.get(model_key or ("asr" if kind == "asr" else "text"), self._models["text"])
         return (uuid.uuid4().hex, clock.now_iso(), model, kind, purpose, memory_day, served,
                 duration_ms, ok, images, words_in, words_out, audio_ms,
                 usage["tokens_in"] if usage else None, usage["tokens_out"] if usage else None)
