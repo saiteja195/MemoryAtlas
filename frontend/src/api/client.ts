@@ -1,3 +1,4 @@
+import { youifyDeep } from "../utils/voice";
 import type {
   Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, Todo, TodoState,
 } from "./types";
@@ -39,7 +40,7 @@ async function call<T>(path: string, init?: RequestInit, opts: Options = {}): Pr
     throw new ApiError(res.status, detail, Number.isFinite(wait) && wait > 0 ? wait : undefined);
   }
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  return youifyDeep(await res.json()) as T;
 }
 
 const post = <T,>(path: string, body?: unknown, opts?: Options) =>
