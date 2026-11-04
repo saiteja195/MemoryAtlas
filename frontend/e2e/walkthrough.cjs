@@ -128,7 +128,7 @@ async function audit(page, label) {
   await page.waitForSelector("dialog[open] >> text=Forgetting receipt", { timeout: 20000 });
   check(await page.locator("dialog[open] >> text=7 of 7 checks passed").isVisible(), "the first tab shows the receipt on its own: 7 of 7 checks passed");
   const receipt = await page.locator("dialog[open]").innerText();
-  check(/Me met with Alex/.test(receipt) && /Calendar at 12:30/.test(receipt), "receipt: 'Me met with Alex' is kept because the calendar still supports it");
+  check(/You met with Alex/.test(receipt) && /Calendar at 12:30/.test(receipt), "receipt: 'You met with Alex' is kept because the calendar still supports it");
   check(!/pastor|proposal|Friday/i.test(receipt), "receipt does not repeat anything that was forgotten");
   await audit(page, "receipt dialog open");
   await page.keyboard.press("Escape");

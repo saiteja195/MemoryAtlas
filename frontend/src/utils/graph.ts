@@ -479,9 +479,10 @@ export function factRows(view: Graph): FactRow[] {
     .filter((e) => e.predicate !== "part_of_episode" && e.predicate !== "summary_of")
     .map((e) => ({
       id: e.id,
-      subject: name.get(e.source) ?? e.source,
-      relation: humanPredicate(e.predicate),
-      object: e.target ? name.get(e.target) ?? e.target : e.value ?? "",
+      // The person themself is spoken to: "You were at the cafe", "Alex asked you".
+      subject: e.source === OWNER_ID ? "You" : name.get(e.source) ?? e.source,
+      relation: e.source === OWNER_ID ? humanPredicate(e.predicate).replace(/^was\b/, "were").replace(/^has\b/, "have") : humanPredicate(e.predicate),
+      object: e.target ? (e.target === OWNER_ID ? "you" : name.get(e.target) ?? e.target) : e.value ?? "",
       evidence: evidenceLabel(e.evidence_type),
       status: e.status,
       when: clock(e.event_time),
