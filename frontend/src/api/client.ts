@@ -1,5 +1,5 @@
 import type {
-  Answer, Answers, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Me, Media, PreviewBody, Provenance, Receipt,
+  Answer, Answers, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt,
 } from "./types";
 
 /** An API failure with the server's own explanation, so the UI can say something useful. */
@@ -69,6 +69,8 @@ export const api = {
   status: () => call<DemoStatus>("/demo/status"),
   media: () => call<Media>("/privacy/media"),
   graph: () => call<Graph>("/graph?include=history"),
+  /** Day coverage and model usage; with no day the server picks the latest memory day. */
+  insights: (day?: string) => call<Insights>(day ? `/insights?day=${encodeURIComponent(day)}` : "/insights"),
   grants: () => call<Grant[]>("/consent/grants"),
   demoGrants: () => call<Grant[]>("/demo/grants"),
   receipt: (id: string) => call<Receipt>(`/receipts/${encodeURIComponent(id)}`),
