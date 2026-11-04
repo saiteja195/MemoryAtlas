@@ -52,7 +52,9 @@ class RecallService:
                                 (qhash,)).fetchone()
         if row:
             cached = json.loads(row["answer_json"])
-            if cached.get("graph_version") == version:
+            # An answer built from coverage or usage_stats is never reused: usage changes without the
+            # graph version changing (ruling R-C). Such answers are never written, so this is a guard.
+            if cached.get("graph_version") == version and not cached.get("cited_tools"):
                 cached["cached"] = True
                 self._log(question, cached)
                 return cached
@@ -60,9 +62,10 @@ class RecallService:
         out = ans.as_dict()
         out["citations"] = self._citations(ans.cited_claim_ids)
         out["graph_version"], out["cached"] = version, False
-        self.conn.execute("INSERT OR REPLACE INTO answer_cache(question_hash, answer_json,"
-                          " claim_ids) VALUES (?,?,?)",
-                          (qhash, json.dumps(out), json.dumps(ans.cited_claim_ids)))
+        if not ans.cited_tools:
+            self.conn.execute("INSERT OR REPLACE INTO answer_cache(question_hash, answer_json,"
+                              " claim_ids) VALUES (?,?,?)",
+                              (qhash, json.dumps(out), json.dumps(ans.cited_claim_ids)))
         self._log(question, out)
         return out
 

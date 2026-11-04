@@ -17,6 +17,7 @@ from ..llm.base import LLMClient, LLMUnavailable
 from ..llm.metered import usage_purpose
 from ..privacy.filter import HISTORY, authorized_claim_ids
 from .router import needs_extended
+from .templates import render_coverage, render_usage
 from .tools import RecallTools
 
 MAX_STEPS = 6
@@ -30,6 +31,12 @@ TIME_RE = re.compile(r"\b\d{1,2}:\d{2}\b")
 ORDER_RE = re.compile(r"\b(before|after|earlier|later|first|sooner|prior to|ahead of|preceded|followed)\b", re.I)
 PLACE_RE = re.compile(r"\b(where|left|leave|leaving|still|find|found|located|location|moved|move|put|keep|kept|"
                       r"whereabouts|sighting|last (?:see|saw|seen))\b", re.I)
+# Numbers in an answer that cites a stats tool: clock times as one token, then digit groups (with
+# thousands separators and decimals). Each is normalised so "4,200" == "4200", "3.0" == "3", "9:05" == "09:05".
+CLOCK_RE = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?!\d)")
+NUMBER_RE = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
+# The tools whose result may be cited instead of a claim, and the sentence that replaces a twice-failed answer.
+STATS_TEMPLATES = {"coverage": render_coverage, "usage_stats": render_usage}
 
 SYSTEM = """You answer questions about the user's own day using a graph of remembered claims.
 You can only learn facts by calling tools. Every step, reply with ONE JSON object, either
@@ -85,7 +92,13 @@ More tools:
  coverage(time_from?, time_to?)      the spans the memory covers and the gaps, within one day
  usage_stats(day?)                   how much the models read and answered (counts only)
  uncertain_claims()                  disputed, partial and low-confidence claims
-- If a tool is unknown, do not guess: finish with status "abstained" and say you have no record."""
+- If a tool is unknown, do not guess: finish with status "abstained" and say you have no record.
+- An answer about coverage or model usage comes from the coverage or usage_stats result, not from
+  a claim: name that tool in "cited_tools" and copy its figures as given ("13:20", "4 h 25 min",
+  "25%", "4,200"). Do not work out any other number. When share_basis is "hours" the share is of
+  waking hours; when it is "minutes" it is of the window asked about.
+ {"action":"final","status":"answered|partial|abstained","answer":"...",
+  "cited_claim_ids":["clm-..."],"cited_tools":["coverage"],"uncertainty_note":"..."}"""
 
 STEP_SCHEMA = {"type": "object", "properties": {"action": {"enum": ["tool", "final"]}},
                "required": ["action"]}
@@ -98,6 +111,7 @@ class Step(BaseModel):
     status: Literal["answered", "partial", "abstained"] | None = None
     answer: str = ""
     cited_claim_ids: list[str] = Field(default_factory=list)
+    cited_tools: list[str] = Field(default_factory=list)
     uncertainty_note: str = ""
 
 
@@ -110,10 +124,11 @@ class Answer:
     trace: list[dict[str, Any]] = field(default_factory=list)
     steps: int = 0
     checks: list[str] = field(default_factory=list)   # post-check notes, for transparency
+    cited_tools: list[str] = field(default_factory=list)  # stats tools whose result backs the answer
 
     def as_dict(self) -> dict[str, Any]:
         return {"status": self.status, "answer": self.answer,
-                "cited_claim_ids": self.cited_claim_ids,
+                "cited_claim_ids": self.cited_claim_ids, "cited_tools": self.cited_tools,
                 "uncertainty_note": self.uncertainty_note, "trace": self.trace,
                 "steps": self.steps, "checks": self.checks}
 
@@ -142,6 +157,7 @@ class Investigator:
         pad: list[dict[str, Any]] = []
         checks: list[str] = []
         retried = False
+        cited_tools: list[str] = []          # tools named by failed answers, for the fallback
         for step_no in range(1, MAX_STEPS + 1):
             hint = ("This is your last step: give the final answer now." if step_no == MAX_STEPS
                     else None)
@@ -160,11 +176,17 @@ class Investigator:
             if problem is None:
                 return self._finish(step, tools, step_no, checks)
             checks.append(problem)
+            cited_tools += [t for t in step.cited_tools if t not in cited_tools]
             if retried:
+                fallback = self._fallback(cited_tools, tools, step_no, checks)
+                if fallback:
+                    return fallback
                 return abstain(f"answer failed a check twice: {problem}", tools, step_no, checks)
             retried = True
             pad.append({"step": step_no, "checker": problem + " Fix it, or abstain."})
-        return abstain("step limit reached without a verified answer", tools, MAX_STEPS, checks)
+        # A stats answer that failed on the last step has no room for its retry: use the template too.
+        return self._fallback(cited_tools, tools, MAX_STEPS, checks) or \
+            abstain("step limit reached without a verified answer", tools, MAX_STEPS, checks)
 
     # -- model step ---------------------------------------------------------------------------
 
@@ -197,8 +219,48 @@ class Investigator:
     def _check(self, step: Step, tools: RecallTools, question: str) -> str | None:
         if step.status in (None, "abstained"):
             return None
-        if not step.cited_claim_ids:
+        if not step.cited_claim_ids and not step.cited_tools:
             return "An answered or partial reply must cite at least one claim."
+        if step.cited_claim_ids:
+            problem = self._check_claims(step, tools, question)
+            if problem:
+                return problem
+        if step.cited_tools:
+            return self._check_numbers(step, tools)
+        return None
+
+    def _check_numbers(self, step: Step, tools: RecallTools) -> str | None:
+        """Every cited tool must be a stats tool that returned a usable result in this question, and every
+        number in the answer (and its note) must appear in those results, or in the cited claims."""
+        names = list(dict.fromkeys(step.cited_tools))
+        uncalled = [t for t in names if not _usable(tools, t)]
+        if uncalled:
+            return (f"These cited tools were not called in this question, returned an error or are not "
+                    f"coverage or usage_stats: {uncalled}.")
+        allowed: set[str] = set()
+        for t in names:
+            allowed |= stats_numbers(tools.stats_returned[t])
+        for c in step.cited_claim_ids:      # already checked above: returned, readable and authorized
+            r = self.conn.execute("SELECT text, object_value, event_time FROM claims WHERE claim_id=?",
+                                  (c,)).fetchone()
+            allowed |= stats_numbers([r["text"], r["object_value"], r["event_time"]])
+        unknown = sorted(numbers_in(f"{step.answer} {step.uncertainty_note}") - allowed)
+        if unknown:
+            return (f"These numbers do not appear in the {' or '.join(names)} result: {unknown}. "
+                    f"Use only the figures the tool returned, as given.")
+        return None
+
+    def _fallback(self, cited: list[str], tools: RecallTools, steps: int, checks: list[str]) -> Answer | None:
+        """After a second failed check: the deterministic sentence for the first cited tool that returned a
+        usable result, or None (then the caller abstains, as before)."""
+        name = next((t for t in cited if _usable(tools, t)), None)
+        if name is None:
+            return None
+        checks.append(f"fallback: the answer failed its check twice, so it was built from the {name} result")
+        return Answer("answered", STATS_TEMPLATES[name](tools.stats_returned[name]), [], "", tools.trace,
+                      steps, checks, [name])
+
+    def _check_claims(self, step: Step, tools: RecallTools, question: str) -> str | None:
         unseen = [c for c in step.cited_claim_ids if c not in tools.returned]
         if unseen:
             return f"These cited claim ids were never returned by a tool: {unseen}."
@@ -241,7 +303,42 @@ class Investigator:
         if status == "abstained":
             return Answer("abstained", step.answer or "I don't have a record that answers that.",
                           [], note, tools.trace, steps, checks)
-        return Answer(status, step.answer.strip(), cited, note.strip(), tools.trace, steps, checks)
+        return Answer(status, step.answer.strip(), cited, note.strip(), tools.trace, steps, checks,
+                      list(dict.fromkeys(step.cited_tools)))
+
+
+def _usable(tools: RecallTools, name: str) -> bool:
+    """A stats tool that ran in this question and gave a result (an error result is never stored)."""
+    out = tools.stats_returned.get(name)
+    return name in STATS_TEMPLATES and isinstance(out, dict) and "error" not in out
+
+
+def _norm_number(text: str) -> str:
+    text = text.replace(",", "")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return str(int(text)) if text.isdigit() else text
+
+
+def numbers_in(text: str) -> set[str]:
+    """Clock times ("13:20", "9:05" as "09:05") and digit groups ("4,200" as "4200", "3.0" as "3")."""
+    out = {f"{int(h):02d}:{m}" for h, m in CLOCK_RE.findall(text)}
+    return out | {_norm_number(n) for n in NUMBER_RE.findall(CLOCK_RE.sub(" ", text))}
+
+
+def stats_numbers(value: Any) -> set[str]:
+    """Every number a tool result holds, as raw values and inside its preformatted strings."""
+    if isinstance(value, bool) or value is None:
+        return set()
+    if isinstance(value, (int, float)):
+        return numbers_in(repr(value) if isinstance(value, float) else str(value))
+    if isinstance(value, str):
+        return numbers_in(value)
+    if isinstance(value, dict):
+        value = list(value.values())
+    if isinstance(value, (list, tuple)):
+        return set().union(*(stats_numbers(v) for v in value)) if value else set()
+    return set()
 
 
 def _only_compares_time(question: str) -> bool:
