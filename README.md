@@ -14,6 +14,10 @@ Built for the Meta AI Developer Hackathon (Indie Developer track) with Meta's Mu
 verifiable forgetting (with a receipt of 7 automated leak checks), all in a browser UI (the "Atlas"). Evaluation
 and submission are still to do; see the open issues and [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
 
+The dashboard shows what the models processed (counts only), how much of the day the memories cover and a tracked to-do
+list; one **Ask your memory** assistant, shared by every page, answers fact, summary, to-do and "about my memory"
+questions with its receipts. See [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md#the-dashboard-and-the-assistant).
+
 ## Run it locally
 
 No API key needed (it replays recorded model responses):

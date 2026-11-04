@@ -809,9 +809,9 @@ dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
 .cov-ticks { position: relative; block-size: 1.4rem; margin-block-start: 4px; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .cov-ticks span { position: absolute; transform: translateX(-50%); }
 .cov-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; }
-.cov-figs div { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); min-inline-size: 0; }
-.cov-figs dd { margin: 0; order: 1; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.cov-figs dt { order: 2; font-size: 0.78rem; color: var(--muted); }
+.cov-figs div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); min-inline-size: 0; }
+.cov-figs dd { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cov-figs dt { font-size: 0.78rem; color: var(--muted); }
 
 /* Model usage cards */
 .models { display: grid; gap: 12px; min-inline-size: 0; }
@@ -886,3 +886,12 @@ dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
 .todo-meta { margin: 0; overflow-wrap: anywhere; }
 .todo-source { justify-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: 0.8rem; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .todo-dismiss { flex: none; inline-size: 28px; block-size: 28px; font-size: 0.8rem; }
+
+/* Dashboard additions */
+.mention-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mention-chips .entity-chip b { font-weight: 700; }
+.unsure-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.unsure-list li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.unsure-list button { border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: start; cursor: pointer; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.coverage-card .card-head select { min-block-size: 32px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 2px 8px; font: inherit; }
+.dash-card.coverage-card { grid-column: 1 / -1; }

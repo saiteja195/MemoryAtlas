@@ -18,7 +18,7 @@ export function CoverageStrip({ coverage }: { coverage: Coverage | null }) {
     + (gap ? `, ${gap.label}` : "");
   return (
     <div className="cov">
-      <div className="cov-scroll">
+      <div className="cov-scroll" tabIndex={0} role="group" aria-label="Day coverage, scrolls sideways">
         <div className="cov-inner">
           <div className="cov-label-row" aria-hidden="true">
             {gap && (
@@ -43,9 +43,9 @@ export function CoverageStrip({ coverage }: { coverage: Coverage | null }) {
         </div>
       </div>
       <dl className="cov-figs">
-        <div><dd>{pct}%</dd><dt>of waking hours</dt></div>
-        <div><dd>{hourLabel(coverage.busiest_hour)}</dd><dt>busiest hour</dt></div>
-        <div><dd>{coverage.longest_gap ? formatMinutes(coverage.longest_gap.minutes) : "none"}</dd><dt>longest gap</dt></div>
+        <div><dt>of waking hours</dt><dd>{pct}%</dd></div>
+        <div><dt>busiest hour</dt><dd>{hourLabel(coverage.busiest_hour)}</dd></div>
+        <div><dt>longest gap</dt><dd>{coverage.longest_gap ? formatMinutes(coverage.longest_gap.minutes) : "none"}</dd></div>
       </dl>
     </div>
   );

@@ -101,6 +101,37 @@ The page follows your system's light or dark theme and reduced-motion setting. I
 tabs take arrow keys, Esc closes dialogs), and every fact in the picture is also in the **All facts as a table**
 section under it. The header always shows the model mode and **Raw media kept: 0 B**.
 
+### The dashboard and the assistant
+
+The **Dashboard** shows, for the day on screen (the latest day with memories; a day picker appears when there are several):
+
+- **Day coverage:** a bar from 06:00 to 22:00, filled where your memories are, with the longest stretch with no memories
+  boxed. Under it: the share of waking hours covered, the busiest hour and the longest gap. Times are the clock times
+  stored with each memory, with no timezone conversion.
+- **What the models processed:** one card per model (Muse Spark reads and answers, Muse Voice transcribes) with calls,
+  photos and words read, audio minutes, the average live response time and how many requests were replayed from a
+  recording instead of calling the model. Totals are for the whole profile; "On <day>" counts what was read from that day's
+  memories. The log keeps **counts and sizes only**, never prompts, replies, transcripts or media. A demo profile built
+  from recorded replies says so until you use it.
+- **To-dos:** promises you made and things you were asked to do, found when Muse reads a conversation or a note. Tick
+  one done or dismiss it. Only your own promises and requests made of you appear, with your own words and no due date,
+  and a to-do disappears when the memory behind it is forgotten.
+- Facts by kind, where facts come from, who and what is mentioned most, and what Muse is not sure about.
+
+The **Ask your memory** button (bottom right, also `Cmd/Ctrl+K`) opens one assistant for every page: it docks in the
+corner, expands to a full sheet, and keeps the same conversation on the Dashboard and the Atlas and across reloads. Each
+question is asked about the day on screen: "today" means that day, not the computer's date. It answers fact questions
+("Where did I leave my wallet?"), summaries ("Summarise my day."), to-dos ("Did I promise anyone anything?", with a plain
+"no record" when there is none) and questions about the memory itself ("What did the models read today?", "How much of my
+day is covered?", "What happened between 13:20 and 17:45?", "What are you unsure about?"). Numbers in the last kind are
+checked against what the code computed; if a reply states one it did not, it is replaced by a plain sentence built from the
+real figures. `Esc` closes the panel. In replay mode only recorded questions can be answered.
+
+To see how the live model handles all twelve non-to-do prompts on the sample day, run `backend/scripts/check_prompts.py`
+with `MODEL_API_KEY` set in your own shell (never paste it anywhere); it prints each answer, the checks that ran and whether
+the plain-sentence fallback was used. To give the **sample day** a real to-do and real model-usage numbers, rebuild
+`fixtures/profiles/staged.db` once with the live model (see `fixtures/profiles/README.md`); until then its to-do list is empty.
+
 ### Adding your own memories
 
 Press **Add memory** in the header. It needs **live mode** (a model key). In replay or record mode the dialog says
@@ -314,6 +345,11 @@ npm run e2e                                   # resets the demo first; exit code
 of the other's memories, wrong and unknown passcodes look the same, five wrong passcodes lock, a deleted profile is
 gone and a browser with no session is refused. Start the API with `MEMORYATLAS_AUTH=on MEMORYATLAS_LLM_MODE=replay`
 and a scratch `MEMORYATLAS_DB`, then `npm run e2e:profiles`.
+
+`frontend/e2e/assistant.cjs` checks the dashboard and the assistant on a fresh profile: the coverage strip and model
+cards, the to-do empty state, asking from the launcher, `Esc` and `Ctrl+K`, the same conversation on the Atlas and after a
+reload. Start the API with `MEMORYATLAS_AUTH=on MEMORYATLAS_LLM_MODE=replay` and a scratch `MEMORYATLAS_DATA_DIR`, then
+`npm run e2e:assistant`.
 
 Re-recording the model responses needs a key and takes several minutes per script. Do it only after changing a
 prompt (the prompt is part of the recording's key, so any prompt change makes the replay tests fail with

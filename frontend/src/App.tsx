@@ -27,6 +27,7 @@ import { Header, type Page } from "./components/Header";
 import { Dashboard } from "./components/Dashboard";
 import { useTheme } from "./hooks/useTheme";
 import { useDay } from "./hooks/useDay";
+import { useTodos } from "./hooks/useTodos";
 import { useAssistant } from "./hooks/useAssistant";
 import { HowItWorks } from "./components/HowItWorks";
 import { Welcome } from "./components/Welcome";
@@ -116,6 +117,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   const theme = useTheme();
   // One day and one conversation for every page: the dashboard, the Atlas and the assistant read these.
   const dayState = useDay(atlas.dataKey);
+  const todoState = useTodos(atlas.dataKey);
 
   // Theme: the canvas needs real colour strings, so re-read them when the system theme flips.
   useEffect(() => {
@@ -281,6 +283,11 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
             onConsent={() => { setPage("atlas"); setTab("consent"); }}
             onReceipt={(id) => void openReceipt(id)}
             onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} canReset={canReset}
+            insights={dayState.insights} insightsError={dayState.error} day={dayState.day} days={dayState.days}
+            onDay={dayState.setDay} demo={me.auth && me.profile.demo_kind !== null}
+            todos={todoState.todos} todosLoading={todoState.loading} todosError={todoState.error}
+            onTodoState={(id, st) => void todoState.setState(id, st)}
+            onOpenMemory={(id) => { setPage("atlas"); cite(id); }}
           />
         </main>
       ) : (

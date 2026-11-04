@@ -9,7 +9,8 @@
     "test": "vitest run",
     "check": "tsc --noEmit && vitest run",
     "e2e": "node e2e/walkthrough.cjs",
-    "e2e:profiles": "node e2e/profiles.cjs"
+    "e2e:profiles": "node e2e/profiles.cjs",
+    "e2e:assistant": "node e2e/assistant.cjs"
   },
   "dependencies": {
     "cytoscape": "3.30.2",
