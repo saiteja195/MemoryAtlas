@@ -100,6 +100,8 @@ export type Answer = {
   steps: number;
   checks: string[];
   cached: boolean;
+  /** Set when the answer came from the models' usage or the day's coverage rather than from memories. */
+  cited_tools?: string[];
 };
 
 export type Provenance = ClaimView & {
@@ -227,4 +229,76 @@ export type CommitResult = {
   session_id: string;
   results: { status: string; reason: string | null; source_id: string | null; claims: number; compile_rejected: unknown }[];
   grants: { person: string; grant_id: string; revocation_token: string }[];
+};
+
+/** One hour of the waking window: whether any readable memory touches it, and how many sources land in it. */
+export type CoverageHour = { hour: number; covered: boolean; count: number };
+/** A stretch of covered time as "HH:MM". A span cut at midnight can end at "24:00". */
+export type CoverageSpan = { start: string; end: string };
+export type Coverage = {
+  day: string;
+  /** [first hour, last hour) of the waking window, normally [6, 22]. */
+  window: [number, number];
+  hours: CoverageHour[];
+  spans: CoverageSpan[];
+  covered_hours: number;
+  waking_hours: number;
+  /** 0..1 */
+  share: number;
+  busiest_hour: number | null;
+  longest_gap: { start: string; end: string; minutes: number } | null;
+};
+
+/** `avg_ms` is 0 (not null) when nothing ran live: use `live` to decide whether to show it. */
+export type UsageBucket = {
+  calls: number; live: number; cache: number; failed: number; reading: number; answering: number;
+  photos: number; words_read: number; audio_minutes: number; avg_ms: number;
+};
+export type ModelRow = {
+  model: string;
+  kind_label: "Reads and answers" | "Transcribes";
+  calls: number; photos: number; words_read: number; audio_minutes: number; avg_ms: number;
+  reading: number; answering: number; cache: number;
+};
+export type UsageSummary = {
+  recorded: boolean;
+  since: string | null;
+  total: UsageBucket;
+  day: UsageBucket | null;
+  models: ModelRow[];
+};
+export type Insights = {
+  day: string | null;
+  days: string[];
+  coverage: Coverage | null;
+  usage: UsageSummary;
+  todos_open: number;
+};
+
+/** One saved message of the conversation, as `GET /chat` returns it (oldest first). */
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  /** The day the question was about (YYYY-MM-DD). */
+  as_of: string | null;
+  status: "answered" | "partial" | "abstained" | null;
+  cited_claim_ids: string[];
+  /** Only the memories that may still be read; a forgotten one is gone. */
+  citations: ClaimView[];
+  cited_tools: string[];
+  redacted: boolean;
+};
+
+export type TodoState = "open" | "done" | "dismissed";
+export type Todo = {
+  claim_id: string;
+  kind: "promise" | "request";
+  /** The person's own words. */
+  text: string;
+  who: string | null;
+  when: string | null;
+  source_label: string;
+  state: TodoState;
+  citations: ClaimView[];
 };

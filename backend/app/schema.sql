@@ -99,8 +99,38 @@ CREATE TABLE IF NOT EXISTS answer_cache (
   question_hash TEXT PRIMARY KEY, answer_json TEXT NOT NULL, claim_ids TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS chat_messages (
   msg_id TEXT PRIMARY KEY, role TEXT NOT NULL, text TEXT NOT NULL,
-  claim_ids TEXT NOT NULL DEFAULT '[]', redacted INTEGER NOT NULL DEFAULT 0);
+  claim_ids TEXT NOT NULL DEFAULT '[]', redacted INTEGER NOT NULL DEFAULT 0,
+  -- The day the question was asked about, the answer's status, and the stats tools it cited.
+  as_of TEXT, status TEXT, cited_tools TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS forgetting_receipts (
   receipt_id TEXT PRIMARY KEY, grant_id TEXT NOT NULL,
   created_at TEXT NOT NULL, report_json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS blocked_hashes (content_hash TEXT PRIMARY KEY, reason TEXT NOT NULL);
+
+-- One row per model call: counts and sizes only, never prompts, replies, transcripts or media.
+CREATE TABLE IF NOT EXISTS model_calls (
+  call_id     TEXT PRIMARY KEY,
+  at          TEXT NOT NULL,
+  model       TEXT NOT NULL,
+  kind        TEXT NOT NULL CHECK (kind IN ('text', 'vision', 'asr')),
+  purpose     TEXT NOT NULL,
+  memory_day  TEXT,
+  served_from TEXT NOT NULL CHECK (served_from IN ('live', 'cache')),
+  duration_ms INTEGER NOT NULL,
+  ok          INTEGER NOT NULL,
+  images      INTEGER NOT NULL DEFAULT 0,
+  words_in    INTEGER NOT NULL DEFAULT 0,
+  words_out   INTEGER NOT NULL DEFAULT 0,
+  audio_ms    INTEGER NOT NULL DEFAULT 0,
+  tokens_in   INTEGER,
+  tokens_out  INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_model_calls_at ON model_calls(at);
+
+-- The state of a tracked promise or request. A claim with no row here is open. The row goes when
+-- the claim does (forgetting deletes it); the claim itself lives in `claims`.
+CREATE TABLE IF NOT EXISTS todo_state (
+  claim_id   TEXT PRIMARY KEY,
+  state      TEXT NOT NULL CHECK (state IN ('open', 'done', 'dismissed')),
+  updated_at TEXT NOT NULL
+);

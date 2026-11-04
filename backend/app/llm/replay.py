@@ -1,5 +1,6 @@
 import hashlib
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,16 @@ class RecordReplayClient:
         # nothing is ever written to or deleted from it, so a purge of `cache_dir` is complete.
         self._seed = Path(seed_dir) if seed_dir else None
         self._inner = inner
+        # Per-thread: the client is shared by overlapping requests, and each caller must read
+        # the label of its own call.
+        self._local = threading.local()
         self._dir.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def last_served(self) -> str:
+        """Where this thread's latest call was answered from: "cache" (a recorded response, or
+        a miss in replay mode, which never reaches the model) or "live"."""
+        return getattr(self._local, "served", "live")
 
     @staticmethod
     def _key(method: str, payload: dict[str, Any]) -> str:
@@ -42,11 +52,14 @@ class RecordReplayClient:
         for candidate in (path, self._seed / name if self._seed else None):
             if candidate is not None and candidate.exists():
                 data = json.loads(candidate.read_text())
+                self._local.served = "cache"
                 if isinstance(data, dict) and ERROR_KEY in data:
                     raise LLMUnavailable(data[ERROR_KEY])  # the model's unusable reply, replayed
                 return data
         if self.mode == "replay":
+            self._local.served = "cache"      # a miss never reaches the model
             raise LLMUnavailable(f"no recorded response for {method} ({path.name})")
+        self._local.served = "live"
         try:
             result = getattr(self._inner, method)(*args)
         except LLMUnavailable as e:

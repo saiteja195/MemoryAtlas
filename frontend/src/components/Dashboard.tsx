@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import type { DemoStatus, Graph, Grant, Health, Media, Receipt } from "../api/types";
-import { summarize } from "../utils/dashboard";
+import type { DemoStatus, Graph, Grant, Health, Insights, Media, Receipt, Todo, TodoState } from "../api/types";
+import { mostMentioned, notSure, summarize } from "../utils/dashboard";
 import { CATEGORY_INFO, dayCards, formatBytes } from "../utils/graph";
 import { personName, sessionLabel } from "./Badges";
 import { kindWord } from "./Header";
+import { CoverageStrip } from "./CoverageStrip";
+import { ModelCards } from "./ModelCards";
+import { TodoCard } from "./TodoCard";
 
 type Props = {
   graph: Graph;
@@ -24,6 +27,19 @@ type Props = {
   onLive: (id: string) => void;
   onReset: () => void;
   canReset: boolean;
+  /** The day's coverage and the models' usage, and the day on screen. */
+  insights: Insights | null;
+  insightsError: string | null;
+  day: string | null;
+  days: string[];
+  onDay: (day: string) => void;
+  /** True for a demo profile, whose model usage is not recorded. */
+  demo: boolean;
+  todos: Todo[];
+  todosLoading: boolean;
+  todosError: string | null;
+  onTodoState: (claimId: string, state: TodoState) => void;
+  onOpenMemory: (claimId: string) => void;
 };
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -91,14 +107,10 @@ export function Dashboard(p: Props) {
     return () => { cancelled = true; };
   }, [lastReceiptId]);
 
-  const suggestions: { title: string; text: string; action: string; run: () => void; primary?: boolean }[] = [];
-  if (nextEvent) suggestions.push({ title: "Play the staged day", text: `Next up: the ${nextEvent.at} ${kindWord(nextEvent.kind, nextEvent.label)}. Each event becomes sourced facts.`, action: "Play next", run: p.onPlayNext, primary: empty });
-  if (!empty && withdrawn.length === 0) {
-    suggestions.push({ title: "Ask something no single source holds", text: "Which restaurant did Alex recommend? The answer links a chat to a photo of a sign.", action: "Ask it", run: () => p.onAsk("Which restaurant did Alex recommend when we met near the office?"), primary: true });
-  }
-  if (live.length) suggestions.push({ title: "Watch memory correct itself", text: `Upload the ${live[0].at} photo, then ask where your wallet is. The old answer stays as history.`, action: "Upload photo", run: () => p.onLive(live[0].id) });
-  if (!empty && active.length && withdrawn.length === 0) suggestions.push({ title: "Let someone withdraw consent", text: "See what is removed, what is kept and why, with automated leak checks.", action: "Open consent", run: p.onConsent });
-  if (withdrawn.length) suggestions.push({ title: "Check what was forgotten", text: "Ask the restaurant question again. It should now say there is no record.", action: "Ask again", run: () => p.onAsk("Which restaurant did Alex recommend when we met near the office?"), primary: true });
+  const mentioned = useMemo(() => mostMentioned(p.graph, 4), [p.graph]);
+  const unsure = useMemo(() => notSure(p.graph, 3), [p.graph]);
+  // The sample controls only matter while the sample day is unfinished.
+  const sampleOpen = nextEvent !== undefined || live.length > 0;
 
   return (
     <div className="dash">
@@ -129,17 +141,66 @@ export function Dashboard(p: Props) {
       </section>
 
       <div className="dash-grid">
-        <section className="card pad dash-card span-2" aria-labelledby="d-next">
-          <h3 id="d-next">Suggested next steps</h3>
-          {suggestions.length === 0 && <p className="muted small">You have tried everything on the demo path. {p.canReset ? " Reset to run it again." : ""}</p>}
-          <ul className="steps-list">
-            {suggestions.map((x) => (
-              <li key={x.title}>
-                <div><strong>{x.title}</strong><span className="muted small">{x.text}</span></div>
-                <button type="button" className={`btn small ${x.primary ? "primary" : ""}`} disabled={p.busy || p.offline} onClick={x.run}>{x.action}</button>
-              </li>
-            ))}
-          </ul>
+        {sampleOpen && (
+          <section className="card pad dash-card span-2" aria-labelledby="d-next">
+            <h3 id="d-next">Next</h3>
+            <ul className="steps-list">
+              {nextEvent && (
+                <li>
+                  <div><strong>Play the staged day</strong><span className="muted small">Next up: the {nextEvent.at} {kindWord(nextEvent.kind, nextEvent.label)}. Each event becomes sourced facts.</span></div>
+                  <button type="button" className="btn small primary" disabled={p.busy || p.offline} onClick={p.onPlayNext}>Play next</button>
+                </li>
+              )}
+              {live.length > 0 && (
+                <li>
+                  <div><strong>Watch memory correct itself</strong><span className="muted small">Upload the {live[0].at} photo, then ask where your wallet is. The old answer stays as history.</span></div>
+                  <button type="button" className="btn small" disabled={p.busy || p.offline} onClick={() => p.onLive(live[0].id)}>Upload photo</button>
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
+        <section className="card pad dash-card span-2 coverage-card" aria-labelledby="d-cov">
+          <div className="card-head">
+            <h3 id="d-cov">Day coverage</h3>
+            {p.days.length > 1 && p.day && (
+              <>
+                <label className="sr-only" htmlFor="day-pick">Day</label>
+                <select id="day-pick" value={p.day} onChange={(e) => p.onDay(e.target.value)}>
+                  {p.days.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </>
+            )}
+          </div>
+          {p.insightsError ? <p className="notice error" role="alert">{p.insightsError}</p>
+            : <CoverageStrip coverage={p.insights?.coverage ?? null} />}
+        </section>
+
+        <section className="card pad dash-card span-2" aria-labelledby="d-models">
+          <h3 id="d-models">What the models processed</h3>
+          {p.insights ? <ModelCards usage={p.insights.usage} day={p.day} demo={p.demo} />
+            : <p className="muted small" role="status">{p.insightsError ? "Model activity is unavailable." : "Loading…"}</p>}
+        </section>
+
+        <TodoCard todos={p.todos} loading={p.todosLoading} error={p.todosError} onSetState={p.onTodoState} onOpenMemory={p.onOpenMemory} />
+
+        <section className="card pad dash-card" aria-labelledby="d-who">
+          <h3 id="d-who">Most mentioned</h3>
+          {mentioned.length ? (
+            <div className="mention-chips">
+              {mentioned.map((m) => <span key={m.id} className={`entity-chip t-${m.type}`} title={`${m.name}: ${m.count} facts`}><span className="chip-text">{m.name}</span> <b>{m.count}</b></span>)}
+            </div>
+          ) : <p className="muted small">Nothing yet.</p>}
+        </section>
+
+        <section className="card pad dash-card" aria-labelledby="d-unsure">
+          <h3 id="d-unsure">Not sure about {unsure.count > 0 && <span className="muted small">{unsure.count}</span>}</h3>
+          {unsure.items.length ? (
+            <ul className="unsure-list">
+              {unsure.items.map((i) => <li key={i.id}><button type="button" onClick={() => p.onOpenMemory(i.id)}>{i.text}</button> <span className="muted small">{i.why}</span></li>)}
+            </ul>
+          ) : <p className="muted small">Nothing in doubt.</p>}
         </section>
 
         <section className="card pad dash-card" aria-labelledby="d-ev">

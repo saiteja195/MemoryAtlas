@@ -14,6 +14,7 @@ class Settings:
     llm_base_url: str = os.getenv("META_API_BASE_URL", "https://api.meta.ai")
     llm_api_key: str = os.getenv("MODEL_API_KEY", "")
     llm_model: str = os.getenv("META_MODEL", "muse-spark-1.3")
+    asr_model: str = os.getenv("META_ASR_MODEL", "muse-voice-transcribe-1.0")
     cache_dir: str = os.getenv("MEMORYATLAS_CACHE_DIR", str(ROOT / "fixtures" / "llm_cache"))
     demo_script: str = os.getenv("MEMORYATLAS_DEMO_SCRIPT",
                                  str(ROOT / "fixtures" / "demo_day" / "script.yaml"))

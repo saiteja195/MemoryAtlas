@@ -15,6 +15,7 @@ from ..demo_acts import load_acts
 from ..engine import MemoryEngine
 from ..llm.base import LLMClient
 from ..llm.factory import build_client
+from ..llm.metered import MeteredLLM
 from ..privacy.revocation import RevocationEngine
 from ..recall.service import RecallService
 
@@ -49,6 +50,9 @@ class ProfileRuntime:
                 return []
 
     def close(self) -> None:
+        flush = getattr(self.llm, "flush", None)
+        if flush:
+            flush()                      # usage rows still held back go out before the connection closes
         try:
             self.conn.close()
         except sqlite3.Error:
@@ -126,7 +130,7 @@ class Runtimes:
             s = replace(self.settings, db_path=os.path.join(d, "memoryatlas.db"),
                         runtime_cache_dir=os.path.join(d, "llmcache"))
         conn = db.connect(s.db_path)
-        llm = self.llm or build_client(s)
+        llm = MeteredLLM(self.llm or build_client(s), conn, {"text": s.llm_model, "asr": s.asr_model})
         adapter = MockDayAdapter(s.demo_script)
         engine = MemoryEngine(conn, llm, adapter.owner, adapter.names)
         demo = DemoRunner(engine, adapter, s.revocation_secret, seed=seed_demo)
@@ -143,7 +147,7 @@ class Runtimes:
             cache_dir=s.runtime_cache_dir, red_team_questions=red_team)
         rt = ProfileRuntime(
             profile_id=profile_id, owner_name=owner_name, conn=conn, engine=engine, demo=demo,
-            recall=RecallService(conn, llm), revoker=revoker, drafts=DraftStore(), llm=llm,
+            recall=RecallService(conn, llm, adapter.owner), revoker=revoker, drafts=DraftStore(), llm=llm,
             sweep_lock=threading.Lock(),
             db_path=None if s.db_path == ":memory:" else os.path.abspath(s.db_path),
             cache_dir=s.runtime_cache_dir, settings=s)

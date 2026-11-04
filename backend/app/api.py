@@ -1,11 +1,12 @@
 import base64
 import os
+import re
 import tempfile
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from pydantic import BaseModel, Field
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from pydantic import BaseModel, Field, field_validator
 
 from .capture.audit import media_bytes_on_disk
 from .capture.commit import Answers, CommitError, commit as commit_draft, plan as plan_commit
@@ -15,6 +16,8 @@ from .capture.preview import BadRequest, TooLarge, build_preview
 from .config import Settings
 from .corrections import CorrectionError, correct_claim
 from .graph import build_graph
+from .insights.coverage import coverage, memory_days
+from .insights.usage import usage_summary
 from .llm.base import LLMClient, LLMUnavailable
 from .privacy import clock
 from .privacy.consent import create_grant
@@ -26,6 +29,9 @@ from .profiles.routes import client_ip, make_router
 from .profiles.runtime import ProfileRuntime, Runtimes
 from .profiles import snapshots
 from .profiles.session import current_profile, open_runtime, resolve_runtime
+from .todos import count_open, list_todos, set_todo_state
+
+_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 class CaptureBody(BaseModel):
@@ -46,6 +52,13 @@ class CaptureBody(BaseModel):
     turns: list[dict[str, Any]] | None = None
 
 
+TodoFilter = Literal["open", "done", "dismissed", "all"]
+
+
+class TodoBody(BaseModel):
+    state: Literal["open", "done", "dismissed"]
+
+
 class PreviewBody(BaseModel):
     kind: Literal["frame", "audio", "note", "video"]
     data_b64: str | None = None                 # frame: the image. audio: the WAV
@@ -63,6 +76,14 @@ class CommitBody(BaseModel):
 
 class AskBody(BaseModel):
     question: str = Field(min_length=3, max_length=500)
+    as_of: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")   # the day "today" means
+
+    @field_validator("as_of")
+    @classmethod
+    def _real_day(cls, v: str | None) -> str | None:
+        if v is not None:
+            date.fromisoformat(v)          # 2026-10-32 is not a day: a ValueError becomes a 422
+        return v
 
 
 class RevokeBody(BaseModel):
@@ -147,6 +168,35 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     def graph(at: str | None = None, include: str | None = None,
               rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         return build_graph(rt.conn, at, include_history=include == "history")
+
+    @app.get("/insights")
+    def insights(day: str | None = Query(None), rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        if day is not None:
+            try:
+                if not _DAY.fullmatch(day):
+                    raise ValueError(day)
+                date.fromisoformat(day)
+            except ValueError:
+                raise HTTPException(422, "day must be a real date like 2026-10-29") from None
+        days = memory_days(rt.conn)
+        chosen = day or (days[-1] if days else None)
+        return {"day": chosen, "days": days,
+                "coverage": coverage(rt.conn, chosen) if chosen else None,
+                "usage": usage_summary(rt.conn, chosen),
+                "todos_open": count_open(rt.conn, rt.engine.gateway.owner)}
+
+    @app.get("/todos")
+    def todos(state: TodoFilter = "open", rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
+        return list_todos(rt.conn, rt.engine.gateway.owner, state)
+
+    @app.post("/todos/{claim_id}")
+    def todo_state(claim_id: str, body: TodoBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        owner = rt.engine.gateway.owner
+        try:
+            set_todo_state(rt.conn, claim_id, body.state, owner)
+        except KeyError:
+            raise HTTPException(404, "That is not one of your to-dos.") from None
+        return next(t for t in list_todos(rt.conn, owner, "all") if t["claim_id"] == claim_id)
 
     @app.get("/privacy/media")
     def media(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
@@ -273,9 +323,14 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     @app.post("/recall/ask", dependencies=[Depends(spend)])
     def ask(body: AskBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         try:
-            return rt.recall.ask(body.question)
+            return rt.recall.ask(body.question, body.as_of)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
+
+    @app.get("/chat")
+    def chat(rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
+        """The conversation so far, so the assistant shows the same thread after a reload and on every page."""
+        return rt.recall.history()
 
     @app.get("/claims/{claim_id}/provenance")
     def provenance(claim_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:

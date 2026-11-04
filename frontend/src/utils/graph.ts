@@ -30,7 +30,7 @@ const PREDICATES: Record<string, string> = {
   observed_at: "was at", located_at: "located at", met_with: "met with", attended: "attended",
   said: "said", recommended: "recommended", committed_to: "committed to", has_attribute: "has",
   near: "near", across_from: "across from", part_of_episode: "part of", same_as: "also called",
-  summary_of: "summary",
+  summary_of: "summary", requested: "asked",
 };
 export const humanPredicate = (p: string): string => PREDICATES[p] ?? p.replace(/_/g, " ");
 
@@ -423,7 +423,7 @@ export const CATEGORY_INFO: Record<FactCategory, { title: string; hint: string }
 };
 export const CATEGORY_ORDER: FactCategory[] = ["people", "places", "details", "inferred"];
 
-const PEOPLE_PREDICATES = new Set(["met_with", "attended", "said", "recommended", "committed_to"]);
+const PEOPLE_PREDICATES = new Set(["met_with", "attended", "said", "recommended", "committed_to", "requested"]);
 const PLACE_PREDICATES = new Set(["observed_at", "located_at", "near", "across_from"]);
 
 /** Which group a fact belongs to, by what it is about. Inferred facts get their own group. */

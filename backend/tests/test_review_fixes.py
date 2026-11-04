@@ -137,7 +137,7 @@ def test_model_routes_are_limited_per_profile(tmp_path):
     a, b = new_client(app), new_client(app)
     signup(a, "Profile Aaa", "passcode-aaa")
     signup(b, "Profile Bbb", "passcode-bbb")
-    fake = app.state.runtimes.get(pid_of(a), "x", False).llm
+    fake = app.state.runtimes.get(pid_of(a), "x", False).llm._inner
     fake.recall_replies[:] = [{"action": "final", "status": "abstained", "answer": "No record.",
                                "cited_claim_ids": [], "uncertainty_note": ""}] * 6
     ask = lambda c: c.post("/recall/ask", json={"question": "Where did I eat?"})
@@ -154,7 +154,7 @@ def test_model_routes_are_limited_per_address_and_demo_profiles_share_only_that(
     app.state.budget.per_profile = RateLimiter(1, 3600)
     app.state.budget.per_ip = RateLimiter(3, 3600)
     demo = make_demo(app)
-    fake = app.state.runtimes.get(pid_of(demo), "x", False).llm
+    fake = app.state.runtimes.get(pid_of(demo), "x", False).llm._inner
     fake.recall_replies[:] = [{"action": "final", "status": "abstained", "answer": "No record.",
                                "cited_claim_ids": [], "uncertainty_note": ""}] * 6
     ask = lambda: demo.post("/recall/ask", json={"question": "Where did I eat?"})

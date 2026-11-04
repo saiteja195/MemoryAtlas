@@ -22,9 +22,13 @@ def when(iso: str | None) -> str | None:
 
 
 class RecallTools:
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, extended: bool = False, owner: str = "me"):
         self.conn = conn
+        self.owner = owner                   # the entity whose to-dos open_todos lists
         self.returned: set[str] = set()      # every claim id the model has been shown
+        # Stats tools show numbers, not claims: the raw result of each, keyed by tool name, so the
+        # figures in an answer can be checked against it and the tool cited instead of a claim.
+        self.stats_returned: dict[str, dict[str, Any]] = {}
         self.trace: list[dict[str, Any]] = []
         self._auth: set[str] | None = None
         self._names: dict[str, str] = {}
@@ -32,6 +36,9 @@ class RecallTools:
             "search_claims": self.search_claims, "find_entity": self.find_entity,
             "timeline": self.timeline, "last_seen": self.last_seen, "episodes": self.episodes,
             "neighbors": self.neighbors, "provenance": self.provenance}
+        if extended:                         # only for questions the router sends to the extended prompt
+            from .tools_extra import extra_tools
+            self.registry.update(extra_tools(self))
 
     # -- plumbing -----------------------------------------------------------------------------
 

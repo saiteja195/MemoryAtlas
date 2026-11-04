@@ -795,3 +795,103 @@ dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
 .set-consent { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; list-style: disc; }
 .set-delete { display: grid; gap: 10px; }
 @media (max-width: 640px) { dialog.settings-dialog { inline-size: 100vw; max-inline-size: 100vw; max-block-size: 100dvh; margin: 0; border-radius: 0; } }
+
+/* Day coverage strip: 06:00 to 22:00 as one bar. Scrolls sideways when the screen is narrow. */
+.cov { display: grid; gap: 12px; min-inline-size: 0; }
+.cov-empty { padding: 10px 2px; }
+.cov-scroll { overflow-x: auto; padding-block-end: 4px; }
+.cov-inner { position: relative; min-inline-size: 520px; padding-inline: 4px; }
+.cov-label-row { position: relative; block-size: 1.5rem; }
+.cov-gap-label { position: absolute; inset-block-start: 0; white-space: nowrap; font-size: 0.82rem; font-weight: 600; color: var(--warn); }
+.cov-track { position: relative; block-size: 34px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+.cov-block { position: absolute; inset-block: 0; background: var(--c-place); border-radius: 3px; }
+.cov-gap { position: absolute; inset-block: 2px; border: 2px dashed var(--warn); border-radius: 6px; background: var(--warn-soft); opacity: 0.55; box-sizing: border-box; }
+.cov-ticks { position: relative; block-size: 1.4rem; margin-block-start: 4px; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cov-ticks span { position: absolute; transform: translateX(-50%); }
+.cov-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; }
+.cov-figs div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); min-inline-size: 0; }
+.cov-figs dd { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cov-figs dt { font-size: 0.78rem; color: var(--muted); }
+
+/* Model usage cards */
+.models { display: grid; gap: 12px; min-inline-size: 0; }
+.model-summary, .model-empty p { margin: 0; overflow-wrap: anywhere; }
+.model-empty { display: grid; gap: 4px; padding: 10px 2px; }
+.model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.model-card { display: grid; gap: 8px; align-content: start; padding: 14px 16px; min-inline-size: 0; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.model-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; min-inline-size: 0; }
+.model-name { min-inline-size: 0; overflow-wrap: anywhere; font-size: 0.95rem; }
+.model-big b { font-size: 2rem; line-height: 1.1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.model-bar { block-size: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.model-bar span { display: block; block-size: 100%; border-radius: 999px; background: var(--c-person); }
+.model-kv { display: grid; gap: 4px; margin: 0; font-size: 0.88rem; }
+.model-kv div { display: flex; justify-content: space-between; gap: 12px; padding-block: 4px; border-block-start: 1px solid var(--border); min-inline-size: 0; }
+.model-kv dt { color: var(--muted); min-inline-size: 0; overflow-wrap: anywhere; }
+.model-kv dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; text-align: end; overflow-wrap: anywhere; }
+
+/* ------------------------------------------------------------------------------------------
+   The assistant: a launcher in the corner, a docked panel, and an expanded sheet
+   ------------------------------------------------------------------------------------------ */
+.assistant-launch {
+  position: fixed; inset-block-end: 16px; inset-inline-end: 16px; z-index: 40; display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 999px; border: 0; cursor: pointer; font: inherit; font-weight: 600;
+  background: var(--text); color: var(--bg); box-shadow: var(--shadow-lg);
+}
+.assistant-launch:hover { filter: brightness(1.1); }
+.assistant-launch kbd { font: inherit; font-size: 0.75rem; opacity: 0.7; padding-inline-start: 4px; }
+.assistant {
+  position: fixed; z-index: 41; display: flex; flex-direction: column; min-block-size: 0; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-lg);
+}
+.assistant.docked {
+  inset-block-end: 16px; inset-inline-end: 16px; inline-size: min(400px, calc(100vw - 32px)); block-size: min(640px, calc(100dvh - 32px));
+}
+.assistant.expanded {
+  inset: 16px; inline-size: auto; max-inline-size: 960px; margin-inline: auto; block-size: auto;
+}
+.assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-block-end: 1px solid var(--border); }
+.assistant-head h2 { margin: 0; font-size: 1rem; letter-spacing: -0.01em; }
+.assistant-tools { display: flex; gap: 4px; }
+.icon-btn {
+  inline-size: 32px; block-size: 32px; display: grid; place-items: center; border: 0; border-radius: 10px; cursor: pointer;
+  background: transparent; color: var(--muted); font: inherit; font-size: 1rem;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.assistant-body { flex: 1; min-block-size: 0; overflow-y: auto; padding: 12px 14px 14px; }
+.assistant .chat { min-block-size: 100%; grid-template-rows: 1fr auto auto auto; }
+.assistant .chat-thread { max-block-size: none; min-block-size: 120px; }
+.day-chip { margin: -4px 4px 0; align-self: flex-end; }
+@media (max-width: 520px) {
+  .assistant.docked { inset-block-end: 8px; inset-inline: 8px; inline-size: auto; block-size: calc(100dvh - 16px); }
+  .assistant.expanded { inset: 8px; }
+  .assistant-launch kbd { display: none; }
+}
+
+/* To-dos */
+.todo-card { padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+.todo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.todo-head h3 { margin: 0; font-size: 0.95rem; }
+.todo-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.todo { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-block-start: 1px solid var(--border); }
+.todo-box {
+  flex: none; inline-size: 22px; block-size: 22px; margin-block-start: 1px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.5px solid var(--muted); background: transparent; color: var(--accent-text); cursor: pointer; padding: 0; font-size: 0.8rem; font-weight: 700;
+}
+.todo-box:hover { border-color: var(--accent); }
+.todo.done .todo-box { background: var(--ok); border-color: var(--ok); }
+.todo-main { flex: 1; min-inline-size: 0; display: grid; gap: 2px; }
+.todo-text { margin: 0; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.todo.done .todo-text { text-decoration: line-through; color: var(--muted); font-weight: 500; }
+.todo-meta { margin: 0; overflow-wrap: anywhere; }
+.todo-source { justify-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: 0.8rem; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.todo-dismiss { flex: none; inline-size: 28px; block-size: 28px; font-size: 0.8rem; }
+
+/* Dashboard additions */
+.mention-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mention-chips .entity-chip b { font-weight: 700; }
+.unsure-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.unsure-list li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.unsure-list button { border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: start; cursor: pointer; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.coverage-card .card-head select { min-block-size: 32px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 2px 8px; font: inherit; }
+.dash-card.coverage-card { grid-column: 1 / -1; }

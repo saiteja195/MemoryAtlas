@@ -1,6 +1,7 @@
 import base64
 import json
 import re
+import threading
 import time
 from typing import Any, Callable
 
@@ -32,6 +33,7 @@ class MetaClient:
         self.api_key, self.model, self.asr_model = api_key, model or "muse-spark-1.3", asr_model
         self._http = http or httpx.Client(timeout=120)
         self._attempts, self._sleep = attempts, sleep
+        self._local = threading.local()   # per-thread: the client is shared by overlapping requests
 
     # -- transport ---------------------------------------------------------------------------
 
@@ -55,6 +57,27 @@ class MetaClient:
             return resp.json()
         raise LLMUnavailable(f"{path}: retries exhausted")
 
+    @property
+    def last_usage(self) -> dict[str, int] | None:
+        """Token counts the API reported for this thread's latest call, or None."""
+        return getattr(self._local, "usage", None)
+
+    @last_usage.setter
+    def last_usage(self, value: dict[str, int] | None) -> None:
+        self._local.usage = value
+
+    @staticmethod
+    def _read_usage(data: Any) -> dict[str, int] | None:
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if not isinstance(usage, dict):
+            return None
+        tin, tout = usage.get("input_tokens"), usage.get("output_tokens")
+        if isinstance(tin, bool) or isinstance(tout, bool):
+            return None
+        if isinstance(tin, int) and isinstance(tout, int):
+            return {"tokens_in": tin, "tokens_out": tout}
+        return None
+
     # -- text and vision ---------------------------------------------------------------------
 
     def _responses_text(self, system: str, parts: list[dict[str, Any]]) -> str:
@@ -66,7 +89,9 @@ class MetaClient:
             ],
             "stream": False,
         }
+        self.last_usage = None
         data = self._post("/v1/responses", json=body)
+        self.last_usage = self._read_usage(data)
         chunks = [c.get("text", "")
                   for item in data.get("output", []) if item.get("type") == "message"
                   for c in item.get("content", []) if c.get("type") == "output_text"]
@@ -122,10 +147,12 @@ class MetaClient:
                    "languageBias": ["English"]}
         if keywords:
             request["keywords"] = keywords
+        self.last_usage = None
         data = self._post("/v1/asr/transcribe", files={
             "request": (None, json.dumps(request), "application/json"),
             "audio": ("audio.wav", audio, "audio/wav"),
         })
+        self.last_usage = self._read_usage(data)
         turns = [{"turn_id": t["turnId"], "start_ms": t["startMs"], "end_ms": t["endMs"],
                   "speaker": t.get("speaker"), "text": t["transcript"]}
                  for t in data.get("turns", [])]

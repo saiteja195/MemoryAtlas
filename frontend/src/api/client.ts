@@ -1,5 +1,5 @@
 import type {
-  Answer, Answers, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Me, Media, PreviewBody, Provenance, Receipt,
+  Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, Todo, TodoState,
 } from "./types";
 
 /** An API failure with the server's own explanation, so the UI can say something useful. */
@@ -69,6 +69,8 @@ export const api = {
   status: () => call<DemoStatus>("/demo/status"),
   media: () => call<Media>("/privacy/media"),
   graph: () => call<Graph>("/graph?include=history"),
+  /** Day coverage and model usage; with no day the server picks the latest memory day. */
+  insights: (day?: string) => call<Insights>(day ? `/insights?day=${encodeURIComponent(day)}` : "/insights"),
   grants: () => call<Grant[]>("/consent/grants"),
   demoGrants: () => call<Grant[]>("/demo/grants"),
   receipt: (id: string) => call<Receipt>(`/receipts/${encodeURIComponent(id)}`),
@@ -79,7 +81,13 @@ export const api = {
     post<{ played: { id: string; rejected: string[] }[] }>(`/demo/advance?steps=${steps}`),
   uploadLive: (eventId: string) => post<{ ingested: number }>(`/demo/live/${encodeURIComponent(eventId)}`),
   reset: () => post<DemoStatus>("/demo/reset"),
-  ask: (question: string) => post<Answer>("/recall/ask", { question }),
+  /** `asOf` (YYYY-MM-DD) is the day "today" means; the server defaults to the latest day with memories. */
+  ask: (question: string, asOf?: string | null) =>
+    post<Answer>("/recall/ask", asOf ? { question, as_of: asOf } : { question }),
+  /** The saved conversation, oldest first. */
+  chat: () => call<ChatMessage[]>("/chat"),
+  todos: (state: TodoState | "all" = "open") => call<Todo[]>(`/todos?state=${state}`),
+  setTodo: (claimId: string, state: TodoState) => post<Todo>(`/todos/${encodeURIComponent(claimId)}`, { state }),
   /** Muse reads an upload; nothing is stored until commitCapture. */
   previewCapture: (body: PreviewBody) => post<Draft>("/capture/preview", body),
   commitCapture: (body: { draft_id: string; answers: Answers }) => post<CommitResult>("/capture/commit", body),

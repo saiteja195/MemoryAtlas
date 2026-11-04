@@ -134,3 +134,55 @@ def test_transient_network_errors_are_retried_then_surface_as_unavailable():
     with pytest.raises(LLMUnavailable) as e:
         client(down).complete_json("s", "u", {})
     assert "ConnectError" in str(e.value) and "sk-secret" not in str(e.value)
+
+
+def test_meta_client_reads_usage_when_present():
+    body = responses_body('{"ok": true}')
+    body["usage"] = {"input_tokens": 12, "output_tokens": 7}
+    c = client(lambda r: httpx.Response(200, json=body))
+    assert c.last_usage is None
+    c.complete_json("s", "u", {})
+    assert c.last_usage == {"tokens_in": 12, "tokens_out": 7}
+    c2 = client(lambda r: httpx.Response(200, json=responses_body('{"ok": true}')))
+    c2.complete_json("s", "u", {})
+    assert c2.last_usage is None
+
+
+def test_meta_client_usage_is_reset_and_tolerates_junk():
+    state = {"body": {**responses_body("{}"), "usage": {"input_tokens": 3, "output_tokens": 1}}}
+    c = client(lambda r: httpx.Response(200, json=state["body"]))
+    c.complete_json("s", "u", {})
+    assert c.last_usage == {"tokens_in": 3, "tokens_out": 1}
+    state["body"] = {**responses_body("{}"), "usage": "weird"}
+    c.complete_json("s", "u", {})
+    assert c.last_usage is None
+
+
+def test_last_usage_is_per_thread_on_a_shared_client():
+    import threading
+    started, release = threading.Event(), threading.Event()
+
+    def handler(req):
+        if b"slow" in req.content:
+            started.set()
+            assert release.wait(5)
+            usage = {"input_tokens": 100, "output_tokens": 200}
+        else:
+            usage = {"input_tokens": 1, "output_tokens": 2}
+        return httpx.Response(200, json={**responses_body("{}"), "usage": usage})
+
+    c = client(handler)
+    seen = {}
+
+    def slow():
+        c.complete_json("s", "slow", {})
+        seen["slow"] = c.last_usage
+
+    t = threading.Thread(target=slow)
+    t.start()
+    assert started.wait(5)
+    c.complete_json("s", "fast", {})
+    release.set()
+    t.join(5)
+    assert seen["slow"] == {"tokens_in": 100, "tokens_out": 200}
+    assert c.last_usage == {"tokens_in": 1, "tokens_out": 2}

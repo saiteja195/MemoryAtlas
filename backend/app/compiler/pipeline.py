@@ -10,13 +10,17 @@ from .contradiction import contradiction_pass
 from .derive import Deriver
 from .episodes import bind_episode
 from .extract import ExtractedClaim, ExtractionRejected, extract_claims
-from .resolve import EntityResolver
+from .resolve import EntityResolver, norm
 from .store import ClaimWriter
+from .todo_scan import scan_todos
 
 log = logging.getLogger(__name__)
 
 DIRECT_CONFIDENCE = 0.95    # direct_observation = model confidence x 0.95
 CONFIRMED_CONFIDENCE = 0.99
+# What the to-do scan reads: conversation segments and typed notes (a note is stored as a
+# `user_confirmation` source). Never photos, calendar entries or location fixes.
+TODO_SCAN_KINDS = ("transcript_segment", "user_confirmation")
 
 
 @dataclass
@@ -37,7 +41,8 @@ class Compiler:
         self.writer = ClaimWriter(conn)
         self.deriver = Deriver(conn, llm, owner)
 
-    def compile(self, obs: Observation) -> CompileResult:
+    def compile(self, obs: Observation, todo_scan: bool = True) -> CompileResult:
+        """`todo_scan=False` skips the promise-and-request pass (a correction is not scanned)."""
         res = CompileResult(obs.source_id)
         self.resolver.ensure_owner()
         res.episode_id = bind_episode(self.conn, obs)
@@ -53,6 +58,13 @@ class Compiler:
             res.rejected = str(e)
             self.conn.commit()   # the episode binding stays; the source has no claims
             return res
+        if todo_scan and obs.kind in TODO_SCAN_KINDS:
+            # A second, optional pass. It returns [] when the model is unavailable or keeps
+            # replying out of schema, so it never rejects the observation. The store only merges
+            # claims whose value matches exactly, so a scanned promise that rewords one the
+            # extraction already returned for the same person is dropped here, in code.
+            scanned = scan_todos(self.llm, obs, known, extracted)
+            extracted = [*extracted, *[c for c in scanned if not _restates(c, extracted)]]
 
         mentioned: dict[str, float] = {}
         subjects: set[str] = set()
@@ -104,6 +116,8 @@ class Compiler:
                                                  obs.source_id, ctx)
             if object_id == subject_id:
                 return None
+        if c.predicate == "requested" and subject_id == self.owner:
+            return None     # the owner is the one asked, never the one asking
         event_time = c.event_time or obs.captured_at
         if obs.kind == "user_confirmation":
             evidence, conf = "user_confirmation", CONFIRMED_CONFIDENCE
@@ -111,7 +125,7 @@ class Compiler:
             evidence, conf = "direct_observation", round(c.confidence * DIRECT_CONFIDENCE, 3)
         cid, _ = self.writer.write(
             subject_id=subject_id, predicate=c.predicate, object_id=object_id,
-            object_value=None if object_id else c.value, event_time=event_time,
+            object_value=_object_value(c, object_id), event_time=event_time,
             evidence_type=evidence, confidence=conf, episode_id=episode_id, text=c.text.strip(),
             source_id=obs.source_id,
             valid_from=event_time if c.predicate == "located_at" else None)
@@ -127,3 +141,39 @@ class Compiler:
             confidence=round(conf * DIRECT_CONFIDENCE, 3), episode_id=episode_id,
             text=f"{name} was part of {episode_name}", source_id=obs.source_id)
         return cid
+
+
+_STOP = frozenset("a an the to by on in at of for and or i ll will would me my you your he she "
+                  "they we it is be him her them his their our this that".split())
+
+
+def _tokens(text: str | None) -> frozenset[str]:
+    return frozenset(t for t in norm(text or "").split() if t not in _STOP)
+
+
+def _near(a: str | None, b: str | None) -> bool:
+    """Two promise texts say the same thing: more than half of their content words are shared
+    (Jaccard > 0.5), or every content word of the shorter one, when it has at least two, appears
+    in the longer one. Exactly half ("the proposal by Friday" / "the budget by Friday") is two
+    promises, and a one-word promise never swallows a different, longer one."""
+    ta, tb = _tokens(a), _tokens(b)
+    if not ta or not tb:
+        return norm(a or "") == norm(b or "")
+    short, long_ = sorted((ta, tb), key=len)
+    return len(ta & tb) / len(ta | tb) > 0.5 or (len(short) >= 2 and short <= long_)
+
+
+def _restates(c: ExtractedClaim, found: list[ExtractedClaim]) -> bool:
+    """A scanned `committed_to` that rewords a promise extraction found for the same person."""
+    if c.predicate != "committed_to":
+        return False
+    return any(f.predicate == "committed_to" and norm(f.subject) == norm(c.subject)
+               and _near(f.value, c.value) for f in found)
+
+
+def _object_value(c: ExtractedClaim, object_id: str | None) -> str | None:
+    """Literal text is kept only when there is no object entity, except for a request, which
+    needs both: who was asked (the object) and what they were asked to do (the value)."""
+    if object_id is None or c.predicate == "requested":
+        return c.value
+    return None

@@ -280,6 +280,7 @@ def revoke(grant_id, token):
 - **Consent panel:** list of grants. "Revoke" opens a simulated consent page (QR code / second browser tab as Alex with a PIN) to show it is *Alex's* action, not the user's.
 - **Forgetting receipt modal:** removed / retained counts, which retained facts survived and *why* (the alternate source), plus the probe results as green checks.
 - **Correct:** "That's wrong" on a claim creates a `user_confirmation` source that supersedes it.
+- **Dashboard and assistant (post-plan, see `docs/superpowers/specs/2026-11-03-dashboard-and-assistant-design.md`):** per-profile model-usage log (counts only), day coverage, a to-do list built from promises and requests, and one shared assistant on every page.
 - `frontend/src/lib/` is ignored by the root `.gitignore` (Python template ignores `lib/`). Put shared code in `frontend/src/utils/` or add a `!frontend/src/lib/` exception.
 
 ### 4.6 LLM client (`backend/app/llm/`)

@@ -10,7 +10,8 @@ import {
   pathElementIds, relatedFactClaims, type FactMode, type Selection, type ViewMode,
 } from "./utils/graph";
 import { readPalette, watchColorScheme, type Palette } from "./utils/theme";
-import { AskPanel, type QA } from "./components/AskPanel";
+import { Assistant } from "./components/Assistant";
+import { buildSuggestions } from "./utils/assistant";
 import { ConsentDevice } from "./components/ConsentDevice";
 import { ConsentPanel } from "./components/ConsentPanel";
 import { AddMemory } from "./components/AddMemory";
@@ -25,6 +26,9 @@ import { GraphView, type GraphHandle } from "./components/GraphView";
 import { Header, type Page } from "./components/Header";
 import { Dashboard } from "./components/Dashboard";
 import { useTheme } from "./hooks/useTheme";
+import { useDay } from "./hooks/useDay";
+import { useTodos } from "./hooks/useTodos";
+import { useAssistant } from "./hooks/useAssistant";
 import { HowItWorks } from "./components/HowItWorks";
 import { Welcome } from "./components/Welcome";
 import { Legend } from "./components/Legend";
@@ -82,8 +86,8 @@ function Gate() {
   return <Atlas key={profile.profile_id} me={session.me} refreshMe={session.refresh} signOut={session.signOut} />;
 }
 
-type Tab = "ask" | "facts" | "consent";
-const TABS: { id: Tab; label: string }[] = [{ id: "ask", label: "Ask" }, { id: "facts", label: "Facts" }, { id: "consent", label: "Consent" }];
+type Tab = "facts" | "consent";
+const TABS: { id: Tab; label: string }[] = [{ id: "facts", label: "Facts" }, { id: "consent", label: "Consent" }];
 
 type AtlasProps = { me: Me; refreshMe: () => Promise<void>; signOut: () => Promise<void> };
 
@@ -105,15 +109,15 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   const [selection, setSelection] = useState<Selection>(null);
   const [focus, setFocus] = useState<string[] | null>(null);
   const [evidence, setEvidence] = useState<string[] | null>(null);
-  const [tab, setTab] = useState<Tab>("ask");
-  const [qas, setQas] = useState<QA[]>([]);
-  const [asking, setAsking] = useState(false);
+  const [tab, setTab] = useState<Tab>("facts");
   const [simulate, setSimulate] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
   const [page, setPage] = useState<Page>("dashboard");
   const theme = useTheme();
-  const qaId = useRef(0);
+  // One day and one conversation for every page: the dashboard, the Atlas and the assistant read these.
+  const dayState = useDay(atlas.dataKey);
+  const todoState = useTodos(atlas.dataKey);
 
   // Theme: the canvas needs real colour strings, so re-read them when the system theme flips.
   useEffect(() => {
@@ -204,25 +208,25 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   }, [atlas.pulse]);
 
   // --- actions ----------------------------------------------------------------------------------
-  const ask = useCallback(async (question: string) => {
-    const id = ++qaId.current;
-    setTab("ask");
-    setAsking(true);
-    try {
-      const a = await api.ask(question);
-      setQas((q) => [{ id, question, answer: a }, ...q]);
+  const assistant = useAssistant(dayState.day, {
+    dataKey: atlas.dataKey,
+    onAnswer: (a) => {
       setSelection(null);
       setScrubAt(null);
       setFocus(a.cited_claim_ids.length ? a.cited_claim_ids : null);
       if (a.cited_claim_ids.length) setMode("entities");
       announce(`${a.status === "abstained" ? "No record." : "Answer."} ${a.answer}`);
-    } catch (e) {
-      const err = e instanceof ApiError ? e : null;
-      setQas((q) => [{ id, question, error: { text: e instanceof Error ? e.message : String(e), notRecorded: !!err?.isNotRecorded } }, ...q]);
-    } finally {
-      setAsking(false);
-    }
-  }, [announce]);
+    },
+  });
+  const ask = useCallback(async (question: string) => {
+    assistant.setOpen(true);
+    await assistant.ask(question);
+  }, [assistant.ask, assistant.setOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const suggestions = useMemo(() => buildSuggestions({
+    graph: atlas.graph, goals: me.auth ? me.profile.goals : [], todosOpen: dayState.insights?.todos_open ?? 0,
+    selection, hasMemories: atlas.graph.nodes.some((n) => n.type !== "episode"),
+    gap: dayState.insights?.coverage?.longest_gap ?? null,
+  }), [atlas.graph, me, dayState.insights, selection]);
 
   const cite = (claimId: string) => {
     setMode("entities");
@@ -248,7 +252,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
 
   const reset = async () => {
     await atlas.reset();
-    setQas([]); setSelection(null); setFocus(null); setEvidence(null); setScrubAt(null);
+    assistant.clear(); setSelection(null); setFocus(null); setEvidence(null); setScrubAt(null);
     setPlaying(false); setEpisode(null);
   };
 
@@ -276,10 +280,15 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
             onPlayNext={() => void atlas.advance(1)} onPlayAll={() => void atlas.advance(50)}
             onOpenAtlas={() => setPage("atlas")}
             onOpenMoment={(id) => { setPage("atlas"); openEpisode(id); }}
-            onAsk={(q) => { setPage("atlas"); void ask(q); }}
+            onAsk={(q) => void ask(q)}
             onConsent={() => { setPage("atlas"); setTab("consent"); }}
             onReceipt={(id) => void openReceipt(id)}
             onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} canReset={canReset}
+            insights={dayState.insights} insightsError={dayState.error} day={dayState.day} days={dayState.days}
+            onDay={dayState.setDay} demo={me.auth && me.profile.demo_kind !== null}
+            todos={todoState.todos} todosLoading={todoState.loading} todosError={todoState.error}
+            onTodoState={(id, st) => void todoState.setState(id, st)}
+            onOpenMemory={(id) => { setPage("atlas"); cite(id); }}
           />
         </main>
       ) : (
@@ -369,12 +378,8 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
           />
         </main>
 
-        <aside className="side" aria-label="Ask and consent">
+        <aside className="side" aria-label="Facts and consent">
           <TabBar tab={tab} onTab={setTab} />
-          <div role="tabpanel" id="panel-ask" aria-labelledby="tab-ask" hidden={tab !== "ask"} tabIndex={0}>
-            <AskPanel qas={qas} asking={asking} forgotten={forgotten} mode={atlas.health?.llm_mode}
-                      onAsk={(q) => void ask(q)} onCite={cite} onWhy={why} />
-          </div>
           <div role="tabpanel" id="panel-facts" aria-labelledby="tab-facts" hidden={tab !== "facts"} tabIndex={0}>
             <FactsPanel view={view} selectedClaim={selection?.kind === "claim" ? selection.id : null} onSelect={cite} />
           </div>
@@ -389,6 +394,8 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
         <Settings open={settings} me={me} onClose={() => setSettings(false)} onChanged={refreshMe}
                   onResetDemo={reset} onSignedOut={() => void signOut()} />
       )}
+      <Assistant assistant={assistant} suggestions={suggestions} selectedDay={dayState.day}
+                 mode={atlas.health?.llm_mode} forgotten={forgotten} onCite={cite} onWhy={why} />
       <AddMemory open={adding} mode={atlas.health?.llm_mode} onClose={() => setAdding(false)} onSaved={() => void atlas.refresh()} />
       <HowItWorks open={help} onClose={() => setHelp(false)} />
       <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />
