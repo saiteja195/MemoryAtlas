@@ -900,5 +900,6 @@ dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
 .dash-card.coverage-card { grid-column: 1 / -1; }
 
 /* Saving a memory: what Muse is doing, and for how long */
-.save-progress { display: grid; gap: 2px; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); }
+/* A fixed height for both lines, so the box does not grow after the dialog has scrolled it into view. */
+.save-progress { display: grid; gap: 2px; align-content: center; min-block-size: 3.8rem; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); }
 .save-progress strong { font-size: 0.92rem; }
