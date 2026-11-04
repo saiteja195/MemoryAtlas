@@ -56,7 +56,7 @@ async function settledDuration(video: HTMLVideoElement): Promise<number> {
 
 export type ExtractedVideo = { frames: Blob[]; offsetsMs: number[]; audio: Uint8Array | null; durationMs: number };
 
-export async function extractVideo(blob: Blob, maxFrames = 4): Promise<ExtractedVideo> {
+export async function extractVideo(blob: Blob, maxFrames = 4, withAudio = true): Promise<ExtractedVideo> {
   const url = URL.createObjectURL(blob);
   const video = document.createElement("video");
   video.muted = true;
@@ -85,7 +85,7 @@ export async function extractVideo(blob: Blob, maxFrames = 4): Promise<Extracted
       frames.push(jpeg);
     }
     let audio: Uint8Array | null = null;
-    try { audio = await toWav16k(blob); } catch { /* no audio track, or one we cannot decode */ }
+    if (withAudio) try { audio = await toWav16k(blob); } catch { /* no audio track, or one we cannot decode */ }
     return { frames, offsetsMs, audio, durationMs };
   } finally {
     URL.revokeObjectURL(url);

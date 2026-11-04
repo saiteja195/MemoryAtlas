@@ -234,8 +234,17 @@ export type SaveJob = {
   calls_started: number;
   calls_done: number;
   working_s: number;
-  result: CommitResult | null;
+  result: (CommitResult & Partial<TrackResult>) | null;
   error: { status: number; message: string } | null;
+};
+
+/** One object looked for in a video, and the stretches of the clip where it was visible. */
+export type TrackedObject = {
+  phrase: string; found: boolean; frames_checked: number; ranges: { start_ms: number; end_ms: number; hits: number }[];
+};
+export type TrackResult = { objects: TrackedObject[]; stored: boolean; grants: CommitResult["grants"] };
+export type TrackBody = {
+  frames_b64: string[]; offsets_ms: number[]; phrases: string[]; clip_start: string; duration_ms: number;
 };
 
 export type CommitResult = {

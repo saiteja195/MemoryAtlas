@@ -1,6 +1,6 @@
 import { youifyDeep } from "../utils/voice";
 import type {
-  Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, SaveJob, Todo, TodoState,
+  Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, SaveJob, Todo, TodoState, TrackBody,
 } from "./types";
 
 /** An API failure with the server's own explanation, so the UI can say something useful. */
@@ -95,6 +95,8 @@ export const api = {
   /** Saves in the background and returns at once; poll `commitJob` for the outcome. */
   startCommit: (body: { draft_id: string; answers: Answers }) => post<{ job_id: string }>("/capture/commit/start", body),
   commitJob: (jobId: string) => call<SaveJob>(`/capture/commit/jobs/${encodeURIComponent(jobId)}`),
+  /** Opt-in: look for named objects in a video's frames. Poll `commitJob` with the returned id. */
+  startTrack: (body: TrackBody) => post<{ job_id: string }>("/capture/track", body),
   /** DEMO ONLY: let a grant lapse now. */
   expire: (grantId: string) =>
     post<{ expired: { grant_id: string; receipt_id: string }[] }>(`/demo/grants/${encodeURIComponent(grantId)}/expire`),

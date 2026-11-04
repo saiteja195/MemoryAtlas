@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { api, ApiError } from "../api/client";
-import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question, SaveJob } from "../api/types";
+import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question, SaveJob, TrackResult } from "../api/types";
 import {
   addAvailability, classifyFile, localIso, maxBytes, toCommitBody, unanswered, whenInputValue,
   type AnswerState, type FileKind,
 } from "../utils/addMemory";
 import { extractVideo, toBase64, toWav16k } from "../utils/media";
 import { pollJob, progressText } from "../utils/saveJob";
+import { FRAMES, parsePhrases, trackCost, trackLines } from "../utils/tracking";
 import { CaptureButtons, type Captured } from "./CaptureButtons";
 import { Dialog } from "./Dialog";
 
@@ -54,13 +55,21 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const [grants, setGrants] = useState<CommitResult["grants"]>([]);
   const [hover, setHover] = useState(false);
   const [job, setJob] = useState<SaveJob | null>(null);
+  // Opt-in: follow named objects through a video after it is saved. Off unless the person ticks the box.
+  const [trackOn, setTrackOn] = useState(false);
+  const [trackText, setTrackText] = useState("");
+  const [track, setTrack] = useState<{ state: "running" | "done" | "error"; lines: string[]; message?: string } | null>(null);
   const progressBox = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setSource(null); setNote(""); setStep("add"); setError(null); setDraft(null);
     setAnswers({ people: {} }); setPlaceChoice(null); setOutcome(null); setGrants([]); setHover(false); setJob(null);
+    setTrackOn(false); setTrackText(""); setTrack(null);
   };
+  const wanted = trackOn && source?.kind === "video" ? parsePhrases(trackText) : { phrases: [] as string[] };
+  const wantedError = "error" in wanted ? wanted.error : null;
+  const wantedPhrases = "phrases" in wanted ? wanted.phrases : [];
   useEffect(() => { if (!open) reset(); }, [open]);
 
   const take = (file: File) => {
@@ -124,9 +133,29 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
       setOutcome(r);
       setStep("saved");
       if (r.saved) onSaved();
+      if (r.saved && source?.kind === "video" && wantedPhrases.length) {
+        void followObjects(source.blob, wantedPhrases, answers.when ?? draft.captured_at ?? localIso(Date.now()));
+      }
     } catch (e) {
       setError(e instanceof ApiError || e instanceof Error ? e.message : String(e));
       setStep("review");
+    }
+  };
+
+  // After the video is saved, look for the named objects in a few frames. A failure here never undoes the save.
+  const followObjects = async (blob: Blob, phrases: string[], clipStart: string) => {
+    setTrack({ state: "running", lines: [] });
+    try {
+      const v = await extractVideo(blob, FRAMES, false);
+      const { job_id } = await api.startTrack({
+        frames_b64: await Promise.all(v.frames.map(toBase64)), offsets_ms: v.offsetsMs, phrases,
+        clip_start: clipStart, duration_ms: v.durationMs,
+      });
+      const result = (await pollJob(() => api.commitJob(job_id), () => {})) as unknown as TrackResult;
+      setTrack({ state: "done", lines: trackLines(result.objects) });
+      if (result.stored) onSaved();
+    } catch (e) {
+      setTrack({ state: "error", lines: [], message: e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -138,7 +167,8 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const open_ = draft ? unanswered(draft, answers) : [];
   const declined = Object.values(answers.people).some((p) => p.consented === false);
   const avail = addAvailability(mode);
-  const canAnalyze = (source !== null || note.trim().length > 0) && step === "add";
+  const canAnalyze = (source !== null || note.trim().length > 0) && step === "add"
+    && !wantedError && !(trackOn && source?.kind === "video" && wantedPhrases.length === 0);
 
   return (
     <Dialog open={open} onClose={onClose} title="Add a memory" className="add-dialog" initialFocus="[data-autofocus]">
@@ -165,6 +195,29 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
               <span className="add-name">{source.name}</span>
               <span className="small muted">{fmtBytes(source.blob.size)}</span>
               <button type="button" className="btn small ghost" disabled={step === "reading"} onClick={() => setSource(null)} aria-label={`Remove ${source.name}`}>Remove</button>
+            </div>
+          )}
+
+          {source?.kind === "video" && mode === "live" && (
+            <div className="add-track">
+              <label className="add-check">
+                <input type="checkbox" checked={trackOn} disabled={step === "reading"} onChange={(e) => setTrackOn(e.target.checked)} />
+                <span>Also follow objects in this video <span className="muted">(optional)</span></span>
+              </label>
+              {trackOn && (
+                <>
+                  <input id="track-objects" className="add-track-input" type="text" maxLength={80} value={trackText}
+                         disabled={step === "reading"} placeholder="wallet, car key, glasses" aria-label="Objects to follow, separated by commas"
+                         aria-invalid={wantedError !== null} onChange={(e) => setTrackText(e.target.value)} />
+                  {wantedError
+                    ? <p className="small warn-text" role="alert">{wantedError}</p>
+                    : <p className="small muted">
+                        Up to 3 objects, never people. Muse looks at {FRAMES} frames with SAM 3.1
+                        {wantedPhrases.length > 0 && <> and this costs at most {trackCost(FRAMES, wantedPhrases.length)}</>}.
+                        Only when each object was visible is saved, as text. No boxes or masks are kept.
+                      </p>}
+                </>
+              )}
             </div>
           )}
 
@@ -243,6 +296,15 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
       {open && step === "saved" && outcome && (
         <div className="add-step" role="status">
           <div className={`notice ${outcome.saved ? "info" : "warn"}`}>{outcome.text}</div>
+          {track && (
+            <div className={`notice ${track.state === "error" ? "warn" : "info"}`} role="status" aria-live="polite">
+              {track.state === "running" && <strong>Following objects in the video…</strong>}
+              {track.state === "error" && <>Your video is saved, but the objects could not be followed: {track.message}</>}
+              {track.state === "done" && (
+                <ul className="add-track-found">{track.lines.map((l) => <li key={l}>{l}</li>)}</ul>
+              )}
+            </div>
+          )}
           {outcome.saved && grants.length > 0 && <WithdrawCodes grants={grants} />}
           <div className="add-actions">
             <button type="button" className="btn" onClick={reset}>Add another</button>

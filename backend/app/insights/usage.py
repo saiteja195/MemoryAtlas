@@ -45,7 +45,8 @@ def usage_summary(conn: sqlite3.Connection, memory_day: str | None = None) -> di
     per_model = _SELECT.format(extra="model, MIN(kind = 'asr') AS only_asr, ")
     for row in conn.execute(per_model + " GROUP BY model ORDER BY calls DESC, model"):
         models.append({"model": row["model"],
-                       "kind_label": "Transcribes" if row["only_asr"] else "Reads and answers",
+                       "kind_label": ("Transcribes" if row["only_asr"] else "Finds objects in images"
+                                      if row["model"].startswith("sam") else "Reads and answers"),
                        **{k: v for k, v in _bucket(row).items()
                           if k in ("calls", "photos", "words_read", "audio_minutes", "avg_ms",
                                    "reading", "answering", "cache")}})

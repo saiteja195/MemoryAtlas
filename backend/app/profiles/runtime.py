@@ -130,7 +130,7 @@ class Runtimes:
             s = replace(self.settings, db_path=os.path.join(d, "memoryatlas.db"),
                         runtime_cache_dir=os.path.join(d, "llmcache"))
         conn = db.connect(s.db_path)
-        llm = MeteredLLM(self.llm or build_client(s), conn, {"text": s.llm_model, "asr": s.asr_model})
+        llm = MeteredLLM(self.llm or build_client(s), conn, {"text": s.llm_model, "asr": s.asr_model, "sam": s.sam_model})
         adapter = MockDayAdapter(s.demo_script)
         engine = MemoryEngine(conn, llm, adapter.owner, adapter.names)
         demo = DemoRunner(engine, adapter, s.revocation_secret, seed=seed_demo)
