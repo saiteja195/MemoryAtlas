@@ -124,3 +124,11 @@ CREATE TABLE IF NOT EXISTS model_calls (
   tokens_out  INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_model_calls_at ON model_calls(at);
+
+-- The state of a tracked promise or request. A claim with no row here is open. The row goes when
+-- the claim does (forgetting deletes it); the claim itself lives in `claims`.
+CREATE TABLE IF NOT EXISTS todo_state (
+  claim_id   TEXT PRIMARY KEY,
+  state      TEXT NOT NULL CHECK (state IN ('open', 'done', 'dismissed')),
+  updated_at TEXT NOT NULL
+);

@@ -29,6 +29,7 @@ from .profiles.routes import client_ip, make_router
 from .profiles.runtime import ProfileRuntime, Runtimes
 from .profiles import snapshots
 from .profiles.session import current_profile, open_runtime, resolve_runtime
+from .todos import count_open, list_todos, set_todo_state
 
 _DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
@@ -49,6 +50,13 @@ class CaptureBody(BaseModel):
     audio_b64: str | None = None
     perception: dict[str, Any] | None = None
     turns: list[dict[str, Any]] | None = None
+
+
+TodoFilter = Literal["open", "done", "dismissed", "all"]
+
+
+class TodoBody(BaseModel):
+    state: Literal["open", "done", "dismissed"]
 
 
 class PreviewBody(BaseModel):
@@ -166,7 +174,21 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         chosen = day or (days[-1] if days else None)
         return {"day": chosen, "days": days,
                 "coverage": coverage(rt.conn, chosen) if chosen else None,
-                "usage": usage_summary(rt.conn, chosen)}
+                "usage": usage_summary(rt.conn, chosen),
+                "todos_open": count_open(rt.conn, rt.engine.gateway.owner)}
+
+    @app.get("/todos")
+    def todos(state: TodoFilter = "open", rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
+        return list_todos(rt.conn, rt.engine.gateway.owner, state)
+
+    @app.post("/todos/{claim_id}")
+    def todo_state(claim_id: str, body: TodoBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        owner = rt.engine.gateway.owner
+        try:
+            set_todo_state(rt.conn, claim_id, body.state, owner)
+        except KeyError:
+            raise HTTPException(404, "That is not one of your to-dos.") from None
+        return next(t for t in list_todos(rt.conn, owner, "all") if t["claim_id"] == claim_id)
 
     @app.get("/privacy/media")
     def media(rt: ProfileRuntime = Depends(get_runtime)) -> dict:

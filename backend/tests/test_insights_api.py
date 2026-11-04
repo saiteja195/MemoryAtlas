@@ -94,7 +94,7 @@ def test_insights_defaults_to_the_latest_day(signed):
     assert body["day"] == "2026-10-29" and body["days"] == ["2026-10-28", "2026-10-29"]
     assert body["coverage"]["day"] == "2026-10-29" and body["coverage"]["covered_hours"] == 1
     assert body["coverage"]["busiest_hour"] == 12
-    assert body["usage"]["recorded"] is False
+    assert body["usage"]["recorded"] is False and body["todos_open"] == 0
 
 
 def test_insights_with_a_chosen_day(signed):
@@ -137,6 +137,7 @@ def test_insights_for_an_empty_profile(signed):
     body = c.get("/insights").json()
     assert body["day"] is None and body["days"] == [] and body["coverage"] is None
     assert body["usage"]["recorded"] is False and body["usage"]["day"] is None
+    assert body["todos_open"] == 0
 
 
 def test_a_todo_scan_counts_as_reading_not_answering():

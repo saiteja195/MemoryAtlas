@@ -244,6 +244,7 @@ class RevocationEngine:
         _delete_in(c, "DELETE FROM claim_index WHERE claim_id IN ({})", dead_list)
         _delete_in(c, "DELETE FROM claim_vectors WHERE claim_id IN ({})", dead_list)
         _delete_in(c, "DELETE FROM claims WHERE claim_id IN ({})", dead_list)
+        _delete_in(c, "DELETE FROM todo_state WHERE claim_id IN ({})", dead_list)
 
         refs_after = self._referenced_entities()
         orphan_ids = sorted((refs_before - refs_after) - {self.owner})
