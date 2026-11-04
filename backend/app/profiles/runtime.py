@@ -147,7 +147,7 @@ class Runtimes:
             cache_dir=s.runtime_cache_dir, red_team_questions=red_team)
         rt = ProfileRuntime(
             profile_id=profile_id, owner_name=owner_name, conn=conn, engine=engine, demo=demo,
-            recall=RecallService(conn, llm), revoker=revoker, drafts=DraftStore(), llm=llm,
+            recall=RecallService(conn, llm, adapter.owner), revoker=revoker, drafts=DraftStore(), llm=llm,
             sweep_lock=threading.Lock(),
             db_path=None if s.db_path == ":memory:" else os.path.abspath(s.db_path),
             cache_dir=s.runtime_cache_dir, settings=s)

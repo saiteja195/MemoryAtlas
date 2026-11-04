@@ -32,9 +32,9 @@ def graph_version(conn: sqlite3.Connection) -> str:
 
 
 class RecallService:
-    def __init__(self, conn: sqlite3.Connection, llm: LLMClient):
+    def __init__(self, conn: sqlite3.Connection, llm: LLMClient, owner: str = "me"):
         self.conn, self.llm = conn, llm
-        self.investigator = Investigator(conn, llm)
+        self.investigator = Investigator(conn, llm, owner=owner)
 
     def ask(self, question: str, as_of: str | None = None) -> dict[str, Any]:
         """`as_of` (YYYY-MM-DD) is the day "today" means; it defaults to the latest day with memories

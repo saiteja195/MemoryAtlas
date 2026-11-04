@@ -81,6 +81,8 @@ def test_addendum_states_the_windows_and_the_new_tools():
                  "open_todos(", "coverage(", "usage_stats(", "uncertain_claims("):
         assert text in EXTENDED_ADDENDUM
     assert "unknown" in EXTENDED_ADDENDUM.lower() and "no record" in EXTENDED_ADDENDUM.lower()
+    assert "returns an error" not in EXTENDED_ADDENDUM     # an argument error is corrected and retried
+    assert "coverage(time_from?, time_to?)" in EXTENDED_ADDENDUM
     assert not EXTENDED_ADDENDUM.startswith(SYSTEM)       # appended, never a rewrite
 
 

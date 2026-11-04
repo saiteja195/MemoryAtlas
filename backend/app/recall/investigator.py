@@ -82,11 +82,10 @@ Date context:
 More tools:
  day_summary(time_from, time_to)     moments, people, places and counts for a window
  open_todos()                        open promises the user made and requests made of the user
- coverage(time_from, time_to)        the spans the memory covers and the gaps
+ coverage(time_from?, time_to?)      the spans the memory covers and the gaps
  usage_stats(day?)                   how much the models read and answered (counts only)
  uncertain_claims()                  disputed, partial and low-confidence claims
-- If a tool is unknown or returns an error, do not guess: finish with status "abstained" and
-  say you have no record."""
+- If a tool is unknown, do not guess: finish with status "abstained" and say you have no record."""
 
 STEP_SCHEMA = {"type": "object", "properties": {"action": {"enum": ["tool", "final"]}},
                "required": ["action"]}
@@ -126,8 +125,8 @@ def abstain(why: str, tools: RecallTools | None = None, steps: int = 0,
 
 
 class Investigator:
-    def __init__(self, conn: sqlite3.Connection, llm: LLMClient, purpose: str = "answer"):
-        self.conn, self.llm, self.purpose = conn, llm, purpose
+    def __init__(self, conn: sqlite3.Connection, llm: LLMClient, purpose: str = "answer", owner: str = "me"):
+        self.conn, self.llm, self.purpose, self.owner = conn, llm, purpose, owner
 
     def ask(self, question: str, as_of: str | None = None) -> Answer:
         """`as_of` (YYYY-MM-DD) is the day "today" means. Without it no question is routed, so callers
@@ -137,7 +136,9 @@ class Investigator:
             return self._ask(question, as_of if route else None)
 
     def _ask(self, question: str, as_of: str | None = None) -> Answer:
-        tools = RecallTools(self.conn)
+        # `as_of` is set exactly when the router sent this question to the extended prompt (`ask` passes
+        # None otherwise), so those questions, and only those, get the five extra tools.
+        tools = RecallTools(self.conn, extended=as_of is not None, owner=self.owner)
         pad: list[dict[str, Any]] = []
         checks: list[str] = []
         retried = False
