@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { api, ApiError } from "../api/client";
-import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question } from "../api/types";
+import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question, SaveJob } from "../api/types";
 import {
   addAvailability, classifyFile, localIso, maxBytes, toCommitBody, unanswered, whenInputValue,
   type AnswerState, type FileKind,
 } from "../utils/addMemory";
 import { extractVideo, toBase64, toWav16k } from "../utils/media";
+import { pollJob, progressText } from "../utils/saveJob";
 import { CaptureButtons, type Captured } from "./CaptureButtons";
 import { Dialog } from "./Dialog";
 
@@ -52,11 +53,12 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const [outcome, setOutcome] = useState<{ text: string; saved: boolean } | null>(null);
   const [grants, setGrants] = useState<CommitResult["grants"]>([]);
   const [hover, setHover] = useState(false);
+  const [job, setJob] = useState<SaveJob | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setSource(null); setNote(""); setStep("add"); setError(null); setDraft(null);
-    setAnswers({ people: {} }); setPlaceChoice(null); setOutcome(null); setGrants([]); setHover(false);
+    setAnswers({ people: {} }); setPlaceChoice(null); setOutcome(null); setGrants([]); setHover(false); setJob(null);
   };
   useEffect(() => { if (!open) reset(); }, [open]);
 
@@ -111,8 +113,11 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
     if (!draft) return;
     setError(null);
     setStep("saving");
+    setJob(null);
     try {
-      const result = await api.commitCapture(toCommitBody(draft, answers));
+      // Saving runs in the background (a slow model must not hold a request open): start it, then watch it.
+      const { job_id } = await api.startCommit(toCommitBody(draft, answers));
+      const result = await pollJob(() => api.commitJob(job_id), setJob);
       const r = outcomeText(result);
       setGrants(result.grants);
       setOutcome(r);
@@ -211,6 +216,13 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
             <div className="notice warn" role="status">Saving will drop this memory: someone in it did not agree.</div>
           )}
           {error && <div className="notice error" role="alert">{error}</div>}
+
+          {step === "saving" && (
+            <div className="save-progress" role="status" aria-live="polite">
+              <strong>{progressText(job).title}</strong>
+              {progressText(job).detail && <span className="small muted">{progressText(job).detail}</span>}
+            </div>
+          )}
 
           <div className="add-actions">
             <button type="button" className="btn ghost" disabled={step === "saving"} onClick={reset}>Start over</button>

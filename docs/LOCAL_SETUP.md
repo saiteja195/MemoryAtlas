@@ -137,6 +137,14 @@ the plain-sentence fallback was used. To give the **sample day** a real to-do an
 Press **Add memory** in the header. It needs **live mode** (a model key). In replay or record mode the dialog says
 so and stays off, because those modes cache model responses, including transcripts of people who might say no.
 
+Saving runs in the background, so a slow model can never time out the page: **Save to Atlas** returns at once and the
+dialog shows what Muse is doing (the step, how long the current call has run and the time so far). You can close the dialog
+and it keeps saving. A save with one photo or note takes from about 30 seconds to two minutes with the live model. The server
+log (`docker compose logs backend`) has one `model call ... took Ns` line per call, a `slow model call` warning past 20
+seconds, and a `model API retry` warning each time the model API had to be retried. API: `POST /capture/commit/start`
+returns a job id; `GET /capture/commit/jobs/{id}` reports `running`, `done` (with the result) or `error`. The old
+`POST /capture/commit` still waits for the result.
+
 - **What you can add:** a photo (JPEG or PNG), a voice recording, a video, or a typed note. You can drop or pick a
   file, or capture one with the device: **Take photo**, **Record voice**, **Record video**. Voice is limited to
   10 minutes and video to 60 seconds when recorded in the page.

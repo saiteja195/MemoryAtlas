@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import re
 import threading
 import time
@@ -10,6 +11,7 @@ import httpx
 from .base import LLMUnavailable
 
 _RETRY_STATUS = {429, 500, 502, 503, 504}
+llm_log = logging.getLogger("memoryatlas.llm")
 
 
 class MetaClient:
@@ -46,10 +48,14 @@ class MetaClient:
                 resp = self._http.post(self.base_url + path, headers=headers, **kwargs)
             except httpx.TransportError as e:       # resets, timeouts, DNS: transient
                 if attempt < self._attempts - 1:
+                    llm_log.warning("model API retry: %s attempt %d of %d failed (%s); waiting %ds",
+                                    path, attempt + 1, self._attempts, type(e).__name__, 2 ** attempt)
                     self._sleep(2 ** attempt)
                     continue
                 raise LLMUnavailable(f"{path}: network error {type(e).__name__}") from None
             if resp.status_code in _RETRY_STATUS and attempt < self._attempts - 1:
+                llm_log.warning("model API retry: %s attempt %d of %d failed (HTTP %d); waiting %ds",
+                                path, attempt + 1, self._attempts, resp.status_code, 2 ** attempt)
                 self._sleep(2 ** attempt)
                 continue
             if resp.status_code >= 400:

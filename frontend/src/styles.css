@@ -898,3 +898,7 @@ dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
 .unsure-list button { border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: start; cursor: pointer; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; overflow-wrap: anywhere; }
 .coverage-card .card-head select { min-block-size: 32px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 2px 8px; font: inherit; }
 .dash-card.coverage-card { grid-column: 1 / -1; }
+
+/* Saving a memory: what Muse is doing, and for how long */
+.save-progress { display: grid; gap: 2px; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); }
+.save-progress strong { font-size: 0.92rem; }
