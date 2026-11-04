@@ -15,7 +15,9 @@ export function progressText(job: SaveJob | null): { title: string; detail: stri
   if (job.calls_started === job.calls_done) {
     return { title: "Saving what Muse found…", detail: `${span(job.elapsed_s)} so far` };
   }
-  let detail = `Step ${job.calls_started} · ${span(job.working_s)} · ${span(job.elapsed_s)} so far`;
+  // The first step is the whole wait so far: say the time once, not twice.
+  const now = span(job.working_s);
+  let detail = now === span(job.elapsed_s) ? `Step ${job.calls_started} · ${now}` : `Step ${job.calls_started} · ${now} · ${span(job.elapsed_s)} so far`;
   if (job.working_s >= 90) detail += ". Still working: you can close this and it will keep saving.";
   else if (job.working_s >= 45) detail += ". Slower than usual, but still going.";
   return { title: "Muse is working…", detail };

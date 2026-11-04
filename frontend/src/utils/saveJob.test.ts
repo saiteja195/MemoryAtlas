@@ -17,6 +17,12 @@ describe("progressText", () => {
     expect(t.detail).toContain("12 s");
     expect(t.detail).toContain("40 s so far");
   });
+  it("does not say the same number of seconds twice", () => {
+    const first = progressText(job({ calls_started: 1, working_s: 24.2, elapsed_s: 24.4 }));
+    expect(first.detail).toBe("Step 1 · 24 s");
+    const later = progressText(job({ calls_started: 2, calls_done: 1, working_s: 5, elapsed_s: 24 }));
+    expect(later.detail).toBe("Step 2 · 5 s · 24 s so far");
+  });
   it("says what is happening between two model calls", () => {
     expect(progressText(job({ calls_started: 1, calls_done: 1, elapsed_s: 15 })).title).toBe("Saving what Muse found…");
   });
