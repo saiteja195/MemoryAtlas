@@ -104,3 +104,23 @@ CREATE TABLE IF NOT EXISTS forgetting_receipts (
   receipt_id TEXT PRIMARY KEY, grant_id TEXT NOT NULL,
   created_at TEXT NOT NULL, report_json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS blocked_hashes (content_hash TEXT PRIMARY KEY, reason TEXT NOT NULL);
+
+-- One row per model call: counts and sizes only, never prompts, replies, transcripts or media.
+CREATE TABLE IF NOT EXISTS model_calls (
+  call_id     TEXT PRIMARY KEY,
+  at          TEXT NOT NULL,
+  model       TEXT NOT NULL,
+  kind        TEXT NOT NULL CHECK (kind IN ('text', 'vision', 'asr')),
+  purpose     TEXT NOT NULL,
+  memory_day  TEXT,
+  served_from TEXT NOT NULL CHECK (served_from IN ('live', 'cache')),
+  duration_ms INTEGER NOT NULL,
+  ok          INTEGER NOT NULL,
+  images      INTEGER NOT NULL DEFAULT 0,
+  words_in    INTEGER NOT NULL DEFAULT 0,
+  words_out   INTEGER NOT NULL DEFAULT 0,
+  audio_ms    INTEGER NOT NULL DEFAULT 0,
+  tokens_in   INTEGER,
+  tokens_out  INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_model_calls_at ON model_calls(at);

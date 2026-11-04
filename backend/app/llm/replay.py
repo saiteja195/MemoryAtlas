@@ -29,6 +29,8 @@ class RecordReplayClient:
         # nothing is ever written to or deleted from it, so a purge of `cache_dir` is complete.
         self._seed = Path(seed_dir) if seed_dir else None
         self._inner = inner
+        # Where the last call was answered from: "cache" (a recorded response) or "live".
+        self.last_served = "live"
         self._dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -42,9 +44,11 @@ class RecordReplayClient:
         for candidate in (path, self._seed / name if self._seed else None):
             if candidate is not None and candidate.exists():
                 data = json.loads(candidate.read_text())
+                self.last_served = "cache"
                 if isinstance(data, dict) and ERROR_KEY in data:
                     raise LLMUnavailable(data[ERROR_KEY])  # the model's unusable reply, replayed
                 return data
+        self.last_served = "live"
         if self.mode == "replay":
             raise LLMUnavailable(f"no recorded response for {method} ({path.name})")
         try:
