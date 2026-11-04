@@ -867,3 +867,22 @@ dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
   .assistant.expanded { inset: 8px; }
   .assistant-launch kbd { display: none; }
 }
+
+/* To-dos */
+.todo-card { padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+.todo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.todo-head h3 { margin: 0; font-size: 0.95rem; }
+.todo-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.todo { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; border-block-start: 1px solid var(--border); }
+.todo-box {
+  flex: none; inline-size: 22px; block-size: 22px; margin-block-start: 1px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.5px solid var(--muted); background: transparent; color: var(--accent-text); cursor: pointer; padding: 0; font-size: 0.8rem; font-weight: 700;
+}
+.todo-box:hover { border-color: var(--accent); }
+.todo.done .todo-box { background: var(--ok); border-color: var(--ok); }
+.todo-main { flex: 1; min-inline-size: 0; display: grid; gap: 2px; }
+.todo-text { margin: 0; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.todo.done .todo-text { text-decoration: line-through; color: var(--muted); font-weight: 500; }
+.todo-meta { margin: 0; overflow-wrap: anywhere; }
+.todo-source { justify-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: 0.8rem; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.todo-dismiss { flex: none; inline-size: 28px; block-size: 28px; font-size: 0.8rem; }
