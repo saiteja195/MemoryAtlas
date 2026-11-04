@@ -1,10 +1,11 @@
 import base64
 import os
+import re
 import tempfile
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .capture.audit import media_bytes_on_disk
@@ -15,6 +16,8 @@ from .capture.preview import BadRequest, TooLarge, build_preview
 from .config import Settings
 from .corrections import CorrectionError, correct_claim
 from .graph import build_graph
+from .insights.coverage import coverage, memory_days
+from .insights.usage import usage_summary
 from .llm.base import LLMClient, LLMUnavailable
 from .privacy import clock
 from .privacy.consent import create_grant
@@ -26,6 +29,8 @@ from .profiles.routes import client_ip, make_router
 from .profiles.runtime import ProfileRuntime, Runtimes
 from .profiles import snapshots
 from .profiles.session import current_profile, open_runtime, resolve_runtime
+
+_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 class CaptureBody(BaseModel):
@@ -147,6 +152,21 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     def graph(at: str | None = None, include: str | None = None,
               rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         return build_graph(rt.conn, at, include_history=include == "history")
+
+    @app.get("/insights")
+    def insights(day: str | None = Query(None), rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        if day is not None:
+            try:
+                if not _DAY.fullmatch(day):
+                    raise ValueError(day)
+                date.fromisoformat(day)
+            except ValueError:
+                raise HTTPException(422, "day must be a real date like 2026-10-29") from None
+        days = memory_days(rt.conn)
+        chosen = day or (days[-1] if days else None)
+        return {"day": chosen, "days": days,
+                "coverage": coverage(rt.conn, chosen) if chosen else None,
+                "usage": usage_summary(rt.conn, chosen)}
 
     @app.get("/privacy/media")
     def media(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
