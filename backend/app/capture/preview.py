@@ -1,6 +1,8 @@
 """Read an upload with Muse and return a draft. Nothing is stored; the bytes are dropped."""
 import base64
 import binascii
+import concurrent.futures
+import contextvars
 from datetime import datetime
 
 from ..compiler.perceive import perceive_frame
@@ -12,7 +14,8 @@ from .media_info import MediaError, check_image, check_wav, read_exif
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_AUDIO_BYTES = 32 * 1024 * 1024
 MAX_NOTE_CHARS = 5000
-MAX_VIDEO_FRAMES = 4
+MAX_VIDEO_FRAMES = 8
+READ_WORKERS = 4                 # frames read at the same time: a clip takes about as long as one photo
 
 
 class TooLarge(ValueError):
@@ -47,6 +50,14 @@ def local_iso(value: str | None) -> str | None:
 def _day(iso: str | None) -> str | None:
     """The memory day (YYYY-MM-DD) of a capture time, when it is known."""
     return iso[:10] if iso else None
+
+
+def _read_frames(llm: LLMClient, images: list[bytes]) -> list[dict]:
+    """Read every frame, a few at a time, keeping their order. Each reading runs in a copy of this request's context,
+    so the usage purpose and the progress count follow it."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(READ_WORKERS, len(images))) as pool:
+        futures = [pool.submit(contextvars.copy_context().run, perceive_frame, llm, image) for image in images]
+        return [f.result().model_dump() for f in futures]
 
 
 def build_preview(llm: LLMClient, kind: str, *, data_b64: str | None = None,
@@ -90,7 +101,7 @@ def build_preview(llm: LLMClient, kind: str, *, data_b64: str | None = None,
         if audio is not None:
             check_wav(audio)
         with usage_purpose("read_memory", _day(when)):
-            perceptions = [perceive_frame(llm, image).model_dump() for image in images]
+            perceptions = _read_frames(llm, images)
             turns = llm.transcribe(audio, None) if audio is not None else None
         del images, audio
         return build_draft("video", perceptions=perceptions, frame_offsets_ms=list(offsets),

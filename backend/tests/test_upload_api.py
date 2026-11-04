@@ -147,7 +147,7 @@ def test_preview_video_without_audio_has_no_speakers():
     assert d["speakers"] == [] and fake.transcribed == []
 
 
-@pytest.mark.parametrize("frames,offsets", [(5, [1, 2, 3, 4, 5]), (2, [1]), (0, [])])
+@pytest.mark.parametrize("frames,offsets", [(9, list(range(1, 10))), (2, [1]), (0, [])])
 def test_preview_video_bad_frame_counts_are_422(frames, offsets):
     c, _ = make()
     body = {"kind": "video", "frames_b64": [b64(png())] * frames, "frame_offsets_ms": offsets}
@@ -321,10 +321,10 @@ def test_commit_video_ingests_frames_and_audio():
                                                 {"ref": "visible1", "consented": True}])
     assert r.status_code == 200, r.text
     statuses = [x["status"] for x in r.json()["results"]]
-    assert statuses == ["ingested"] * 5                    # 3 frames, 2 spoken turns
-    times = sorted(t for t in (x[0] for x in c.app.state.conn.execute(
-        "SELECT captured_at FROM sources WHERE kind='frame_observation' AND session_id LIKE 'upload-%'")))
-    assert times == ["2026-10-29T12:35:01", "2026-10-29T12:35:02", "2026-10-29T12:35:03"]
+    assert statuses == ["ingested"] * 3                    # the clip's frames as one memory, 2 spoken turns
+    times = [x[0] for x in c.app.state.conn.execute(
+        "SELECT captured_at FROM sources WHERE kind='frame_observation' AND session_id LIKE 'upload-%'")]
+    assert times == ["2026-10-29T12:35:00"]
 
 
 def test_commit_video_person_declines_stores_nothing():

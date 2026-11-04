@@ -11,6 +11,7 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, Field
 
+from ..compiler.perceive import merge_perceptions
 from .media_info import ExifInfo
 
 Confidence = Literal["sure", "check", "ask"]
@@ -28,10 +29,14 @@ _PERSON_WORDS = (
 )
 _PERSON_RE = re.compile(r"\b(?:" + "|".join(_PERSON_WORDS) + r")\b", re.IGNORECASE)
 _MAX_VISIBLE = 3
+_MAX_SEEN = 12
+# Text printed on these is a title, a brand or a label, not the name of the place the person is in.
+_PRINTED_ON = re.compile(r"\b(?:book|books|magazine|notebook|mouse ?pad|bottle|can|box|package|packaging|sticker|poster|"
+                         r"laptop|keyboard|monitor|screen|shirt)\b", re.IGNORECASE)
 
 
 class DraftField(BaseModel):
-    key: Literal["when", "where", "doing", "people"]
+    key: Literal["when", "where", "doing", "seen", "people"]
     value: str | None
     source: Source | None
     confidence: Confidence
@@ -76,11 +81,26 @@ def _visible_people(perception: dict) -> int:
 
 
 def _first_ocr(perceptions: list[dict]) -> str | None:
+    """The first visible text that could be the name of a place. Text on a book or a mouse pad is not one, and neither
+    is a cropped fragment ("pplications") or a single letter; when nothing qualifies the person is asked instead."""
     for p in perceptions:
+        labels = [(o.get("label") if isinstance(o, dict) else str(o)) or "" for o in p.get("objects") or []]
+        if any(_PRINTED_ON.search(label) for label in labels):
+            continue
         for t in p.get("ocr_text") or []:
-            if str(t).strip():
-                return str(t).strip()
+            t = str(t).strip()
+            if sum(c.isalpha() for c in t) >= 3 and not t[0].islower():
+                return t
     return None
+
+
+def _seen(perceptions: list[dict]) -> str | None:
+    """The objects Muse noticed, once each, for the review screen. The same list is saved with the memory."""
+    labels = [o["label"] for o in merge_perceptions(perceptions)["objects"]]
+    if not labels:
+        return None
+    more = len(labels) - _MAX_SEEN
+    return ", ".join(labels[:_MAX_SEEN]) + (f" (+{more} more)" if more > 0 else "")
 
 
 def _first_caption(perceptions: list[dict]) -> str | None:
@@ -125,9 +145,12 @@ def build_draft(kind: str, *, perceptions: list[dict] | None = None,
 
     # doing
     if kind in ("frame", "video"):
-        caption = _first_caption(perceptions)
+        caption = (merge_perceptions(perceptions)["caption"] if kind == "video" else _first_caption(perceptions))
         if caption:
             fields.append(DraftField(key="doing", value=caption, source="image", confidence="sure"))
+        seen = _seen(perceptions)
+        if seen:
+            fields.append(DraftField(key="seen", value=seen, source="image", confidence="sure"))
     elif kind == "note" and text:
         fields.append(DraftField(key="doing", value=text.strip(), source="note", confidence="sure"))
 

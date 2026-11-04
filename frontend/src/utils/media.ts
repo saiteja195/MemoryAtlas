@@ -1,11 +1,14 @@
 // Browser glue for recordings and uploads: decode audio to WAV, pull frames out of a video, and
 // base64-encode for the API. These need a real browser (AudioContext, <video>, canvas), so they
 // are exercised by hand and kept thin; the maths lives in wav.ts, which is unit tested.
+import { lumaSignature, pickDistinct } from "./frames";
 import { downmixToMono, encodeWav16, frameOffsets, resampleLinear } from "./wav";
 
 export const ASR_RATE = 16000;
 const MAX_AUDIO_SECONDS = 600;
 const MAX_FRAME_SIDE = 1280;
+const THUMB = 16;                  // a 16 x 16 copy of each frame is enough to tell whether the picture changed
+const DISTINCT_THRESHOLD = 10;      // average brightness change (0 to 255) that counts as a different picture
 
 export function toBase64(data: Blob | Uint8Array): Promise<string> {
   const blob = data instanceof Blob ? data : new Blob([data as BlobPart]);
@@ -56,7 +59,8 @@ async function settledDuration(video: HTMLVideoElement): Promise<number> {
 
 export type ExtractedVideo = { frames: Blob[]; offsetsMs: number[]; audio: Uint8Array | null; durationMs: number };
 
-export async function extractVideo(blob: Blob, maxFrames = 4, withAudio = true): Promise<ExtractedVideo> {
+/** `distinct`: look at twice as many frames and keep only the ones that differ, up to `maxFrames` (fewer paid reads). */
+export async function extractVideo(blob: Blob, maxFrames = 4, withAudio = true, distinct = false): Promise<ExtractedVideo> {
   const url = URL.createObjectURL(blob);
   const video = document.createElement("video");
   video.muted = true;
@@ -67,7 +71,7 @@ export async function extractVideo(blob: Blob, maxFrames = 4, withAudio = true):
     video.src = url;
     await loaded;
     const durationMs = Math.round((await settledDuration(video)) * 1000);
-    const offsetsMs = frameOffsets(durationMs, maxFrames);
+    const offsetsMs = frameOffsets(durationMs, distinct ? maxFrames * 2 : maxFrames);
     const scale = Math.min(1, MAX_FRAME_SIDE / Math.max(video.videoWidth, video.videoHeight, 1));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
@@ -75,6 +79,9 @@ export async function extractVideo(blob: Blob, maxFrames = 4, withAudio = true):
     const g = canvas.getContext("2d");
     if (!g) throw new Error("This browser cannot read video frames.");
     const frames: Blob[] = [];
+    const signatures: number[][] = [];
+    const thumb = distinct ? Object.assign(document.createElement("canvas"), { width: THUMB, height: THUMB })
+      .getContext("2d", { willReadFrequently: true }) : null;
     for (const at of offsetsMs) {
       const seeked = once(video, "seeked");
       video.currentTime = at / 1000;
@@ -83,6 +90,16 @@ export async function extractVideo(blob: Blob, maxFrames = 4, withAudio = true):
       const jpeg = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
       if (!jpeg) throw new Error("Could not capture a frame from the video.");
       frames.push(jpeg);
+      if (thumb) {
+        thumb.drawImage(video, 0, 0, THUMB, THUMB);
+        signatures.push(lumaSignature(thumb.getImageData(0, 0, THUMB, THUMB).data));
+      }
+    }
+    if (distinct && signatures.length === frames.length) {
+      const keep = pickDistinct(signatures, maxFrames, DISTINCT_THRESHOLD);
+      const picked = { frames: keep.map((i) => frames[i]), offsets: keep.map((i) => offsetsMs[i]) };
+      frames.splice(0, frames.length, ...picked.frames);
+      offsetsMs.splice(0, offsetsMs.length, ...picked.offsets);
     }
     let audio: Uint8Array | null = null;
     if (withAudio) try { audio = await toWav16k(blob); } catch { /* no audio track, or one we cannot decode */ }
