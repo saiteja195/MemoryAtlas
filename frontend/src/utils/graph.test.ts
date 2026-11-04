@@ -3,6 +3,7 @@ import full from "./__fixtures__/graph-full.json";
 import after from "./__fixtures__/graph-after-revoke.json";
 import type { Graph, GraphEdge } from "../api/types";
 import { summarize } from "./dashboard";
+import { CARD, textRoom } from "./cardText";
 import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "./suggest";
 import {
   atTime, buildElements, claimIdOfFact, clock, dayCards, describeGraph, factCategory, groupFacts, episodeOptions, factNodeId, factRows,
@@ -330,6 +331,108 @@ describe("lane layout of the map", () => {
   it("bows out edges that stay inside one column", () => {
     const same = els().filter((e) => e.group === "edges" && String(e.classes).includes("same-lane"));
     expect(same.length).toBeGreaterThan(0);
+  });
+});
+
+describe("cards on the map", () => {
+  const clone = (): Graph => JSON.parse(JSON.stringify(FULL)) as Graph;
+  const nodeNamed = (g: Graph, name: string) => g.nodes.find((n) => n.name === name)!;
+  const entity = (es: ReturnType<typeof buildElements>, id: string) => es.find((e) => e.data.id === id)!;
+
+  it("gives every card a width that fits its text, and keeps the whole name", () => {
+    const es = buildElements(FULL, opts());
+    const cards = es.filter((e) => String(e.classes).includes("entity"));
+    expect(cards.length).toBeGreaterThan(5);
+    for (const c of cards) {
+      expect(c.data.w).toBeGreaterThanOrEqual(CARD.minW);
+      expect(c.data.w).toBeLessThanOrEqual(CARD.maxW);
+      expect(typeof c.data.name).toBe("string");
+      // The renderer's own ellipsis guard: a little wider than the text, still inside the card's padding.
+      expect(c.data.tw).toBeGreaterThan(textRoom(c.data.w as number) - 1);
+      expect(c.data.tw).toBeLessThanOrEqual(textRoom(c.data.w as number) + CARD.pad / 2);
+    }
+    expect(entity(es, nodeNamed(FULL, "Luna Taqueria").id).data.name).toBe("Luna Taqueria");
+  });
+
+  it("cuts a very long name to fit the card but keeps all of it for the tooltip", () => {
+    const g = clone();
+    const long = "The little cafe on the corner of Market Street and Fourth Avenue, opposite the old bank, " + "very ".repeat(30);
+    const n = nodeNamed(g, "Luna Taqueria");
+    n.name = long;
+    const c = entity(buildElements(g, opts()), n.id);
+    expect(String(c.data.label).endsWith("…")).toBe(true);
+    expect(String(c.data.label).length).toBeLessThan(long.length);
+    expect(c.data.name).toBe(long.trim());
+    expect(c.data.w).toBeLessThanOrEqual(CARD.maxW);
+  });
+
+  it("shows a stand-in, marked so it can be styled quietly, when a name is missing", () => {
+    const g = clone();
+    const n = nodeNamed(g, "Luna Taqueria");
+    n.name = "   ";
+    const c = entity(buildElements(g, opts()), n.id);
+    expect(c.data.label).toBe("Unnamed place");
+    expect(String(c.classes)).toContain("unnamed");
+    const g2 = clone();
+    (nodeNamed(g2, "Alex") as { name: unknown }).name = null;
+    expect(entity(buildElements(g2, opts()), nodeNamed(g2, "Me").id).data.label).toBe("Me");
+    expect(buildElements(g2, opts()).some((e) => e.data.label === "Unnamed person")).toBe(true);
+  });
+
+  it("puts a name that has line breaks on one line", () => {
+    const g = clone();
+    const n = nodeNamed(g, "Blue Door Café");
+    n.name = "Blue Door\n  Café";
+    expect(entity(buildElements(g, opts()), n.id).data.label).toBe("Blue Door Café");
+  });
+
+  it("keeps a relationship label short, and shows nothing for a blank one", () => {
+    const g = clone();
+    const rel = g.edges.find((e) => e.target && e.status !== "superseded" && e.predicate !== "part_of_episode")!;
+    rel.predicate = "was_extremely_close_to_the_place_where_the_conversation_happened_on_that_day";
+    const long = buildElements(g, opts()).find((e) => e.data.id === rel.id)!;
+    expect((long.data.label as string).length).toBeLessThanOrEqual(32);
+    expect(long.data.relation).toBeTruthy();
+    rel.predicate = "";
+    rel.support = rel.support.slice(0, 1);
+    const blank = buildElements(g, opts()).find((e) => e.data.id === rel.id)!;
+    expect(blank.data.label).toBe("");
+  });
+
+  it("skips a fact whose text is only spaces", () => {
+    const g = clone();
+    const f = g.edges.find((e) => !e.target && e.value)!;
+    f.value = "  \n ";
+    expect(buildElements(g, opts()).some((e) => e.data.id === factNodeId(f.id))).toBe(false);
+  });
+
+  it("keeps a card's details clear of the card, however wide the card is", () => {
+    const g = clone();
+    nodeNamed(g, "Blue Door Café").name = "A very long place name that fills the whole card from edge to edge";
+    const es = buildElements(g, opts());
+    const nodes = new Map(es.filter((e) => e.group === "nodes").map((e) => [e.data.id as string, e]));
+    for (const e of es.filter((x) => x.group === "edges" && String(x.classes).includes("to-fact"))) {
+      const owner = nodes.get(e.data.source as string)!;
+      const fact = nodes.get(e.data.target as string)!;
+      const gap = Math.abs(fact.position!.x - owner.position!.x) - (fact.data.w as number) / 2 - (owner.data.w as number) / 2;
+      expect(gap).toBeGreaterThanOrEqual(16);
+    }
+  });
+});
+
+describe("day cards with awkward names", () => {
+  it("never builds a title from blank or untidy names", () => {
+    const g = JSON.parse(JSON.stringify(FULL)) as Graph;
+    g.nodes.find((n) => n.name === "Alex")!.name = "";
+    g.nodes.find((n) => n.name === "Office")!.name = "  Head\n office ";
+    const titles = dayCards(g).map((c) => c.title);
+    expect(titles.some((t) => t.includes("Unnamed person"))).toBe(true);
+    expect(titles.some((t) => t.includes("Head office"))).toBe(true);
+    for (const t of titles) {
+      expect(t).not.toMatch(/ {2}|\n/);
+      expect(t.trim()).toBe(t);
+      expect(t).not.toMatch(/ with $| and $|^With $|^At $/);
+    }
   });
 });
 

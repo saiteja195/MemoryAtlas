@@ -459,7 +459,13 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); backdrop-filter: blur(6px); }
 .moment-meta { display: grid; gap: 6px; }
 .chip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .chip-label { inline-size: 54px; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.entity-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: 0.86rem; background: var(--surface-2); border: 1px solid transparent; }
+.entity-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: 0.86rem; background: var(--surface-2); border: 1px solid transparent;
+  max-inline-size: min(100%, 34ch); min-inline-size: 0; }
+.entity-chip .chip-text { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entity-chip.t-person { color: var(--c-person); }
+.entity-chip.t-place { color: var(--c-place); }
+.entity-chip.t-object, .entity-chip.t-item { color: var(--c-object); }
+.entity-chip .chip-text { color: var(--text); }
 .entity-chip.t-person { background: color-mix(in srgb, var(--c-person) 16%, transparent); }
 .entity-chip.t-place { background: color-mix(in srgb, var(--c-place) 16%, transparent); }
 .entity-chip.t-object, .entity-chip.t-item { background: color-mix(in srgb, var(--c-object) 18%, transparent); }
@@ -494,10 +500,9 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); backdrop-filter: blur(6px); }
 .legend { margin-block-start: 10px; }
 .legend-quick { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.86rem; color: var(--muted); align-items: center; }
 .legend-quick li { display: inline-flex; align-items: center; gap: 6px; }
-.dot-i { inline-size: 20px; block-size: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; flex: none; }
-.dot-i.sq { border-radius: 6px; }
-.dot-i.dia { border-radius: 4px; transform: rotate(45deg) scale(0.8); }
-.dot-i.dia i { transform: rotate(-45deg); font-style: normal; font-size: 9px; color: #fff; }
+.type-chip { inline-size: 22px; block-size: 22px; border-radius: 7px; display: inline-grid; place-items: center; flex: none;
+  background: color-mix(in srgb, currentColor 20%, transparent); }
+.type-icon { inline-size: 14px; block-size: 14px; flex: none; }
 .legend-more { margin-block-start: 4px; }
 .legend-more summary { cursor: pointer; color: var(--muted); font-size: 0.82rem; min-block-size: 28px; display: flex; align-items: center; }
 

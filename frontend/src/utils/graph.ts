@@ -1,6 +1,7 @@
 // Pure functions that turn the backend graph into what the Atlas shows. No DOM, no React, so
 // they can be unit tested against real payloads (see graph.test.ts).
 import type { ElementDefinition } from "cytoscape";
+import { cardLayout, cleanText, displayName, measureCard, textRoom } from "./cardText";
 import type {
   ClaimStatus, EvidenceType, Graph, GraphEdge, GraphNode, Support,
 } from "../api/types";
@@ -137,13 +138,23 @@ export const factNodeId = (claimId: string) => `fact:${claimId}`;
 export const claimIdOfFact = (nodeId: string) => (nodeId.startsWith("fact:") ? nodeId.slice(5) : null);
 
 const FACT_LABEL_MAX = 34;
-/** Chip width for a fact's text (Cytoscape's own "fit to label" sizing is deprecated). */
-export const factWidth = (label: string): number => Math.round(Math.max(44, label.length * 6.1 + 22));
+const RELATION_LABEL_MAX = 32;
+/** Chip width for a fact's text (Cytoscape's own "fit to label" sizing is deprecated). Facts are drawn
+ *  at 11 px, the card font is 13 px, so measuring in the card font leaves a little spare room. */
+export const factWidth = (label: string): number => Math.max(44, Math.ceil((measureCard(label) * 11) / 13 + 22));
 
+/** The whole relationship text, on one line: "" when the claim has no predicate. */
+const fullClaimLabel = (e: GraphEdge): string => {
+  const base = cleanText(humanPredicate(cleanText(e.predicate)));
+  return base ? `${e.status === "superseded" ? "⏱ " : e.status === "disputed" ? "⚠ " : ""}${base}` : "";
+};
+
+/** The text on a relationship line: short, and empty (so nothing is drawn) when there is none. */
 function claimLabel(e: GraphEdge): string {
+  const full = fullClaimLabel(e);
+  if (!full) return "";
   const n = new Set(e.support.map((s) => `${s.kind}@${s.at}`)).size;
-  const prefix = e.status === "superseded" ? "⏱ " : e.status === "disputed" ? "⚠ " : "";
-  return `${prefix}${humanPredicate(e.predicate)}${n > 1 ? ` ×${n}` : ""}`;
+  return truncate(`${full}${n > 1 ? ` ×${n}` : ""}`, RELATION_LABEL_MAX);
 }
 
 export function episodeTimeLabel(n: GraphNode): string {
@@ -207,28 +218,31 @@ function entityElements(view: Graph, opts: ViewOptions): ElementDefinition[] {
       used.add(e.target);
       edges.push({
         group: "edges", classes: classes.join(" "),
-        data: { id: e.id, source: e.source, target: e.target, label: claimLabel(e), claimId: e.id },
+        data: { id: e.id, source: e.source, target: e.target, label: claimLabel(e), relation: fullClaimLabel(e), claimId: e.id },
       });
-    } else if (e.value && (opts.showFacts === "all" || (opts.showFacts !== "none" && opts.showFacts.has(e.id)))) {
+    } else if (cleanText(e.value) && (opts.showFacts === "all" || (opts.showFacts !== "none" && opts.showFacts.has(e.id)))) {
       used.add(e.source);
       const fid = factNodeId(e.id);
+      const text = cleanText(e.value);
       facts.push({
         group: "nodes", classes: ["fact", `st-${e.status}`, sourceClass(e.support)].join(" "),
-        data: { id: fid, label: truncate(e.value, FACT_LABEL_MAX), full: e.value, claimId: e.id,
-                w: factWidth(truncate(e.value, FACT_LABEL_MAX)) },
+        data: { id: fid, label: truncate(text, FACT_LABEL_MAX), full: text, claimId: e.id,
+                w: factWidth(truncate(text, FACT_LABEL_MAX)) },
       });
       edges.push({
         group: "edges", classes: [...classes, "to-fact"].join(" "),
-        data: { id: e.id, source: e.source, target: fid, label: claimLabel(e), claimId: e.id },
+        data: { id: e.id, source: e.source, target: fid, label: claimLabel(e), relation: fullClaimLabel(e), claimId: e.id },
       });
     }
   }
 
   const nodes: ElementDefinition[] = [...used].map((id) => {
     const n = entities.get(id)!;
+    const card = cardLayout(n.name, n.type);
     return {
-      group: "nodes" as const, classes: `entity type-${n.type}${id === OWNER_ID ? " owner" : ""}`,
-      data: { id, label: n.name, type: n.type },
+      group: "nodes" as const,
+      classes: `entity type-${n.type}${id === OWNER_ID ? " owner" : ""}${card.unnamed ? " unnamed" : ""}`,
+      data: { id, label: card.label, name: card.full, w: card.w, tw: textRoom(card.w) + 4, type: n.type },
     };
   });
   const labels = layoutInLanes(view, nodes, facts, edges);
@@ -245,9 +259,9 @@ const LANES: { id: Lane; title: string; x: number }[] = [
   { id: "place", title: "Places", x: 440 },
   { id: "thing", title: "Things", x: 880 },
 ];
-const ROW = 96;        // vertical space for one node and its label
-const FACT_ROW = 36;   // one fact chip under the same owner
-const FACT_INDENT = 96; // where a fact chip starts, measured from its owner
+const ROW = 76;        // vertical space for one card
+const FACT_ROW = 34;   // one fact chip under the same owner
+const FACT_GAP = 28;   // clear space between a card's edge and its detail chips
 
 export const laneOf = (type: string): Lane => (type === "person" ? "person" : type === "place" || type === "org" ? "place" : "thing");
 
@@ -289,7 +303,7 @@ function layoutInLanes(
       const mine = factsOf.get(n.data.id as string) ?? [];
       mine.forEach((f, i) => {
         // People's details go on the outer (left) side so lines to places never run through them.
-        const dx = FACT_INDENT + (f.data.w as number) / 2;
+        const dx = (n.data.w as number) / 2 + FACT_GAP + (f.data.w as number) / 2;
         f.position = { x: lane.id === "person" ? lane.x - dx : lane.x + dx, y: y + (i - (mine.length - 1) / 2) * FACT_ROW };
       });
       y += ROW + Math.max(0, mine.length - 1) * FACT_ROW;
@@ -446,9 +460,10 @@ export function dayCards(view: Graph): DayCard[] {
       const sources = [...new Set(claims.flatMap((c) => c.support.map((s) => sourceLabel(s.kind))))];
       const places = ms.filter((m) => m.type === "place");
       const people = ms.filter((m) => m.type === "person");
-      const where = places[0]?.name;
-      const title = people.length && where ? `${where} with ${people.map((p) => p.name).join(" and ")}`
-        : people.length ? `With ${people.map((p) => p.name).join(" and ")}`
+      const where = places[0] && displayName(places[0]);
+      const who = people.map(displayName).join(" and ");
+      const title = people.length && where ? `${where} with ${who}`
+        : people.length ? `With ${who}`
         : where ? `At ${where}` : "A moment from your day";
       return {
         id: ep.id, time: episodeTimeLabel(ep), title, summary: summary?.value ?? null,

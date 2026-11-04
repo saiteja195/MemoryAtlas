@@ -8,7 +8,8 @@
     <title>MemoryAtlas</title>
     <script>
       // Apply a saved appearance before first paint so there is no flash of the wrong theme.
-      try { var t = localStorage.getItem("memoryatlas-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+      // Light is the default; "system" leaves the attribute off so the device decides.
+      try { var t = localStorage.getItem("memoryatlas-theme"); if (t !== "system") document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light"); } catch (e) { document.documentElement.setAttribute("data-theme", "light"); }
     </script>
   </head>
   <body>
