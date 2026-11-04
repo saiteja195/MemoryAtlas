@@ -28,6 +28,7 @@ With Docker instead (separate `web` and `backend` services on one network, no lo
 `docker compose up --build`, then open <http://localhost:8080>. See [`docs/DOCKER.md`](docs/DOCKER.md).
 
 Full guide, including the copy-and-paste demo and live mode: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
+Adding your own photos, voice, video and notes: [Adding your own memories](docs/LOCAL_SETUP.md#adding-your-own-memories). Running it on a VM with HTTPS so a phone can use the camera: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Contributing
 

@@ -4,7 +4,7 @@ import os
 import threading
 from datetime import timedelta
 from dataclasses import replace
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -12,7 +12,11 @@ from pydantic import BaseModel, Field
 from . import db
 from .capture.adapters import MockDayAdapter
 from .capture.audit import media_bytes_on_disk
+from .capture.commit import Answers, CommitError, commit as commit_draft, plan as plan_commit
+from .capture.draft import DraftStore
+from .capture.media_info import MediaError
 from .capture.models import KINDS, RawCapture
+from .capture.preview import BadRequest, TooLarge, build_preview
 from .corrections import CorrectionError, correct_claim
 from .config import Settings, runtime_cache_path
 from .demo import DemoRunner
@@ -44,6 +48,21 @@ class CaptureBody(BaseModel):
     audio_b64: str | None = None
     perception: dict[str, Any] | None = None
     turns: list[dict[str, Any]] | None = None
+
+
+class PreviewBody(BaseModel):
+    kind: Literal["frame", "audio", "note", "video"]
+    data_b64: str | None = None                 # frame: the image. audio: the WAV
+    frames_b64: list[str] = Field(default_factory=list)       # video: 1 to 4 JPEG frames
+    frame_offsets_ms: list[int] = Field(default_factory=list)
+    audio_b64: str | None = None                # video: the audio track as WAV
+    text: str | None = None
+    file_modified_at: str | None = None         # local time of the file, naive ISO
+
+
+class CommitBody(BaseModel):
+    draft_id: str
+    answers: Answers = Field(default_factory=Answers)
 
 
 class AskBody(BaseModel):
@@ -108,7 +127,8 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
 
     sweep()                                     # anything that lapsed while the app was off
     app = FastAPI(title="MemoryAtlas", dependencies=[Depends(sweep_before_request)])
-    app.state.conn, app.state.engine, app.state.demo = conn, engine, demo
+    drafts = DraftStore()
+    app.state.conn, app.state.engine, app.state.demo, app.state.drafts = conn, engine, demo, drafts
 
     @app.get("/health")
     def health() -> dict:
@@ -173,6 +193,54 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     @app.get("/export")
     def export() -> dict:
         return export_memories(conn)
+
+    def require_live() -> None:
+        # In record mode every model response is written to the cache, including a transcript of someone
+        # who then says no. Uploads therefore run only on the live client, which keeps nothing.
+        if llm.mode != "live":
+            raise HTTPException(409, "Adding memories needs live mode (a model key); this app is in "
+                                     f"{llm.mode} mode.")
+
+    @app.post("/capture/preview")
+    def capture_preview(body: PreviewBody) -> dict:
+        """Read an upload with Muse and return what it understood and what it still needs to
+        ask. Stores nothing; the commit step does that."""
+        require_live()
+        try:
+            draft = build_preview(
+                llm, body.kind, data_b64=body.data_b64, frames_b64=body.frames_b64,
+                frame_offsets_ms=body.frame_offsets_ms, audio_b64=body.audio_b64, text=body.text,
+                file_modified_at=body.file_modified_at)
+        except TooLarge as e:
+            raise HTTPException(413, str(e)) from None
+        except BadRequest as e:
+            raise HTTPException(422, str(e)) from None
+        except MediaError as e:
+            raise HTTPException(415, str(e)) from None
+        except LLMUnavailable as e:
+            raise HTTPException(503, str(e)) from e
+        return drafts.put(draft).model_dump()
+
+    @app.post("/capture/commit")
+    def capture_commit(body: CommitBody) -> dict:
+        """Store a confirmed draft. Consent is decided here, in code, from the answers."""
+        require_live()
+        try:
+            draft = drafts.peek(body.draft_id)
+        except KeyError:
+            raise HTTPException(404, "draft expired or unknown") from None
+        try:
+            decided = plan_commit(draft, body.answers, engine.gateway.owner)
+        except CommitError as e:
+            raise HTTPException(e.status, e.message) from None
+        try:
+            drafts.take(body.draft_id)          # from here on a second call gets 404
+        except KeyError:
+            raise HTTPException(404, "draft expired or unknown") from None
+        try:
+            return commit_draft(conn, engine, settings.revocation_secret, draft, decided)
+        except LLMUnavailable as e:
+            raise HTTPException(503, str(e)) from e
 
     @app.post("/capture/{kind}")
     def capture(kind: str, body: CaptureBody) -> dict:

@@ -10,6 +10,7 @@ import { readPalette, watchColorScheme, type Palette } from "./utils/theme";
 import { AskPanel, type QA } from "./components/AskPanel";
 import { ConsentDevice } from "./components/ConsentDevice";
 import { ConsentPanel } from "./components/ConsentPanel";
+import { AddMemory } from "./components/AddMemory";
 import { Dialog } from "./components/Dialog";
 import { EvidenceDrawer } from "./components/Evidence";
 import { DayOverview } from "./components/DayOverview";
@@ -69,6 +70,7 @@ function Atlas() {
   const [asking, setAsking] = useState(false);
   const [simulate, setSimulate] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [page, setPage] = useState<Page>("dashboard");
   const theme = useTheme();
   const qaId = useRef(0);
@@ -221,7 +223,7 @@ function Atlas() {
       <Header
         health={atlas.health} media={atlas.media} status={atlas.status} busy={atlas.busy} offline={atlas.offline}
         onNext={() => void atlas.advance(1)} onAll={() => void atlas.advance(50)}
-        onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} onHelp={() => setHelp(true)}
+        onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} onHelp={() => setHelp(true)} onAdd={() => setAdding(true)}
         page={page} onPage={setPage} theme={theme.pref} onTheme={theme.choose}
       />
 
@@ -342,6 +344,7 @@ function Atlas() {
       </div>
       )}
 
+      <AddMemory open={adding} mode={atlas.health?.llm_mode} onClose={() => setAdding(false)} onSaved={() => void atlas.refresh()} />
       <HowItWorks open={help} onClose={() => setHelp(false)} />
       <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />
       <ReceiptDialog receipt={atlas.receipt} onClose={atlas.closeReceipt} />

@@ -1,5 +1,5 @@
 import type {
-  Answer, DemoStatus, Graph, Grant, Health, Media, Provenance, Receipt,
+  Answer, Answers, CommitResult, DemoStatus, Draft, Graph, Grant, Health, Media, PreviewBody, Provenance, Receipt,
 } from "./types";
 
 /** An API failure with the server's own explanation, so the UI can say something useful. */
@@ -52,6 +52,9 @@ export const api = {
   uploadLive: (eventId: string) => post<{ ingested: number }>(`/demo/live/${encodeURIComponent(eventId)}`),
   reset: () => post<DemoStatus>("/demo/reset"),
   ask: (question: string) => post<Answer>("/recall/ask", { question }),
+  /** Muse reads an upload; nothing is stored until commitCapture. */
+  previewCapture: (body: PreviewBody) => post<Draft>("/capture/preview", body),
+  commitCapture: (body: { draft_id: string; answers: Answers }) => post<CommitResult>("/capture/commit", body),
   /** DEMO ONLY: let a grant lapse now. */
   expire: (grantId: string) =>
     post<{ expired: { grant_id: string; receipt_id: string }[] }>(`/demo/grants/${encodeURIComponent(grantId)}/expire`),

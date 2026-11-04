@@ -19,6 +19,13 @@ const AXE = process.env.AXE_PATH && fs.existsSync(process.env.AXE_PATH) ? fs.rea
 let failures = 0;
 const check = (ok, what) => { console.log(`${ok ? "PASS" : "FAIL"}  ${what}`); if (!ok) failures++; };
 
+// The example questions sit in a collapsed section under the chat; open it, then return the group.
+async function examples(page) {
+  const d = page.locator("details.more-prompts");
+  if (!(await d.evaluate((el) => el.open))) await d.locator("summary").click();
+  return page.getByRole("group", { name: "Example questions" });
+}
+
 async function audit(page, label) {
   if (!AXE) return;
   await page.waitForTimeout(700); // let entrance animations finish: axe measures contrast mid-fade otherwise
@@ -87,9 +94,9 @@ async function audit(page, label) {
   // Act 3: a later photo corrects the wallet.
   await page.getByRole("button", { name: /Upload live photo/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
-  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "Where is my wallet?" }).click();
+  await (await examples(page)).getByRole("button", { name: "Where is my wallet?" }).click();
   await page.waitForSelector('.qa .a:has-text("17:45")');
-  const wallet = await page.locator(".qa .a").first().innerText();
+  const wallet = await page.locator(".qa .a").last().innerText();
   check(/Last confirmed sighting at 17:45/.test(wallet) && /09:10/.test(wallet), "wallet answer says 'Last confirmed sighting at 17:45' and keeps the café as history");
 
   // Act 4: Alex withdraws consent on the simulated phone, in a second tab.
@@ -121,10 +128,10 @@ async function audit(page, label) {
 
   // After forgetting.
   await page.getByRole("tab", { name: "Ask" }).click();
-  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "What did Alex promise me?" }).click();
+  await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a');
   check(/no record/i.test(await page.locator(".qa:has-text('What did Alex promise me?') .a").innerText()), "'What did Alex promise me?' now answers that there is no record");
-  await page.getByRole("group", { name: "Example questions" }).getByRole("button", { name: "What colour is the awning at Luna Taqueria?" }).click();
+  await (await examples(page)).getByRole("button", { name: "What colour is the awning at Luna Taqueria?" }).click();
   await page.waitForSelector('.qa:has-text("awning") .a:has-text("green")');
   check(true, "the awning (supported by the sign photo) is still answered");
   await page.getByRole("tab", { name: "Facts" }).click();
@@ -152,19 +159,19 @@ async function audit(page, label) {
   await page.getByRole("button", { name: /Upload live photo/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
   await page.getByRole("tab", { name: "Ask" }).click();
-  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a:has-text("Friday")');
   check(true, "before the correction: 'What did Alex promise me?' answers Friday");
-  await page.locator(".qa .cite").first().click();
+  await page.locator(".qa").last().locator(".cite").first().click();
   await page.getByRole("button", { name: "That's wrong…" }).click();
   await page.getByRole("button", { name: "Use the recorded example" }).click();
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   await audit(page, "correction form open");
   await page.getByRole("button", { name: "Replace this fact" }).click();
   await page.waitForSelector("text=Correction recorded", { state: "attached" });
-  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a:has-text("Monday")');
-  const promised = await page.locator(".qa .a").first().innerText();
+  const promised = await page.locator(".qa .a").last().innerText();
   check(/Monday/.test(promised) && !/Friday/.test(promised), `after the correction: the answer says Monday and no longer Friday (got: ${promised})`);
   await audit(page, "after a correction");
 
@@ -191,9 +198,9 @@ async function audit(page, label) {
   await page.waitForTimeout(400);
   check(await alexCard.locator(".chip", { hasText: "Expired" }).isVisible(), "Alex's grant now shows as Expired");
   await page.getByRole("tab", { name: "Ask" }).click();
-  await page.getByRole("button", { name: "What did Alex promise me?" }).click();
+  await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a');
-  check(/no record/i.test(await page.locator(".qa .a").first().innerText()), "after the expiry, 'What did Alex promise me?' says there is no record");
+  check(/no record/i.test(await page.locator(".qa .a").last().innerText()), "after the expiry, 'What did Alex promise me?' says there is no record");
 
   check(problems.length === 0, `no console errors or warnings${problems.length ? ": " + problems.join(" | ") : ""}`);
   await browser.close();

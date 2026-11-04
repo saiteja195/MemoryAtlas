@@ -82,6 +82,33 @@ The page follows your system's light or dark theme and reduced-motion setting. I
 tabs take arrow keys, Esc closes dialogs), and every fact in the picture is also in the **All facts as a table**
 section under it. The header always shows the model mode and **Raw media kept: 0 B**.
 
+### Adding your own memories
+
+Press **Add memory** in the header. It needs **live mode** (a model key). In replay or record mode the dialog says
+so and stays off, because those modes cache model responses, including transcripts of people who might say no.
+
+- **What you can add:** a photo (JPEG or PNG), a voice recording, a video, or a typed note. You can drop or pick a
+  file, or capture one with the device: **Take photo**, **Record voice**, **Record video**. Voice is limited to
+  10 minutes and video to 60 seconds when recorded in the page.
+- **What happens:** Muse reads it and the page shows what it found (when, where, what is happening, who), each
+  marked *Sure*, *Check* or *Ask*, with where it came from (photo metadata, the file's date, the image, the audio).
+  It asks only about what it cannot tell, such as the place when no sign is readable, which speaker is you, and
+  whether anyone else in it agreed to be in your Atlas. Nothing is stored until you press **Save to Atlas**.
+- **Consent is decided by code, not by the model.** If anyone else is in a recording or picture, you must say
+  whether they agreed. A "no" means the whole memory is dropped and no consent record is created. A person
+  who agrees gets their own consent grant. After saving, the page shows each grant's **withdrawal code once**;
+  keep it. To withdraw later, call `POST /consent/grants/<grant id>/revoke` with `{"token": "<code>"}`.
+  A photo's time comes from its metadata when it has any; otherwise it is the file's date, marked *Check*, and you
+  can change it before saving.
+- **Video** is split in your browser into up to four frames plus its audio track; each frame goes to Muse vision
+  and the audio to Voice Transcribe. Audio is converted to mono 16-bit WAV in the browser, because that is what
+  the speech service accepts. The original photo, audio or video is never stored (**Raw media kept** stays 0 B).
+- **Camera and microphone** permission is asked only when you press a capture button, and the camera is
+  released as soon as you finish or close the dialog. Browsers allow these only on `https://` pages or
+  `localhost`. On a plain `http://` page (for example a phone on your Wi-Fi) the capture buttons open the phone's
+  own camera or recorder instead. To use the page from a phone with full capture, see
+  [`docs/DEPLOY.md`](DEPLOY.md).
+
 ## 3. Try the demo from the terminal (no key, copy and paste)
 
 With `make api` running, in another terminal. The demo replays a staged day: a wallet at a café, a billboard,
@@ -221,6 +248,7 @@ Full, interactive version: http://localhost:8000/docs
 | `GET /graph?at=<ISO time>&include=history` | the memory graph (nodes, claims as edges, their evidence) |
 | `POST /recall/ask` | ask a question; returns the answer, status, cited claims |
 | `GET /claims/{id}/provenance` | the evidence tree behind a claim |
+| `POST /capture/preview`, `POST /capture/commit` | add a photo, audio, video or note: Muse reads it and returns what it found and what it needs to ask (nothing stored); then the answers are committed |
 | `POST /capture/{kind}` | add your own observation (`frame`, `audio`, `calendar`, `note`); needs a consent grant |
 | `POST /consent/grants`, `GET /consent/grants` | create / list consent grants |
 | `POST /consent/grants/{id}/revoke` | withdraw consent and forget what only it supported |

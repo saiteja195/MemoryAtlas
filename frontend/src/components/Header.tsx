@@ -16,6 +16,7 @@ type Props = {
   onLive: (id: string) => void;
   onReset: () => void;
   onHelp: () => void;
+  onAdd: () => void;
   page: Page;
   onPage: (p: Page) => void;
   theme: ThemePref;
@@ -28,7 +29,7 @@ const MODE: Record<string, { text: string; cls: string; hint: string }> = {
   record: { text: "Recording", cls: "accent", hint: "Live calls, saved so they can be replayed later." },
 };
 
-export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp, page, onPage, theme, onTheme }: Props) {
+export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp, onAdd, page, onPage, theme, onTheme }: Props) {
   const mode = health ? MODE[health.llm_mode] : undefined;
   const nextEvent = status?.events.find((e) => e.id === status.next);
   const live = status?.events.filter((e) => e.live_upload && !e.played) ?? [];
@@ -77,6 +78,7 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
       )}
 
       <div className="group">
+        <button type="button" className="btn" onClick={onAdd} aria-haspopup="dialog" disabled={offline}>Add memory</button>
         <button type="button" className="btn ghost" onClick={onHelp} aria-haspopup="dialog">How it works</button>
         <ThemeToggle pref={theme} onChange={onTheme} />
       </div>
