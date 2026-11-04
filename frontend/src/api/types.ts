@@ -225,6 +225,19 @@ export type Answers = {
   people: PersonAnswer[];
 };
 
+/** A save running in the background, as `GET /capture/commit/jobs/{id}` reports it. */
+export type SaveJob = {
+  job_id: string;
+  state: "running" | "done" | "error";
+  elapsed_s: number;
+  /** Model calls started and finished so far, and how long the current one has been running. */
+  calls_started: number;
+  calls_done: number;
+  working_s: number;
+  result: CommitResult | null;
+  error: { status: number; message: string } | null;
+};
+
 export type CommitResult = {
   session_id: string;
   results: { status: string; reason: string | null; source_id: string | null; claims: number; compile_rejected: unknown }[];

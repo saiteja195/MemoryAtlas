@@ -1,6 +1,6 @@
 import { youifyDeep } from "../utils/voice";
 import type {
-  Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, Todo, TodoState,
+  Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, SaveJob, Todo, TodoState,
 } from "./types";
 
 /** An API failure with the server's own explanation, so the UI can say something useful. */
@@ -92,6 +92,9 @@ export const api = {
   /** Muse reads an upload; nothing is stored until commitCapture. */
   previewCapture: (body: PreviewBody) => post<Draft>("/capture/preview", body),
   commitCapture: (body: { draft_id: string; answers: Answers }) => post<CommitResult>("/capture/commit", body),
+  /** Saves in the background and returns at once; poll `commitJob` for the outcome. */
+  startCommit: (body: { draft_id: string; answers: Answers }) => post<{ job_id: string }>("/capture/commit/start", body),
+  commitJob: (jobId: string) => call<SaveJob>(`/capture/commit/jobs/${encodeURIComponent(jobId)}`),
   /** DEMO ONLY: let a grant lapse now. */
   expire: (grantId: string) =>
     post<{ expired: { grant_id: string; receipt_id: string }[] }>(`/demo/grants/${encodeURIComponent(grantId)}/expire`),
