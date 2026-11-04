@@ -16,7 +16,7 @@ import uuid
 from typing import Any, Iterator
 
 from ..privacy import clock
-from .base import LLMClient
+from .base import LLMClient, LLMUnavailable
 
 log = logging.getLogger(__name__)
 
@@ -81,17 +81,22 @@ class MeteredLLM:
     # -- internals ---------------------------------------------------------------------------
 
     def _run(self, kind: str, method: str, args: tuple, *, words_in: int, images: int = 0) -> Any:
-        started, ok, result = time.perf_counter(), 0, None
+        started, ok, result, miss = time.perf_counter(), 0, None, False
         try:
             result = getattr(self._inner, method)(*args)
             ok = 1
             return result
+        except LLMUnavailable as e:
+            # Replay mode has no recording for some calls: nothing ran, so there is no call to log or to call failed.
+            miss = str(e).startswith("no recorded response")
+            raise
         finally:
             elapsed = int((time.perf_counter() - started) * 1000)
-            try:
-                self._write(self._row(kind, elapsed, ok, result, words_in, images))
-            except Exception as e:  # noqa: BLE001  metering must never fail a model call
-                log.warning("could not log model call: %s", type(e).__name__)
+            if not miss:
+                try:
+                    self._write(self._row(kind, elapsed, ok, result, words_in, images))
+                except Exception as e:  # noqa: BLE001  metering must never fail a model call
+                    log.warning("could not log model call: %s", type(e).__name__)
 
     def _row(self, kind: str, duration_ms: int, ok: int, result: Any,
              words_in: int, images: int) -> tuple:

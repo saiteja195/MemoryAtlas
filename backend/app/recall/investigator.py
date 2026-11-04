@@ -160,6 +160,7 @@ class Investigator:
         # `as_of` is set exactly when the router sent this question to the extended prompt (`ask` passes
         # None otherwise), so those questions, and only those, get the five extra tools.
         tools = RecallTools(self.conn, extended=as_of is not None, owner=self.owner)
+        memory = as_of is not None and needs_extended(question) == "memory"
         pad: list[dict[str, Any]] = []
         checks: list[str] = []
         retried = False
@@ -178,7 +179,7 @@ class Investigator:
                 pad.append({"step": step_no, "tool": step.tool, "args": step.args,
                             "result": shown})
                 continue
-            problem = self._check(step, tools, question)
+            problem = self._check(step, tools, question, memory)
             if problem is None:
                 return self._finish(step, tools, step_no, checks)
             checks.append(problem)
@@ -225,9 +226,9 @@ class Investigator:
 
     # -- deterministic post-checks ------------------------------------------------------------
 
-    def _check(self, step: Step, tools: RecallTools, question: str) -> str | None:
+    def _check(self, step: Step, tools: RecallTools, question: str, memory: bool = False) -> str | None:
         if step.status in (None, "abstained"):
-            return None
+            return self._check_unbacked_numbers(step, tools, question) if memory and not tools.stats_returned else None
         if not step.cited_claim_ids and not step.cited_tools:
             return "An answered or partial reply must cite at least one claim."
         if step.cited_claim_ids:
@@ -239,7 +240,24 @@ class Investigator:
         # Citing only claims does not skip the number check once a stats tool has shown its figures: the
         # numbers must then come from those results or from the cited claims themselves.
         ran = [t for t in tools.stats_returned if _usable(tools, t)]
-        return self._check_numbers(step, tools, ran) if ran else None
+        if ran:
+            return self._check_numbers(step, tools, ran)
+        return self._check_unbacked_numbers(step, tools, question) if memory else None
+
+    def _check_unbacked_numbers(self, step: Step, tools: RecallTools, question: str) -> str | None:
+        """A question about the memory itself (usage, coverage) that no stats tool answered may still not state
+        a figure: only the question's own numbers, those of the cited claims, and a count of them may appear."""
+        allowed = numbers_in(question) | {str(len(step.cited_claim_ids))}
+        for c in step.cited_claim_ids:
+            r = self.conn.execute("SELECT text, object_value, event_time FROM claims WHERE claim_id=?",
+                                  (c,)).fetchone()
+            if r:
+                allowed |= stats_numbers([r["text"], r["object_value"], r["event_time"]])
+        unknown = sorted(numbers_in(f"{step.answer} {step.uncertainty_note}") - allowed)
+        if unknown:
+            return (f"These numbers came from no tool result and no cited claim: {unknown}. State only figures "
+                    f"a tool returned (call coverage or usage_stats), or say you have no record.")
+        return None
 
     def _check_numbers(self, step: Step, tools: RecallTools, cited: list[str]) -> str | None:
         """Every named tool must be a stats tool that returned a usable result in this question, and every

@@ -214,9 +214,9 @@ def test_citing_a_claim_whose_consent_was_withdrawn_is_refused(played):
     inv = Investigator(played.conn, llm)
     orig = inv._check
 
-    def revoke_then_check(step, tools, question):   # consent is withdrawn mid-question
+    def revoke_then_check(step, tools, question, *rest):   # consent is withdrawn mid-question
         played.conn.execute("UPDATE consent_grants SET revoked_at='x' WHERE grantor='alex'")
-        return orig(step, tools, question)
+        return orig(step, tools, question, *rest)
 
     inv._check = revoke_then_check
     a = inv.ask("Which restaurant did Alex recommend?")

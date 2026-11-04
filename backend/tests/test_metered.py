@@ -122,13 +122,13 @@ def test_no_content_is_stored():
             assert "hello there" not in str(value)
 
 
-def test_replay_miss_is_logged_as_failed_cache_not_live(tmp_path):
+def test_replay_miss_is_not_logged_at_all(tmp_path):
+    """No recording means nothing ran: it is not a model call, and not a failed one (whole-branch review)."""
     conn = db.connect()
     llm = MeteredLLM(RecordReplayClient(str(tmp_path), "replay"), conn, MODELS)
     with pytest.raises(LLMUnavailable):
         llm.complete_json("never", "recorded", {})
-    [r] = rows(conn)
-    assert r["ok"] == 0 and r["served_from"] == "cache"
+    assert rows(conn) == []
 
 
 def test_overlapping_calls_on_a_shared_client_keep_their_own_labels(tmp_path):

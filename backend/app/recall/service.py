@@ -50,7 +50,8 @@ class RecallService:
         version = graph_version(self.conn)
         # Ruling R-G(c): a memory question (coverage, the models' usage) is never cached at all. Even an
         # abstention or a claim-only answer could outlive new usage, which does not change the graph version.
-        cacheable = route != "memory"
+        # A to-do answer changes when a to-do is ticked or dismissed, which the graph version does not see.
+        cacheable = route not in ("memory", "todo")
         row = self.conn.execute("SELECT answer_json FROM answer_cache WHERE question_hash=?",
                                 (qhash,)).fetchone() if cacheable else None
         if row:
