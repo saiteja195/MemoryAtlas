@@ -21,7 +21,7 @@ Then open **http://localhost:8080**. Stop with `docker compose down` (your data 
 Both main services are on the `memoryatlas` bridge network and find each other by service name
 (`http://backend:8000`). `web` waits until the backend's health check passes before it starts.
 
-There is deliberately no database service: the memory map is one SQLite file (see `docs/HANDOFF.md`), kept in
+There is deliberately no database service: the memory map is one SQLite file (see [where data lives](LOCAL_SETUP.md#6-where-data-lives)), kept in
 the `data` volume at `/data/memoryatlas.db`, next to the model-response cache. A restart or `down`/`up` keeps it.
 
 ## Settings

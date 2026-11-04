@@ -2,6 +2,11 @@
 
 **Meta AI Developer Hackathon, Indie Developer track · "Build for Your World"**
 **Submission deadline: Wed Nov 4, 2026, 9:00 PM ET.** Internal target: submitted by **6:00 PM ET** (3-hour buffer).
+
+> **Historical document.** This is the plan the project was built from, written on 2 November. What shipped is described in the
+> [README](../README.md) and the [wiki](https://github.com/saiteja195/MemoryAtlas/wiki); parts of this plan (the schedule, the
+> Ask panel, the three-day phases) changed on the way.
+
 **Re-baselined Mon Nov 2, 2026.** The first plan (Oct 30) assumed a Fri start; two days were lost, so §8 is now a 3-day, 6-phase plan (Mon → Wed).
 
 > **One line:** MemoryAtlas turns temporary, consented observations into a memory graph where every memory records its evidence. It can piece together what happened, correct itself when new evidence arrives, and *prove* that it forgot something once consent is withdrawn.
@@ -269,7 +274,7 @@ def revoke(grant_id, token):
 
 **Property tests (`hypothesis`):** generate random support DAGs and cyclic graphs, revoke random sources, and assert (a) every surviving claim has a well-founded support path, (b) every claim with such a path survives, (c) revocation is idempotent.
 
-*As built (Phase 3):* dead claims are **deleted** rather than marked `revoked` (a tombstone would still reveal its subject and object); revoking the grant for a recorded conversation removes **all** participants' lines of that session; survivors that lost a source are re-worded from their structure and summaries built on them are dropped; probe 7 also scans the database files for the removed text, and probe 4 covers the app's runtime model-response cache (the committed fixtures are read-only seed data). See `docs/HANDOFF.md` section 5 for the limits.
+*As built (Phase 3):* dead claims are **deleted** rather than marked `revoked` (a tombstone would still reveal its subject and object); revoking the grant for a recorded conversation removes **all** participants' lines of that session; survivors that lost a source are re-worded from their structure and summaries built on them are dropped; probe 7 also scans the database files for the removed text, and probe 4 covers the app's runtime model-response cache (the committed fixtures are read-only seed data). The wiki's [Privacy and Limits](https://github.com/saiteja195/MemoryAtlas/wiki/Privacy-and-Limits) page lists the limits.
 
 **Honesty line for the pitch:** MemoryAtlas proves what *it* retains. Whatever went to a hosted model provider is covered by that provider's terms (Day-0 check #6). The local redaction step limits what gets sent.
 
@@ -280,7 +285,7 @@ def revoke(grant_id, token):
 - **Consent panel:** list of grants. "Revoke" opens a simulated consent page (QR code / second browser tab as Alex with a PIN) to show it is *Alex's* action, not the user's.
 - **Forgetting receipt modal:** removed / retained counts, which retained facts survived and *why* (the alternate source), plus the probe results as green checks.
 - **Correct:** "That's wrong" on a claim creates a `user_confirmation` source that supersedes it.
-- **Dashboard and assistant (post-plan, see `docs/superpowers/specs/2026-11-03-dashboard-and-assistant-design.md`):** per-profile model-usage log (counts only), day coverage, a to-do list built from promises and requests, and one shared assistant on every page.
+- **Dashboard and assistant (post-plan):** per-profile model-usage log (counts only), day coverage, a to-do list built from promises and requests, and one shared assistant on every page.
 - `frontend/src/lib/` is ignored by the root `.gitignore` (Python template ignores `lib/`). Put shared code in `frontend/src/utils/` or add a `!frontend/src/lib/` exception.
 
 ### 4.6 LLM client (`backend/app/llm/`)

@@ -71,7 +71,8 @@ they are built.
 
 Open http://localhost:5173. The whole demo can be run from the browser, in this order:
 
-1. **Build the day.** Press **Play next** (one event at a time) or **Play the day**. The memory graph appears.
+1. **Build the day.** Open **Demo tools** at the top of the page and press **Play next** (one event at a time) or
+   **Play the day**. These add scripted sample memories; to use your own, press **Add memory**. The memory graph appears.
    **Episodes** (the default) shows the day as boxes in time order; **Details** shows the people, places and
    things, and how they relate. The row under the timeline lists every event of the day; dashed ones have not
    happened yet.
@@ -81,7 +82,8 @@ Open http://localhost:5173. The whole demo can be run from the browser, in this 
    with the original quote. Click any fact in the graph to see where it came from, or use **Clear focus**.
 3. **Travel in time.** Drag **Scrub through the day**, or press **Watch it build**. Facts appear when they first
    became knowable, and a sighting that was later replaced counts as current until the newer one arrived.
-4. **Let new evidence correct a memory.** Press **Upload live photo · 17:45**, then ask "Where is my wallet?".
+4. **Let new evidence correct a memory.** In **Demo tools**, press **Add sample wallet sighting · 17:45** (a predefined
+   description, no photo is uploaded), then ask "Where is my wallet?".
    The answer moves from the café to the car; the café sighting stays as greyed-out history (⏱, **History**
    checkbox).
 5. **Withdraw consent.** Open the **Consent** tab. Press "Alex withdraws…" (a simulated phone appears), or
@@ -89,7 +91,10 @@ Open http://localhost:5173. The whole demo can be run from the browser, in this 
    its own, fades out what was forgotten, and shows the **forgetting receipt**: what was removed, what was kept
    and why, and the 7 automated checks. Then ask "What did Alex promise me?" (no record) and "What colour is the
    awning at Luna Taqueria?" (still answered).
-6. **Reset** puts everything back to the start.
+6. **Forget your own memories.** Open a fact, press **Why do we believe this?**, then **Delete this memory** to remove one
+   saved memory (a video or a set of photos goes whole). **Withdraw my consent…** on the Consent tab removes a whole day,
+   and needs no code for your own consent. Both end with a receipt.
+7. **Reset** (in **Demo tools**) puts the sample day back to the start.
 
 Reading the graph (also under "How to read the graph" in the page): a dashed line is inferred, a solid one
 observed; colour says where a fact came from (photo, conversation, calendar, several sources "×N", inferred);
@@ -405,7 +410,7 @@ cd backend && . .venv/bin/activate && python -m pytest -q                       
 | `Address already in use` on 8000 or 5173 | Another server holds the port. Stop it, or run on another port: `uvicorn app.main:app --port 8001` (and update the proxy in `frontend/vite.config.ts`). |
 | `python3 -m venv` fails | On Debian/Ubuntu: `sudo apt install python3-venv`. |
 | Web UI says backend "unreachable" | `make api` is not running, or it is on another port. |
-| `tests/test_replay_recall.py` errors on a different OS or CPU (`no recorded response`) | Known: the recordings replay only where search ranking matches the machine they were recorded on. Fix on branch `bug/replay-portability` (needs a re-recording with a key); see `docs/HANDOFF.md` section 8. |
+| `tests/test_replay_recall.py` errors on a different OS or CPU (`no recorded response`) | Known: the recordings replay only where search ranking matches the machine they were recorded on. Fix on branch `bug/replay-portability` (needs a re-recording with a key). |
 | The UI says "That question isn't in the recording" | Replay mode only answers recorded questions: use an example chip, or switch to live mode. |
 | The graph looks crowded | Set **Facts** to "related", or press **Tidy up**; the "All facts as a table" section lists everything. |
 | `make test` fails right after you edited a prompt | Expected; see re-recording above. |
@@ -427,7 +432,8 @@ backend/tests/    unit, property and replay tests
 frontend/         the Atlas UI: React + Cytoscape. src/utils/graph.ts holds the logic (unit tested),
                   src/components/ the screens, e2e/ the browser check
 fixtures/         the staged demo day and the committed model recordings
-docs/             IMPLEMENTATION_PLAN.md (design), HANDOFF.md (state and decisions), HACKATHON_FACTS.md
+docs/             IMPLEMENTATION_PLAN.md (the original design), EVALUATION.md, DEPLOY.md, DOCKER.md,
+                  HACKATHON_FACTS.md
 ```
 
 Contributing rules (commit author, branch names, commit format) are in [`CONTRIBUTING.md`](../CONTRIBUTING.md).
