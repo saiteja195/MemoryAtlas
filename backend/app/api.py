@@ -183,11 +183,18 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             rt = runtimes.get("local", "Local", True)
         else:
             rt = resolve_runtime(request, registry, runtimes)
-        rt.sweep()
+        if rt.sweep():                      # a consent lapsed: nothing derived from it may linger in a job or a draft
+            forget_copies(rt)
         return rt
 
     app.state.budget = Budget()
     jobs = app.state.jobs = JobBoard()
+
+    def forget_copies(rt: ProfileRuntime) -> None:
+        """Memories were forgotten, so every stored copy of a result (finished answers, previews, saves in flight)
+        and every unsaved draft goes too; a job still running publishes nothing."""
+        jobs.invalidate(rt.profile_id)
+        rt.drafts.clear()
 
     def spend(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> None:
         """Every route that calls the model costs the owner money; count it against the profile and the address."""
@@ -266,8 +273,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         proof that the person who consented is the one asking."""
         try:
             result = rt.revoker.revoke(grant_id, body.token, run_red_team=red_team)
-            jobs.invalidate(rt.profile_id)
-            rt.drafts.clear()
+            forget_copies(rt)
             return result
         except UnknownGrant:
             raise HTTPException(404, "unknown grant") from None
@@ -280,8 +286,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         because being signed in to the profile proves it is the owner. Someone else's consent needs their code."""
         try:
             result = rt.revoker.revoke_own(grant_id, run_red_team=red_team)
-            jobs.invalidate(rt.profile_id)
-            rt.drafts.clear()
+            forget_copies(rt)
             return result
         except UnknownGrant:
             raise HTTPException(404, "unknown grant") from None
@@ -293,7 +298,9 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         """The owner deletes one saved memory (all parts of a video together) and everything that rests only on it.
         The day's consent stays; the receipt proves nothing of it is left."""
         try:
-            return rt.revoker.delete_memory(source_id, run_red_team=red_team)
+            result = rt.revoker.delete_memory(source_id, run_red_team=red_team)
+            forget_copies(rt)
+            return result
         except UnknownMemory:
             raise HTTPException(404, "unknown memory") from None
 
@@ -302,6 +309,8 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         """Forget what rested on grants that have lapsed. The API does this by itself before each request;
         call this from a scheduler to do it on time even when nobody is using the app."""
         receipts = rt.sweep()
+        if receipts:
+            forget_copies(rt)
         return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/receipts/{receipt_id}")
@@ -588,6 +597,8 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
                             (clock.iso(clock.now() - timedelta(seconds=1)), grant_id))
             rt.conn.commit()
         receipts = rt.sweep()
+        if receipts:
+            forget_copies(rt)
         return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/demo/status")
