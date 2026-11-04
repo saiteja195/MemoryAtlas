@@ -63,8 +63,8 @@ def _words(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
-def merge_perceptions(perceptions: list[dict[str, Any]]) -> dict[str, Any]:
-    """The findings of a video's frames as one description: each object, visible text and scene once, and only the
+def merge_perceptions(perceptions: list[dict[str, Any]], medium: Literal["Photo", "Video"] = "Video") -> dict[str, Any]:
+    """The findings of a video's frames (or of several photos) as one description: each object, visible text and scene once, and only the
     captions that say something new. One description means one extraction call when it is saved, not one per frame."""
     captions: list[str] = []
     ocr: dict[str, str] = {}
@@ -92,20 +92,22 @@ def merge_perceptions(perceptions: list[dict[str, Any]]) -> dict[str, Any]:
         if sc and sc.lower() not in (x.lower() for x in scenes) and len(scenes) < 2:
             scenes.append(sc)
     return {"caption": " ".join(captions), "ocr_text": list(ocr.values()), "objects": list(objects.values()),
-            "scene": ", ".join(scenes), "medium": "Video"}
+            "scene": ", ".join(scenes), "medium": medium}
 
 
 def split_for_extraction(merged: dict[str, Any], per_source: int = 6) -> list[dict[str, Any]]:
-    """A merged video description as one or more memories. One extraction reads at most eight facts, so a long list of
+    """A merged video or photo-set description as one or more memories. One extraction reads at most eight facts, so a long list of
     objects is saved a few at a time: the first memory carries the caption, text and scene, and each later one says
     it is more of the same clip. Still far fewer extraction calls than one for every frame."""
     objects = merged["objects"]
     if len(objects) <= per_source:
         return [merged]
+    medium = merged.get("medium", "Video")
+    more = "More of the same video clip" if medium == "Video" else "More from the same photos"
     parts = [{**merged, "objects": objects[:per_source]}]
     for start in range(per_source, len(objects), per_source):
-        parts.append({"caption": "More of the same video clip", "ocr_text": [], "scene": "",
-                      "objects": objects[start:start + per_source], "medium": "Video"})
+        parts.append({"caption": more, "ocr_text": [], "scene": "",
+                      "objects": objects[start:start + per_source], "medium": medium})
     return parts
 
 

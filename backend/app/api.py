@@ -103,9 +103,10 @@ class TrackBody(BaseModel):
 
 class PreviewBody(BaseModel):
     tracking: TrackBody | None = None
-    kind: Literal["frame", "audio", "note", "video"]
+    kind: Literal["frame", "audio", "note", "video", "photos"]
     data_b64: str | None = None                 # frame: the image. audio: the WAV
-    frames_b64: list[str] = Field(default_factory=list)       # video: 1 to 4 JPEG frames
+    frames_b64: list[str] = Field(default_factory=list)       # video: 1 to 8 JPEG frames. photos: 1 to 8 photos
+    photo_times: list[str | None] = Field(default_factory=list)   # photos: each file's own time, naive ISO, or none
     frame_offsets_ms: list[int] = Field(default_factory=list)
     audio_b64: str | None = None                # video: the audio track as WAV
     text: str | None = None
@@ -386,7 +387,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             draft = build_preview(
                 rt.llm, body.kind, data_b64=body.data_b64, frames_b64=body.frames_b64,
                 frame_offsets_ms=body.frame_offsets_ms, audio_b64=body.audio_b64, text=body.text,
-                file_modified_at=body.file_modified_at)
+                file_modified_at=body.file_modified_at, photo_times=body.photo_times)
         except TooLarge as e:
             raise HTTPException(413, str(e)) from None
         except BadRequest as e:

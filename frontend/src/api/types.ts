@@ -191,7 +191,7 @@ export type Question = {
 
 export type Draft = {
   draft_id: string;
-  kind: "frame" | "audio" | "note" | "video";
+  kind: "frame" | "audio" | "note" | "video" | "photos";
   fields: DraftField[];
   questions: Question[];
   captured_at: string | null;
@@ -215,6 +215,8 @@ export type PreviewBody = {
   text?: string;
   /** The file's own time, local, naive ISO. */
   file_modified_at?: string;
+  /** photos: each photo's file time in the same order, or null where the browser gave none. */
+  photo_times?: (string | null)[];
 };
 
 export type PersonAnswer = { ref: string; name?: string | null; consented: boolean };

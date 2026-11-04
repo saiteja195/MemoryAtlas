@@ -417,6 +417,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
             <p>
               MemoryAtlas will forget this memory and every fact that rested only on it, and keep the ones other memories still support.
               {deleting.text.startsWith("Video: ") ? " A video is deleted whole." : ""}
+              {deleting.text.startsWith("Photo: More from the same photos") ? " This is part of a set of photos, and the whole set is deleted." : ""}
               {deleting.kind === "transcript_segment" ? " This is one spoken line of a recording; the other lines stay." : ""}
               {" "}You will get a receipt that proves it. Checking can take a minute or two.
             </p>
