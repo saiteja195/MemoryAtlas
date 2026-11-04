@@ -101,8 +101,13 @@ def build_preview(llm: LLMClient, kind: str, *, data_b64: str | None = None,
         if audio is not None:
             check_wav(audio)
         with usage_purpose("read_memory", _day(when)):
-            perceptions = _read_frames(llm, images)
-            turns = llm.transcribe(audio, None) if audio is not None else None
+            # Speech and vision are independent. Copy metering/progress context into both workers.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                vision = pool.submit(contextvars.copy_context().run, _read_frames, llm, images)
+                speech = (pool.submit(contextvars.copy_context().run, llm.transcribe, audio, None)
+                          if audio is not None else None)
+                perceptions = vision.result()
+                turns = speech.result() if speech is not None else None
         del images, audio
         return build_draft("video", perceptions=perceptions, frame_offsets_ms=list(offsets),
                            turns=turns, file_modified_at=when)
