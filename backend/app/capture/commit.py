@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
 
-from ..compiler.perceive import merge_perceptions
+from ..compiler.perceive import merge_perceptions, split_for_extraction
 from ..engine import MemoryEngine
 from ..privacy.consent import active_grant, create_grant
 from .draft import Draft
@@ -125,9 +125,10 @@ def commit(conn: sqlite3.Connection, engine: MemoryEngine, secret: str, draft: D
     if draft.kind == "note":
         caps.append(RawCapture(kind="note", session_id=session, captured_at=p.captured_at, text=draft.text))
     if draft.kind == "video" and draft.perceptions:
-        # One memory for the whole clip: the frames' findings merged, so saving costs one extraction call, not one a frame.
-        caps.append(RawCapture(kind="frame", session_id=session, captured_at=p.captured_at, lat=draft.lat, lon=draft.lon,
-                               perception=merge_perceptions(draft.perceptions), place_name=p.place_name))
+        # The frames' findings merged, so saving costs a few extraction calls for the whole clip, not one a frame.
+        for part in split_for_extraction(merge_perceptions(draft.perceptions)):
+            caps.append(RawCapture(kind="frame", session_id=session, captured_at=p.captured_at, lat=draft.lat,
+                                   lon=draft.lon, perception=part, place_name=p.place_name))
     else:
         for perception, offset in zip(draft.perceptions, draft.frame_offsets_ms):
             caps.append(RawCapture(kind="frame", session_id=session, captured_at=_shift(p.captured_at, offset),
