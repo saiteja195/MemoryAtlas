@@ -15,7 +15,8 @@ Only text is kept; raw photos, audio and video are never stored. Code, not a pro
 | | |
 |---|---|
 | **Live app** | <https://memoryatlas.209-145-49-232.sslip.io> (HTTPS, live Muse models) |
-| **Demo login** | name `Bob-Demo`, passcode `123456`. Public on purpose and holds only demo content, so please add nothing private. **Settings > Reset demo data** restores it. |
+| **Demo logins** | `Bob-Demo` / `123456`: the scripted sample day. Public on purpose and holds only demo content; **Settings > Reset demo data** restores it. |
+| | `Tej` / `123456`: the owner's own memories, added live (photos, voice, video and notes, kept as text only). **It has no reset, so please look around without deleting anything or withdrawing consent.** |
 | **Wiki** | <https://github.com/saiteja195/MemoryAtlas/wiki>: architecture, forgetting, API and the demo script |
 | **Evaluation** | 39.7 of 40 questions handled correctly, against 24 to 30 for a plain retrieval baseline ([method and limits](docs/EVALUATION.md), [results](eval/results/after-temporal-fix-2026-11-03/RESULTS.md)) |
 
