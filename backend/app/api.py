@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 
 from .capture.audit import media_bytes_on_disk
+from .jobs import Busy, JobBoard
 from .capture.commit import Answers, CommitError, commit as commit_draft, plan as plan_commit
 from .capture.media_info import MediaError
 from .capture.models import KINDS, RawCapture
@@ -148,6 +149,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         return rt
 
     app.state.budget = Budget()
+    jobs = app.state.jobs = JobBoard()
 
     def spend(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> None:
         """Every route that calls the model costs the owner money; count it against the profile and the address."""
@@ -276,9 +278,9 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(503, str(e)) from e
         return rt.drafts.put(draft).model_dump()
 
-    @app.post("/capture/commit", dependencies=[Depends(spend)])
-    def capture_commit(body: CommitBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
-        """Store a confirmed draft. Consent is decided here, in code, from the answers."""
+    def take_confirmed_draft(rt: ProfileRuntime, body: CommitBody):
+        """Check a confirmed draft and take it (from here on a second call gets 404). Consent is decided here,
+        in code, from the answers."""
         require_live(rt)
         try:
             draft = rt.drafts.peek(body.draft_id)
@@ -289,13 +291,41 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         except CommitError as e:
             raise HTTPException(e.status, e.message) from None
         try:
-            rt.drafts.take(body.draft_id)          # from here on a second call gets 404
+            rt.drafts.take(body.draft_id)
         except KeyError:
             raise HTTPException(404, "draft expired or unknown") from None
+        return draft, decided
+
+    @app.post("/capture/commit", dependencies=[Depends(spend)])
+    def capture_commit(body: CommitBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        """Store a confirmed draft and wait for it (kept for scripts; the page uses /capture/commit/start)."""
+        draft, decided = take_confirmed_draft(rt, body)
         try:
             return commit_draft(rt.conn, rt.engine, rt.settings.revocation_secret, draft, decided)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
+
+    @app.post("/capture/commit/start", status_code=202, dependencies=[Depends(spend)])
+    def capture_commit_start(body: CommitBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        """Store a confirmed draft in the background and return at once: a slow model must not hold the request
+        open until the proxy gives up. Poll `GET /capture/commit/jobs/{job_id}` for the outcome."""
+        if jobs.busy(rt.profile_id):
+            raise HTTPException(409, "A memory is already being saved. Wait for it to finish.")
+        draft, decided = take_confirmed_draft(rt, body)
+        try:
+            job = jobs.start(rt.profile_id, lambda: commit_draft(
+                rt.conn, rt.engine, rt.settings.revocation_secret, draft, decided))
+        except Busy:
+            rt.drafts.put(draft)                     # lost the race for the one running slot: keep the draft
+            raise HTTPException(409, "A memory is already being saved. Wait for it to finish.") from None
+        return {"job_id": job.job_id}
+
+    @app.get("/capture/commit/jobs/{job_id}")
+    def capture_commit_job(job_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        job = jobs.get(rt.profile_id, job_id)
+        if job is None:
+            raise HTTPException(404, "unknown save")
+        return JobBoard.status(job)
 
     @app.post("/capture/{kind}", dependencies=[Depends(spend)])
     def capture(kind: str, body: CaptureBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:

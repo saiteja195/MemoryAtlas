@@ -15,10 +15,13 @@ import time
 import uuid
 from typing import Any, Iterator
 
+from .. import progress
 from ..privacy import clock
 from .base import LLMClient, LLMUnavailable
 
 log = logging.getLogger(__name__)
+llm_log = logging.getLogger("memoryatlas.llm")
+SLOW_CALL_S = 20.0          # a live call slower than this is worth a warning in the server log
 
 _purpose: contextvars.ContextVar[tuple[str, str | None]] = contextvars.ContextVar(
     "model_call_purpose", default=("other", None))
@@ -82,6 +85,7 @@ class MeteredLLM:
 
     def _run(self, kind: str, method: str, args: tuple, *, words_in: int, images: int = 0) -> Any:
         started, ok, result, miss = time.perf_counter(), 0, None, False
+        progress.call_started()
         try:
             result = getattr(self._inner, method)(*args)
             ok = 1
@@ -92,11 +96,25 @@ class MeteredLLM:
             raise
         finally:
             elapsed = int((time.perf_counter() - started) * 1000)
+            progress.call_finished()
             if not miss:
+                self._note(kind, elapsed / 1000, ok)
                 try:
                     self._write(self._row(kind, elapsed, ok, result, words_in, images))
                 except Exception as e:  # noqa: BLE001  metering must never fail a model call
                     log.warning("could not log model call: %s", type(e).__name__)
+
+    def _note(self, kind: str, seconds: float, ok: int) -> None:
+        """One line per model call in the server log, and a warning when a live call is slow: this is how a long save
+        is explained afterwards. Never the prompt or the reply."""
+        try:
+            purpose, _ = _purpose.get()
+            served = getattr(self._inner, "last_served", "live")
+            llm_log.info("model call kind=%s purpose=%s served=%s ok=%s took %.1fs", kind, purpose, served, bool(ok), seconds)
+            if served == "live" and seconds >= SLOW_CALL_S:
+                llm_log.warning("slow model call: kind=%s purpose=%s took %.1fs (ok=%s)", kind, purpose, seconds, bool(ok))
+        except Exception:  # noqa: BLE001  logging must never fail a model call
+            pass
 
     def _row(self, kind: str, duration_ms: int, ok: int, result: Any,
              words_in: int, images: int) -> tuple:
