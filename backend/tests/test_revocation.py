@@ -476,7 +476,7 @@ def test_digest_is_order_independent():
 @pytest.fixture
 def client(tmp_path):
     llm = FakeLLM()
-    c = TestClient(create_app(Settings(db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path / "seed"),
+    c = TestClient(create_app(Settings(auth=False, db_path=":memory:", llm_mode="live", cache_dir=str(tmp_path / "seed"),
                                        runtime_cache_dir=str(tmp_path / "rt")), llm))
     c.llm = llm
     c.post("/demo/advance", params={"steps": 10})

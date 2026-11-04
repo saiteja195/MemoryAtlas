@@ -34,6 +34,7 @@ automatically.
 | `MEMORYATLAS_LLM_MODE` | `replay` | `replay` = recorded responses, offline. `live` = call the Meta Model API (needs the key) |
 | `MODEL_API_KEY` | empty | Meta Model API key. Never commit it; it is not baked into any image |
 | `MEMORYATLAS_SECRET` | `dev-only-secret` | Keys the HMAC of consent revocation tokens. **Change it for anything that is not a demo** |
+| `MEMORYATLAS_AUTH` | `on` | `on` = people sign up with a name and passcode and get a private Atlas. `off` = one shared Atlas with no sign-in (development only) |
 | `WEB_PORT` | `8080` | Host port for the UI |
 
 Live mode: `MEMORYATLAS_LLM_MODE=live MODEL_API_KEY=... docker compose up -d`.
@@ -51,9 +52,11 @@ them the container runs as uid 10001 and cannot write to a folder you own.
 
 ## Security notes
 
-- Only the UI port is published, and only on `127.0.0.1`. The demo endpoints (`/api/demo/*`) hand out
-  revocation tokens so the demo can act as "Alex scans the QR code"; they must not face a network. To expose
-  the app beyond your machine, put a real front end with authentication in front and remove the demo routes.
+- Only the UI port is published, and only on `127.0.0.1`. Each profile has its own database under
+  `/data/profiles/<id>/`, and a signed-in person can reach only their own. The demo endpoints (`/api/demo/*`)
+  hand out that profile's own revocation tokens so the demo can act as "Alex scans the QR code". With
+  `MEMORYATLAS_AUTH=off` there is no sign-in at all, so do not expose that mode to a network. To reach the app
+  from the internet use `docs/DEPLOY.md`.
 - The backend container drops all Linux capabilities and cannot gain privileges. Raw photos and audio are never
   stored, in the container or the volume: the database keeps text only (the header shows "Raw media kept: 0 B").
 - Forgetting works inside the container the same way: a withdrawal deletes rows, clears the model-response cache

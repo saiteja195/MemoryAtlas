@@ -53,8 +53,8 @@ def test_health_reports_llm_mode(tmp_path):
     # Built explicitly: importing app.main would create a database file in the working directory.
     from app.api import create_app
     from app.config import Settings
-    app = create_app(Settings(db_path=":memory:", llm_mode="replay", cache_dir=str(tmp_path)))
-    assert TestClient(app).get("/health").json() == {"status": "ok", "llm_mode": "replay"}
+    app = create_app(Settings(auth=False, db_path=":memory:", llm_mode="replay", cache_dir=str(tmp_path)))
+    assert TestClient(app).get("/health").json() == {"status": "ok", "llm_mode": "replay", "auth": False}
 
 
 def test_record_mode_returns_exactly_what_replay_will(tmp_path):

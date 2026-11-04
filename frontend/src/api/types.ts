@@ -3,7 +3,15 @@
 
 export type LlmMode = "replay" | "live" | "record";
 
-export type Health = { status: string; llm_mode: LlmMode };
+export type Health = { status: string; llm_mode: LlmMode; auth?: boolean };
+
+export type Goal = "remember_day" | "trips" | "work_meetings" | "family_friends" | "just_trying";
+
+/** The signed-in profile. With `auth: false` the app is single-user and there is no sign-in. */
+export type Me = {
+  auth: boolean;
+  profile: { profile_id: string; name: string; goals: Goal[]; onboarded: boolean; demo_kind: "staged" | "real" | null };
+};
 
 export type DemoEvent = {
   id: string;

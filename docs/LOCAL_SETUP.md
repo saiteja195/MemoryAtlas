@@ -34,7 +34,7 @@ Check that it works:
 make test
 ```
 
-You should see all tests pass (type-check and 24 web tests, then 175 backend tests; about 25 seconds). Then start everything:
+You should see all tests pass (type-check and 99 web tests, then 465 backend tests; about 25 seconds). Then start everything:
 
 ```bash
 make dev
@@ -47,6 +47,25 @@ make dev
 | Web UI | http://localhost:5173 |
 
 To run them separately, use `make api` and `make web` in two terminals. Stop with Ctrl+C.
+
+### Profiles and sign-in
+
+Every person has a **profile**: a name and a passcode, and a private Atlas that nobody else can open.
+
+1. Open http://localhost:5173 and choose **Create profile**. Pick a name and a passcode (at least 6 characters).
+   There is no email and no passcode reset; if you forget it, make a new profile.
+2. **Onboarding** asks how you want to use MemoryAtlas, shows what you are agreeing to, and then lets you add a
+   first memory, **Try the sample day** (the staged day below), or skip. After that you land on the dashboard.
+3. The profile menu (top right) has **Settings** (change your goals, see what you agreed to, delete your profile and
+   everything in it) and **Sign out**.
+
+Two **demo profiles** can be published so reviewers can look around without signing up (one built from the staged
+day, one from real photos). Their names and passcodes are in the README. A demo profile starts from a saved
+text-only snapshot and has a **Reset demo data** button in Settings. See `fixtures/profiles/README.md` for how
+they are built.
+
+**Single-user mode.** Without profiles, one Atlas for everyone and no sign-in, as before. Start the API with
+`MEMORYATLAS_AUTH=off make api`. Use it for development and for `npm run e2e`; do not expose it to a network.
 
 ### Using the Atlas UI
 
@@ -221,18 +240,22 @@ All are environment variables (or lines in `.env`). Defaults work for local use.
 | `MEMORYATLAS_RUNTIME_CACHE` | `<db file>.llmcache` | where the running app records responses; a forgetting purge cleans this folder |
 | `MEMORYATLAS_DEMO_SCRIPT` | `fixtures/demo_day/script.yaml` | the staged day |
 | `MEMORYATLAS_SECRET` | `dev-only-secret` | keys the HMAC of consent revocation tokens. Change it for anything beyond a local demo |
+| `MEMORYATLAS_AUTH` | `on` | `on`: sign-up, sign-in and a private Atlas per profile. `off`: one shared Atlas, no sign-in (development) |
+| `MEMORYATLAS_DATA_DIR` | folder of `MEMORYATLAS_DB` | where `profiles.db` and each profile's database (`profiles/<id>/`) live |
 
 ## 6. Where data lives
 
 | Path | What | Safe to delete? |
 |---|---|---|
-| `backend/memoryatlas.db`, `-wal`, `-shm` | the memory graph (text only, never raw photos or audio) | yes; the demo recreates it |
-| `backend/memoryatlas.db.llmcache/` | model responses recorded while the app runs | yes |
+| `backend/profiles.db` | profile names, passcode hashes, goals and sign-in sessions (profiles on) | yes; everyone must sign up again |
+| `backend/profiles/<id>/memoryatlas.db` and `llmcache/` | one profile's memory graph and recorded responses (profiles on) | yes, but that profile's memories are gone |
+| `backend/memoryatlas.db`, `-wal`, `-shm` | the memory graph in single-user mode (text only, never raw photos or audio) | yes; the demo recreates it |
+| `backend/memoryatlas.db.llmcache/` | model responses recorded while the app runs (single-user mode) | yes |
 | `backend/.venv/`, `frontend/node_modules/` | installed dependencies | yes; `make setup` recreates them |
 | `fixtures/` | the staged demo day and the committed recordings | **no**, unless you mean to |
 | `.env` | your key | keep private |
 
-To reset completely: stop the API, then `rm -f backend/memoryatlas.db* && rm -rf backend/memoryatlas.db.llmcache`.
+To reset completely: stop the API, then `rm -f backend/memoryatlas.db* backend/profiles.db* && rm -rf backend/memoryatlas.db.llmcache backend/profiles`.
 
 The app keeps **no raw media**. `GET /privacy/media` reports the bytes retained (always 0) and the bytes of
 media files found next to the database.
@@ -243,7 +266,10 @@ Full, interactive version: http://localhost:8000/docs
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | status and model mode |
+| `GET /health` | status, model mode and whether profiles are on |
+| `POST /auth/signup`, `POST /auth/signin`, `POST /auth/signout`, `GET /auth/me`, `DELETE /auth/me` | profiles and sessions (a cookie). Every other route except `/health` needs a session when profiles are on |
+| `POST /auth/goals`, `POST /auth/consent` | save what you use it for; record that you agreed |
+| `POST /demo/load-sample` | fill an empty profile with the staged day |
 | `POST /demo/advance?steps=N`, `POST /demo/live/F4`, `POST /demo/reset`, `GET /demo/status` | drive the staged day |
 | `GET /graph?at=<ISO time>&include=history` | the memory graph (nodes, claims as edges, their evidence) |
 | `POST /recall/ask` | ask a question; returns the answer, status, cited claims |
@@ -256,7 +282,9 @@ Full, interactive version: http://localhost:8000/docs
 | `GET /export` | everything the app currently holds |
 | `GET /demo/grants` | **demo only**: revocation tokens, so the demo can act as Alex. Never expose this outside a local demo |
 
-The API has no login. It is meant to run on your own machine.
+With profiles on, every route except `/health` and the `/auth` sign-in routes answers 401 without a session, and a
+session reaches only its own profile's data. With `MEMORYATLAS_AUTH=off` there is no login and the API is meant to
+run on your own machine only.
 
 ## 8. Running the checks and re-recording
 
@@ -278,8 +306,14 @@ downloads browsers. With `make api` and `make web` running:
 cd frontend
 npm install --no-save playwright && npx playwright install chromium
 npm run e2e                                   # resets the demo first; exit code 0 means every step held
+                                              # (start the API with MEMORYATLAS_AUTH=off for this one)
 # also run an accessibility audit: AXE_PATH=/path/to/axe.min.js npm run e2e   (from the axe-core package)
 ```
+
+`frontend/e2e/profiles.cjs` proves profiles are private: it signs up two people, onboards, checks one sees none
+of the other's memories, wrong and unknown passcodes look the same, five wrong passcodes lock, a deleted profile is
+gone and a browser with no session is refused. Start the API with `MEMORYATLAS_AUTH=on MEMORYATLAS_LLM_MODE=replay`
+and a scratch `MEMORYATLAS_DB`, then `npm run e2e:profiles`.
 
 Re-recording the model responses needs a key and takes several minutes per script. Do it only after changing a
 prompt (the prompt is part of the recording's key, so any prompt change makes the replay tests fail with

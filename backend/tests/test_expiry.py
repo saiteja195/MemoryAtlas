@@ -175,7 +175,7 @@ def test_a_receipt_is_written_even_if_verification_crashes_and_it_is_not_a_pass(
 # -- the API ------------------------------------------------------------------------------------
 
 def client_with(fake=None):
-    return TestClient(create_app(Settings(db_path=":memory:", llm_mode="replay"), fake or FakeLLM()))
+    return TestClient(create_app(Settings(auth=False, db_path=":memory:", llm_mode="replay"), fake or FakeLLM()))
 
 
 def test_the_api_creates_an_expiring_grant_and_lists_it():

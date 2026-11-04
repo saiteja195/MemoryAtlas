@@ -144,7 +144,7 @@ def test_a_wrong_sighting_that_was_disputed_stops_being_disputed_once_set_aside(
 
 
 def test_the_api_corrects_a_claim_and_reports_errors():
-    s = Settings(db_path=":memory:", llm_mode="replay")
+    s = Settings(auth=False, db_path=":memory:", llm_mode="replay")
     fake = FakeLLM()
     client = TestClient(create_app(s, fake))
     client.post("/demo/advance", params={"steps": 50})

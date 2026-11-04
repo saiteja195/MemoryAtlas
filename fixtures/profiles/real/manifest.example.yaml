@@ -1,0 +1,17 @@
+# Copy to <your media dir>/manifest.yaml and edit. Every media file needs an entry.
+# Allowed keys per file: captured_at, where, owner_speaker, people, skip. Anything else is an error.
+files:
+  lunch.jpg:
+    captured_at: "2026-10-12T13:05:00"     # needed unless the photo has an EXIF date; file dates are not trusted
+    where: "Blue Door Cafe"                # optional; Muse reads a sign if there is one
+    people:                                # one entry for every person Muse sees; each must have agreed
+      - {ref: visible1, name: "Priya", consented: true}
+  standup.wav:
+    captured_at: "2026-10-12T09:30:00"
+    owner_speaker: A                       # which speaker is you, when there are two or more
+    people:
+      - {ref: B, name: "Sam", consented: true}
+  walk-note.txt:
+    captured_at: "2026-10-12T18:00:00"
+  blurry.jpg:
+    skip: true                             # leave this file out on purpose

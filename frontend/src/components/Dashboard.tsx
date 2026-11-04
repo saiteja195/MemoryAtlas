@@ -23,6 +23,7 @@ type Props = {
   onReceipt: (id: string) => void;
   onLive: (id: string) => void;
   onReset: () => void;
+  canReset: boolean;
 };
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -114,7 +115,7 @@ export function Dashboard(p: Props) {
           {nextEvent && <button type="button" className="btn primary large" disabled={p.busy || p.offline} onClick={p.onPlayNext}>Play next · {nextEvent.at}</button>}
           {nextEvent && <button type="button" className="btn large" disabled={p.busy || p.offline} onClick={p.onPlayAll}>Play the day</button>}
           <button type="button" className="btn large" onClick={p.onOpenAtlas}>Open the map</button>
-          {!empty && <button type="button" className="btn large ghost" disabled={p.busy} onClick={p.onReset}>Reset</button>}
+          {!empty && p.canReset && <button type="button" className="btn large ghost" disabled={p.busy} onClick={p.onReset}>Reset</button>}
         </div>
       </section>
 
@@ -130,7 +131,7 @@ export function Dashboard(p: Props) {
       <div className="dash-grid">
         <section className="card pad dash-card span-2" aria-labelledby="d-next">
           <h3 id="d-next">Suggested next steps</h3>
-          {suggestions.length === 0 && <p className="muted small">You have tried everything on the demo path. Reset to run it again.</p>}
+          {suggestions.length === 0 && <p className="muted small">You have tried everything on the demo path. {p.canReset ? " Reset to run it again." : ""}</p>}
           <ul className="steps-list">
             {suggestions.map((x) => (
               <li key={x.title}>
