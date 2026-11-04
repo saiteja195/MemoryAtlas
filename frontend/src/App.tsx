@@ -283,13 +283,11 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
           <Dashboard
             graph={atlas.graph} status={atlas.status} media={atlas.media} health={atlas.health} grants={atlas.grants}
             busy={atlas.busy !== null} offline={atlas.offline}
-            onPlayNext={() => void atlas.advance(1)} onPlayAll={() => void atlas.advance(50)}
             onOpenAtlas={() => setPage("atlas")}
             onOpenMoment={(id) => { setPage("atlas"); openEpisode(id); }}
             onAsk={(q) => void ask(q)}
             onConsent={() => { setPage("atlas"); setTab("consent"); }}
             onReceipt={(id) => void openReceipt(id)}
-            onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} canReset={canReset}
             insights={dayState.insights} insightsError={dayState.error} day={dayState.day} days={dayState.days}
             onDay={dayState.setDay} demo={me.auth && me.profile.demo_kind !== null}
             todos={todoState.todos} todosLoading={todoState.loading} todosError={todoState.error}

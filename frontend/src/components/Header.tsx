@@ -1,6 +1,7 @@
 import type { DemoStatus, Health, Media } from "../api/types";
-import { formatBytes, truncate } from "../utils/graph";
+import { formatBytes } from "../utils/graph";
 import type { ThemePref } from "../hooks/useTheme";
+import { DemoTools } from "./DemoTools";
 import { ProfileMenu } from "./ProfileMenu";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -38,12 +39,10 @@ const MODE: Record<string, { text: string; cls: string; hint: string }> = {
 
 export function Header({ health, media, status, busy, offline, onNext, onAll, onLive, onReset, onHelp, onAdd, profileName, onSettings, onSignOut, canReset, page, onPage, theme, onTheme }: Props) {
   const mode = health ? MODE[health.llm_mode] : undefined;
-  const nextEvent = status?.events.find((e) => e.id === status.next);
-  const live = status?.events.filter((e) => e.live_upload && !e.played) ?? [];
   const kept = media?.raw_media_bytes_retained ?? 0;
-  const disabled = busy !== null || offline;
 
   return (
+    <>
     <header className="header">
       <div className="brand">
         <span className="logo" aria-hidden="true" />
@@ -67,35 +66,15 @@ export function Header({ health, media, status, busy, offline, onNext, onAll, on
         )}
       </div>
 
-      {page === "atlas" && (
-      <div className="group" role="group" aria-label="Demo day controls">
-        {busy && <progress aria-label={busy} />}
-        <button type="button" className="btn primary" disabled={disabled || !nextEvent} onClick={onNext}>
-          {nextEvent ? `Play next: ${nextEvent.at} ${truncate(kindWord(nextEvent.kind, nextEvent.label), 24)}` : "Day played"}
-        </button>
-        <button type="button" className="btn" disabled={disabled || !nextEvent} onClick={onAll}>Play the day</button>
-        {live.map((e) => (
-          <button type="button" className="btn" key={e.id} disabled={disabled} onClick={() => onLive(e.id)}
-                  title={e.label}>
-            Upload live photo · {e.at}
-          </button>
-        ))}
-        {canReset && <button type="button" className="btn ghost" disabled={disabled} onClick={onReset}>Reset</button>}
-      </div>
-      )}
-
       <div className="group">
-        <button type="button" className="btn" onClick={onAdd} aria-haspopup="dialog" disabled={offline}>Add memory</button>
+        <button type="button" className="btn primary" onClick={onAdd} aria-haspopup="dialog" disabled={offline}>Add memory</button>
         <button type="button" className="btn ghost" onClick={onHelp} aria-haspopup="dialog">How it works</button>
         <ThemeToggle pref={theme} onChange={onTheme} />
         {profileName !== null && <ProfileMenu name={profileName} onSettings={onSettings} onSignOut={onSignOut} />}
       </div>
     </header>
+    <DemoTools status={status} busy={busy} offline={offline} onNext={onNext} onAll={onAll}
+      onLive={onLive} onReset={onReset} canReset={canReset} />
+    </>
   );
-}
-
-export function kindWord(kind: string, label: string): string {
-  if (kind === "calendar") return label;
-  if (kind === "audio") return "conversation";
-  return kind === "frame" ? "photo" : label;
 }
