@@ -173,7 +173,7 @@ export type Receipt = {
 export type Confidence = "sure" | "check" | "ask";
 
 export type DraftField = {
-  key: "when" | "where" | "doing" | "people";
+  key: "when" | "where" | "doing" | "seen" | "people";
   value: string | null;
   /** Where the value came from: exif, file, image, voice, note or user. */
   source: string | null;

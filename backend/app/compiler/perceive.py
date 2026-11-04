@@ -1,5 +1,6 @@
 """Step 1 of the compiler: turn a raw frame into text with Muse Spark vision."""
-from typing import Any
+import re
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -27,6 +28,7 @@ class Perception(BaseModel):
     ocr_text: list[str] = Field(default_factory=list)
     objects: list[PObject] = Field(default_factory=list)
     scene: str = ""
+    medium: Literal["Photo", "Video"] = "Photo"      # only changes the word the stored text starts with
 
     @field_validator("ocr_text", mode="before")
     @classmethod
@@ -54,11 +56,50 @@ def perceive_frame(llm: LLMClient, image: bytes) -> Perception:
         raise LLMUnavailable(f"unusable perception: {e}") from e
 
 
+_MAX_CAPTIONS, _MAX_OBJECTS, _MAX_OCR = 3, 25, 10
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def merge_perceptions(perceptions: list[dict[str, Any]]) -> dict[str, Any]:
+    """The findings of a video's frames as one description: each object, visible text and scene once, and only the
+    captions that say something new. One description means one extraction call when it is saved, not one per frame."""
+    captions: list[str] = []
+    ocr: dict[str, str] = {}
+    objects: dict[str, dict[str, Any]] = {}
+    scenes: list[str] = []
+    for raw in perceptions:
+        p = parse_perception(raw)
+        cap = p.caption.strip()
+        if cap and len(captions) < _MAX_CAPTIONS:
+            words = _words(cap)
+            if not any(len(words & w) / max(1, len(words | w)) >= 0.7 for w in map(_words, captions)):
+                captions.append(cap)
+        for t in p.ocr_text:
+            t = t.strip()
+            if t and len(ocr) < _MAX_OCR:
+                ocr.setdefault(t.lower(), t)
+        for o in p.objects:
+            key = o.label.strip().lower()
+            if not key or len(objects) >= _MAX_OBJECTS and key not in objects:
+                continue
+            kept = objects.setdefault(key, {"label": o.label.strip(), "attrs": {}})
+            for k, v in o.attrs.items():
+                kept["attrs"].setdefault(k, v)
+        sc = p.scene.strip()
+        if sc and sc.lower() not in (x.lower() for x in scenes) and len(scenes) < 2:
+            scenes.append(sc)
+    return {"caption": " ".join(captions), "ocr_text": list(ocr.values()), "objects": list(objects.values()),
+            "scene": ", ".join(scenes), "medium": "Video"}
+
+
 def perception_to_text(p: Perception, place_name: str | None = None) -> str:
     """The text that is stored as the source. Raw pixels are not kept anywhere."""
     parts = []
     if p.caption:
-        parts.append(f"Photo: {p.caption.strip()}")
+        parts.append(f"{p.medium}: {p.caption.strip()}")
     if p.ocr_text:
         parts.append("Visible text: " + "; ".join(t.strip() for t in p.ocr_text if t.strip()))
     if p.objects:

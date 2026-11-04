@@ -17,7 +17,7 @@ type Step = "add" | "reading" | "review" | "saving" | "saved";
 type Props = { open: boolean; mode: LlmMode | undefined; onClose: () => void; onSaved: () => void };
 
 const KIND_WORD: Record<FileKind, string> = { frame: "Photo", audio: "Voice", video: "Video" };
-const FIELD_LABEL: Record<DraftField["key"], string> = { when: "When", where: "Where", doing: "Doing", people: "People" };
+const FIELD_LABEL: Record<DraftField["key"], string> = { when: "When", where: "Where", doing: "Doing", seen: "Seen", people: "People" };
 const BADGE = { sure: { text: "Sure", cls: "ok" }, check: { text: "Check", cls: "warn" }, ask: { text: "Ask", cls: "warn" } } as const;
 const SOURCE_WORD: Record<string, string> = {
   exif: "Photo metadata", file: "File date", image: "Read from the image", voice: "Heard in the audio",
@@ -100,7 +100,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
         } else if (source.kind === "audio") {
           body = { kind: "audio", data_b64: await toBase64(await toWav16k(source.blob)), file_modified_at: when };
         } else {
-          const v = await extractVideo(source.blob);
+          const v = await extractVideo(source.blob, 8, true, true);
           body = {
             kind: "video", frames_b64: await Promise.all(v.frames.map(toBase64)), frame_offsets_ms: v.offsetsMs,
             audio_b64: v.audio ? await toBase64(v.audio) : undefined, file_modified_at: when,
