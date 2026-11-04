@@ -49,6 +49,10 @@ class UnknownGrant(LookupError):
     pass
 
 
+class NotYourConsent(PermissionError):
+    """Only the owner's own consent can be withdrawn without a code."""
+
+
 class BadToken(PermissionError):
     pass
 
@@ -88,6 +92,16 @@ class RevocationEngine:
             raise UnknownGrant(grant_id)
         if not verify_token(self.secret, token, grant["token_hash"]):
             raise BadToken(grant_id)
+        return self._end(grant, "withdrawn", run_red_team)
+
+    def revoke_own(self, grant_id: str, run_red_team: bool = True) -> dict[str, Any]:
+        """The signed-in owner withdraws their own consent. Being signed in to this profile is the proof, so no code
+        is needed. Anyone else's consent still needs that person's code (`revoke`)."""
+        grant = self.conn.execute("SELECT * FROM consent_grants WHERE grant_id=?", (grant_id,)).fetchone()
+        if grant is None:
+            raise UnknownGrant(grant_id)
+        if grant["grantor"] != self.owner:
+            raise NotYourConsent(grant_id)
         return self._end(grant, "withdrawn", run_red_team)
 
     def due(self) -> list[str]:

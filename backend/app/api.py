@@ -24,7 +24,7 @@ from .llm.metered import usage_purpose
 from .privacy import clock
 from .privacy.consent import active_grant, create_grant
 from .privacy.export import export_memories
-from .privacy.revocation import BadToken, UnknownGrant
+from .privacy.revocation import BadToken, NotYourConsent, UnknownGrant
 from .profiles.registry import Registry
 from .profiles.limits import Budget, RateLimiter
 from .profiles.routes import client_ip, make_router
@@ -268,6 +268,17 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(404, "unknown grant") from None
         except BadToken:
             raise HTTPException(403, "wrong revocation token") from None
+
+    @app.post("/consent/grants/{grant_id}/withdraw")
+    def withdraw_own(grant_id: str, red_team: bool = True, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        """The owner withdraws their own consent: forget everything only this grant supported. No code is needed,
+        because being signed in to the profile proves it is the owner. Someone else's consent needs their code."""
+        try:
+            return rt.revoker.revoke_own(grant_id, run_red_team=red_team)
+        except UnknownGrant:
+            raise HTTPException(404, "unknown grant") from None
+        except NotYourConsent:
+            raise HTTPException(403, "This consent belongs to someone else. Use their withdrawal code.") from None
 
     @app.post("/consent/expire-due")
     def expire_due(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
