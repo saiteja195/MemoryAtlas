@@ -63,6 +63,9 @@ async function audit(page, label) {
   await page.getByRole("button", { name: "Atlas", exact: true }).click(); // the app opens on the Dashboard
   check(await page.locator("text=Raw media kept: 0 B").isVisible(), "header shows the model mode and 'Raw media kept: 0 B'");
 
+  // Scripted controls are hidden until Demo tools is expanded.
+  check(!(await page.getByRole("button", { name: "Play the day", exact: true }).isVisible()), "sample actions are collapsed by default");
+  await page.locator(".demo-tools > summary").click();
   // Build the day.
   await page.getByRole("button", { name: "Play the day", exact: true }).click();
   await page.waitForSelector("text=Day played");
@@ -102,7 +105,7 @@ async function audit(page, label) {
   await page.keyboard.press("End");
 
   // Act 3: a later photo corrects the wallet.
-  await page.getByRole("button", { name: /Upload live photo/ }).click();
+  await page.getByRole("button", { name: /Add sample wallet sighting/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
   await (await examples(page)).getByRole("button", { name: "Where is my wallet?" }).click();
   await page.waitForSelector('.qa .a:has-text("17:45")');
@@ -170,7 +173,7 @@ async function audit(page, label) {
   await page.getByRole("button", { name: "Atlas", exact: true }).click();
   await page.getByRole("button", { name: "Play the day", exact: true }).click();
   await page.waitForSelector("text=Day played");
-  await page.getByRole("button", { name: /Upload live photo/ }).click();
+  await page.getByRole("button", { name: /Add sample wallet sighting/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
   await openAssistant(page);
   await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
@@ -197,7 +200,7 @@ async function audit(page, label) {
   await page.getByRole("button", { name: "Atlas", exact: true }).click();
   await page.getByRole("button", { name: "Play the day", exact: true }).click();
   await page.waitForSelector("text=Day played");
-  await page.getByRole("button", { name: /Upload live photo/ }).click();
+  await page.getByRole("button", { name: /Add sample wallet sighting/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
   await page.getByRole("tab", { name: "Consent" }).click();
   const alexCard = page.locator("li.grant", { hasText: "Alex" });

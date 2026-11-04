@@ -1,6 +1,6 @@
 import type { DemoEvent } from "../api/types";
 import { clock, truncate } from "../utils/graph";
-import { kindWord } from "./Header";
+import { kindWord } from "./DemoTools";
 
 type Props = {
   moments: string[];

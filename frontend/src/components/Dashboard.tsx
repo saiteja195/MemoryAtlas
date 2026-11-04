@@ -5,7 +5,6 @@ import type { DemoStatus, Graph, Grant, Health, Insights, Media, Receipt, Todo, 
 import { mostMentioned, notSure, summarize } from "../utils/dashboard";
 import { CATEGORY_INFO, dayCards, formatBytes } from "../utils/graph";
 import { personName, sessionLabel } from "./Badges";
-import { kindWord } from "./Header";
 import { CoverageStrip } from "./CoverageStrip";
 import { ModelCards } from "./ModelCards";
 import { TodoCard } from "./TodoCard";
@@ -18,16 +17,11 @@ type Props = {
   grants: Grant[];
   busy: boolean;
   offline: boolean;
-  onPlayNext: () => void;
-  onPlayAll: () => void;
   onOpenAtlas: () => void;
   onOpenMoment: (id: string) => void;
   onAsk: (q: string) => void;
   onConsent: () => void;
   onReceipt: (id: string) => void;
-  onLive: (id: string) => void;
-  onReset: () => void;
-  canReset: boolean;
   /** The day's coverage and the models' usage, and the day on screen. */
   insights: Insights | null;
   insightsError: string | null;
@@ -93,8 +87,6 @@ export function Dashboard(p: Props) {
   const cards = useMemo(() => dayCards(p.graph), [p.graph]);
   const played = p.status?.events.filter((e) => e.played).length ?? 0;
   const total = p.status?.events.length ?? 0;
-  const nextEvent = p.status?.events.find((e) => e.id === p.status?.next);
-  const live = p.status?.events.filter((e) => e.live_upload && !e.played) ?? [];
   const withdrawn = p.grants.filter((g) => g.revoked_at);
   const active = p.grants.filter((g) => !g.revoked_at);
   const kept = p.media?.raw_media_bytes_retained ?? 0;
@@ -112,8 +104,6 @@ export function Dashboard(p: Props) {
 
   const mentioned = useMemo(() => mostMentioned(p.graph, 4), [p.graph]);
   const unsure = useMemo(() => notSure(p.graph, 3), [p.graph]);
-  // The sample controls only matter while the sample day is unfinished.
-  const sampleOpen = nextEvent !== undefined || live.length > 0;
 
   return (
     <div className="dash">
@@ -122,15 +112,12 @@ export function Dashboard(p: Props) {
           <p className="eyebrow">Dashboard</p>
           <h2>{empty ? "Your memory is empty" : "Your memory at a glance"}</h2>
           <p className="muted">
-            {empty ? "Play the staged day to turn photos, a calendar entry and a conversation into sourced facts."
+            {empty ? "Use Add memory to save your first photo, recording or note. Explore scripted examples in Demo tools."
               : `${s.facts} facts across ${s.moments} moments, each traceable to where it came from.`}
           </p>
         </div>
         <div className="dash-actions">
-          {nextEvent && <button type="button" className="btn primary large" disabled={p.busy || p.offline} onClick={p.onPlayNext}>Play next · {nextEvent.at}</button>}
-          {nextEvent && <button type="button" className="btn large" disabled={p.busy || p.offline} onClick={p.onPlayAll}>Play the day</button>}
           <button type="button" className="btn large" onClick={p.onOpenAtlas}>Open the map</button>
-          {!empty && p.canReset && <button type="button" className="btn large ghost" disabled={p.busy} onClick={p.onReset}>Reset</button>}
         </div>
       </section>
 
@@ -144,26 +131,6 @@ export function Dashboard(p: Props) {
       </section>
 
       <div className="dash-grid" ref={grid}>
-        {sampleOpen && (
-          <section className="card pad dash-card span-2" aria-labelledby="d-next">
-            <h3 id="d-next">Next</h3>
-            <ul className="steps-list">
-              {nextEvent && (
-                <li>
-                  <div><strong>Play the staged day</strong><span className="muted small">Next up: the {nextEvent.at} {kindWord(nextEvent.kind, nextEvent.label)}. Each event becomes sourced facts.</span></div>
-                  <button type="button" className="btn small primary" disabled={p.busy || p.offline} onClick={p.onPlayNext}>Play next</button>
-                </li>
-              )}
-              {live.length > 0 && (
-                <li>
-                  <div><strong>Watch memory correct itself</strong><span className="muted small">Upload the {live[0].at} photo, then ask where your wallet is. The old answer stays as history.</span></div>
-                  <button type="button" className="btn small" disabled={p.busy || p.offline} onClick={() => p.onLive(live[0].id)}>Upload photo</button>
-                </li>
-              )}
-            </ul>
-          </section>
-        )}
-
         <section className="card pad dash-card span-2 coverage-card" aria-labelledby="d-cov">
           <div className="card-head">
             <h3 id="d-cov">Day coverage</h3>
@@ -269,9 +236,9 @@ export function Dashboard(p: Props) {
         <section className="card pad dash-card span-2" aria-labelledby="d-day">
           <div className="card-head">
             <h3 id="d-day">The day so far</h3>
-            <span className="muted small">{played} of {total} events played</span>
+            <span className="muted small">Sample day: {played} of {total} events played</span>
           </div>
-          <progress value={played} max={Math.max(total, 1)} aria-label="Events played" />
+          <progress value={played} max={Math.max(total, 1)} aria-label="Sample events played" />
           {cards.length === 0 ? <p className="muted small">No moments yet.</p> : (
             <ul className="mini-moments">
               {cards.map((c) => (

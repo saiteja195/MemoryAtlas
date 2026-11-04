@@ -118,8 +118,9 @@ select, input[type="text"] {
    Layout
    ------------------------------------------------------------------------------------------ */
 /* The assistant launcher is fixed in the bottom-right corner (16px in, about 43px tall). Leave room under the page so the last
-   thing on it, such as the Background activity panel and its Review button, scrolls clear of the launcher. */
-.app { display: grid; grid-template-rows: auto 1fr; min-block-size: 100%; padding-block-end: 76px; }
+   thing on it, such as the Background activity panel and its Review button, scrolls clear of the launcher.
+   Three rows: the header, the Demo tools section, and the page. */
+.app { display: grid; grid-template-rows: auto auto 1fr; min-block-size: 100%; padding-block-end: 76px; }
 .header {
   position: sticky; inset-block-start: 0; z-index: 20;
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px clamp(12px, 2vw, 24px);
@@ -930,3 +931,12 @@ dialog.settings-dialog { inline-size: min(640px, calc(100vw - 32px)); }
 .activity-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .activity-row strong { margin-inline-end: auto; }
 @media (max-width: 600px) { .background-activity { margin: 12px; padding: 12px; } }
+
+/* Scripted examples stay separate from the user's memory actions. */
+.demo-tools { margin: 12px clamp(12px, 2vw, 24px) 0; padding: 0 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); min-inline-size: 0; }
+.demo-tools > summary { cursor: pointer; padding-block: 12px; min-block-size: 44px; font-weight: 600; }
+.demo-tools-body { padding-block-end: 16px; }
+.demo-tools-body > p { margin-block-end: 12px; }
+.demo-tools-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.demo-tools-actions .btn { min-block-size: 44px; white-space: normal; }
+.demo-tools-actions progress { inline-size: 80px; }

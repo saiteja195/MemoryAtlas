@@ -105,7 +105,7 @@ export function useAtlas() {
   }, [run]);
 
   const uploadLive = useCallback(
-    (id: string) => run("Uploading the photo", () => api.uploadLive(id)), [run]);
+    (id: string) => run("Adding the sample wallet sighting", () => api.uploadLive(id)), [run]);
 
   /** DEMO ONLY: let a grant lapse now. The receipt arrives through the normal refresh. */
   const expire = useCallback(
