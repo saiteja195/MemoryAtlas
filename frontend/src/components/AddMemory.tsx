@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { api, ApiError } from "../api/client";
 import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question, SaveJob, TrackResult } from "../api/types";
 import {
-  addAvailability, classifyFile, localIso, maxBytes, splitSeen, toCommitBody, unanswered, whenInputValue,
-  type AnswerState, type FileKind,
+  addAvailability, localIso, MAX_PHOTOS, planAdd, splitSeen, toCommitBody, unanswered, whenInputValue,
+  type AnswerState, type FileKind, type Picked,
 } from "../utils/addMemory";
 import { extractVideo, toBase64, toWav16k } from "../utils/media";
 import { pollJob, progressText } from "../utils/saveJob";
@@ -11,7 +11,6 @@ import { FRAMES, parsePhrases, trackCost, trackLines } from "../utils/tracking";
 import { CaptureButtons, type Captured } from "./CaptureButtons";
 import { Dialog } from "./Dialog";
 
-type Source = { kind: FileKind; blob: Blob; name: string; modifiedAt: number };
 type Step = "add" | "reading" | "review" | "saving" | "saved";
 
 type Props = { open: boolean; mode: LlmMode | undefined; onClose: () => void; onSaved: () => void };
@@ -44,7 +43,8 @@ function outcomeText(r: CommitResult): { text: string; saved: boolean } {
 }
 
 export function AddMemory({ open, mode, onClose, onSaved }: Props) {
-  const [source, setSource] = useState<Source | null>(null);
+  // Up to eight photos together (one memory), or a single voice recording or video.
+  const [sources, setSources] = useState<Picked[]>([]);
   const [note, setNote] = useState("");
   const [step, setStep] = useState<Step>("add");
   const [error, setError] = useState<string | null>(null);
@@ -63,29 +63,31 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const input = useRef<HTMLInputElement>(null);
 
   const reset = () => {
-    setSource(null); setNote(""); setStep("add"); setError(null); setDraft(null);
+    setSources([]); setNote(""); setStep("add"); setError(null); setDraft(null);
     setAnswers({ people: {} }); setPlaceChoice(null); setOutcome(null); setGrants([]); setHover(false); setJob(null);
     setTrackOn(false); setTrackText(""); setTrack(null);
   };
+  const source = sources[0] ?? null;                 // the recording or video, or the first photo
+  const photos = sources.length > 0 && source?.kind === "frame";
   const wanted = trackOn && source?.kind === "video" ? parsePhrases(trackText) : { phrases: [] as string[] };
   const wantedError = "error" in wanted ? wanted.error : null;
   const wantedPhrases = "phrases" in wanted ? wanted.phrases : [];
   useEffect(() => { if (!open) reset(); }, [open]);
 
-  const take = (file: File) => {
-    const c = classifyFile(file);
-    if ("unsupported" in c) { setError(c.unsupported); return; }
-    if (file.size > maxBytes(c.kind)) { setError(`That file is ${fmtBytes(file.size)}, over the ${fmtBytes(maxBytes(c.kind))} limit.`); return; }
-    setError(null);
-    setSource({ kind: c.kind, blob: file, name: file.name, modifiedAt: file.lastModified || 0 });
+  const add = (files: File[]) => {
+    const plan = planAdd(sources, files);
+    setError(plan.error);
+    setSources(plan.sources);
   };
-  const onPick = (e: ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) take(f); };
-  const onDrop = (e: DragEvent) => { e.preventDefault(); setHover(false); const f = e.dataTransfer.files[0]; if (f) take(f); };
+  const onPick = (e: ChangeEvent<HTMLInputElement>) => { const f = Array.from(e.target.files ?? []); e.target.value = ""; add(f); };
+  const onDrop = (e: DragEvent) => { e.preventDefault(); setHover(false); add(Array.from(e.dataTransfer.files)); };
   const onCaptured = (c: Captured) => {
-    const kind: FileKind = c.kind === "photo" ? "frame" : c.kind === "voice" ? "audio" : "video";
+    if (c.kind === "photo") { add([new File([c.blob], c.name, { type: c.blob.type || "image/jpeg", lastModified: Date.now() })]); return; }
+    if (photos) { setError("A voice recording or video can't go with photos. Remove the photos first."); return; }
     setError(null);
-    setSource({ kind, blob: c.blob, name: c.name, modifiedAt: Date.now() });
+    setSources([{ kind: c.kind === "voice" ? "audio" : "video", blob: c.blob, name: c.name, modifiedAt: Date.now() }]);
   };
+  const removeSource = (i: number) => { setError(null); setSources(sources.filter((_, n) => n !== i)); };
 
   const analyze = async () => {
     setError(null);
@@ -95,7 +97,13 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
       if (source) {
         // A file with no modified time sends none, so Muse asks when it happened instead of guessing.
         const when = source.modifiedAt ? localIso(source.modifiedAt) : undefined;
-        if (source.kind === "frame") {
+        if (photos && sources.length > 1) {
+          // Several photos: all are read at once and saved as one memory, at the earliest photo's time.
+          body = {
+            kind: "photos", frames_b64: await Promise.all(sources.map((p) => toBase64(p.blob))),
+            photo_times: sources.map((p) => (p.modifiedAt ? localIso(p.modifiedAt) : null)),
+          };
+        } else if (source.kind === "frame") {
           body = { kind: "frame", data_b64: await toBase64(source.blob), file_modified_at: when };
         } else if (source.kind === "audio") {
           body = { kind: "audio", data_b64: await toBase64(await toWav16k(source.blob)), file_modified_at: when };
@@ -167,7 +175,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const open_ = draft ? unanswered(draft, answers) : [];
   const declined = Object.values(answers.people).some((p) => p.consented === false);
   const avail = addAvailability(mode);
-  const canAnalyze = (source !== null || note.trim().length > 0) && step === "add"
+  const canAnalyze = (sources.length > 0 || note.trim().length > 0) && step === "add"
     && !wantedError && !(trackOn && source?.kind === "video" && wantedPhrases.length === 0);
 
   return (
@@ -183,18 +191,22 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
             onDragOver={(e) => { e.preventDefault(); setHover(true); }}
             onDragLeave={() => setHover(false)} onDrop={onDrop}
           >
-            <p><strong>Drop a file here</strong></p>
-            <p className="small muted">Photo (JPEG or PNG), voice, or video</p>
-            <button type="button" className="btn" data-autofocus disabled={step === "reading"} onClick={() => input.current?.click()}>Browse files</button>
-            <input ref={input} type="file" className="sr-only" tabIndex={-1} accept="image/jpeg,image/png,audio/*,video/*" onChange={onPick} />
+            <p><strong>Drop files here</strong></p>
+            <p className="small muted">Photos (JPEG or PNG, up to {MAX_PHOTOS} at once), or one voice recording or video</p>
+            <button type="button" className="btn" data-autofocus disabled={step === "reading"} onClick={() => input.current?.click()}>
+              {photos ? "Add more photos" : "Browse files"}
+            </button>
+            <input ref={input} type="file" multiple className="sr-only" tabIndex={-1} accept="image/jpeg,image/png,audio/*,video/*" onChange={onPick} />
           </div>
 
-          {source && (
+          {photos ? (
+            <PhotoList photos={sources} busy={step === "reading"} onRemove={removeSource} />
+          ) : source && (
             <div className="add-file">
               <span className="chip accent">{KIND_WORD[source.kind]}</span>
               <span className="add-name">{source.name}</span>
               <span className="small muted">{fmtBytes(source.blob.size)}</span>
-              <button type="button" className="btn small ghost" disabled={step === "reading"} onClick={() => setSource(null)} aria-label={`Remove ${source.name}`}>Remove</button>
+              <button type="button" className="btn small ghost" disabled={step === "reading"} onClick={() => removeSource(0)} aria-label={`Remove ${source.name}`}>Remove</button>
             </div>
           )}
 
@@ -222,9 +234,9 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
           )}
 
           <label className="add-label" htmlFor="add-note">Or write a note</label>
-          <textarea id="add-note" className="add-note" rows={3} maxLength={5000} value={note} disabled={source !== null || step === "reading"}
+          <textarea id="add-note" className="add-note" rows={3} maxLength={5000} value={note} disabled={sources.length > 0 || step === "reading"}
                     placeholder="Lunch with Alex near the office" onChange={(e) => setNote(e.target.value)} />
-          {source && <p className="small muted">A note can only be added on its own. Remove the file to write one.</p>}
+          {sources.length > 0 && <p className="small muted">A note can only be added on its own. Remove the {photos ? "photos" : "file"} to write one.</p>}
 
           {error && <div className="notice error" role="alert">{error}</div>}
 
@@ -234,7 +246,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
               {step === "reading" ? "Reading…" : "Analyze with Muse"}
             </button>
           </div>
-          <p className="small muted">Muse reads it and turns it into text. The photo, audio or video itself is not kept, and nothing is saved until you press Save.</p>
+          <p className="small muted">Muse reads it and turns it into text. The photo{photos && sources.length > 1 ? "s" : ""}, audio or video itself is not kept, and nothing is saved until you press Save.</p>
         </div>
       )}
 
@@ -313,6 +325,30 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** The photos added so far, each with a small picture, its size and a Remove button. They are saved together as one memory. */
+function PhotoList({ photos, busy, onRemove }: { photos: Picked[]; busy: boolean; onRemove: (i: number) => void }) {
+  // One temporary address per photo for its thumbnail, released when the list changes or closes.
+  const urls = useMemo(() => photos.map((p) => URL.createObjectURL(p.blob)), [photos]);
+  useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
+  return (
+    <div className="add-photos">
+      <p className="small muted" id="add-photos-count">
+        {photos.length} of {MAX_PHOTOS} photos. They are read together and saved as one memory, at the time of the earliest.
+      </p>
+      <ul className="add-photo-list" aria-describedby="add-photos-count">
+        {photos.map((p, i) => (
+          <li key={`${p.name}-${p.blob.size}-${p.modifiedAt}`} className="add-photo">
+            <img src={urls[i]} alt="" width={48} height={48} />
+            <span className="add-name">{p.name}</span>
+            <span className="small muted">{fmtBytes(p.blob.size)}</span>
+            <button type="button" className="btn small ghost" disabled={busy} onClick={() => onRemove(i)} aria-label={`Remove ${p.name}`}>Remove</button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
