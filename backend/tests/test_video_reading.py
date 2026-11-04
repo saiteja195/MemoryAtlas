@@ -1,10 +1,11 @@
 """Reading a video well and cheaply: frames are read in parallel, the findings of all frames become one memory (one
 extraction call, not one per frame), the review shows what was seen, and printed text is not mistaken for a place."""
 import base64
+import itertools
 import threading
 
 from app.capture.draft import build_draft
-from app.compiler.perceive import merge_perceptions, perception_to_text, Perception
+from app.compiler.perceive import merge_perceptions, perception_to_text, Perception, split_for_extraction
 
 from .fakes import FakeLLM
 from .test_upload_api import b64, commit, make, png, source_texts
@@ -49,10 +50,11 @@ def test_the_draft_lists_what_was_seen_and_describes_the_whole_clip():
     assert "laptop" in fields["doing"].value and "notebook" in fields["doing"].value
 
 
-def test_a_long_list_of_objects_is_cut_short_on_the_review_screen():
-    d = build_draft("frame", perceptions=[frame("x", objects=[f"item{i}" for i in range(20)])], frame_offsets_ms=[0])
+def test_every_object_is_sent_for_the_review_screen_and_commas_are_kept_out_of_labels():
+    d = build_draft("frame", perceptions=[frame("x", objects=[f"item{i}" for i in range(20)] + ["cup, red"])],
+                    frame_offsets_ms=[0])
     seen = next(f for f in d.fields if f.key == "seen").value
-    assert seen.startswith("item0, item1") and seen.endswith("(+8 more)")
+    assert seen.split(", ") == [f"item{i}" for i in range(20)] + ["cup  red"] and "more" not in seen
 
 
 def test_no_objects_means_no_seen_row():
@@ -116,3 +118,45 @@ def test_a_video_is_saved_as_one_memory_not_one_per_frame():
                                     "AND session_id LIKE 'upload-%'").fetchall()
     assert len(rows) == 1 and rows[0][0] == "2026-10-29T12:35:00"
     assert rows[0][1].startswith("Video: ") and "wallet" in rows[0][1]
+
+
+# -- one extraction reads at most eight facts, so a long list of objects is saved in several memories -------------
+
+def test_a_long_list_of_objects_is_split_so_each_memory_stays_within_what_one_extraction_can_read():
+    merged = merge_perceptions([frame("A desk.", ocr=["Cisco"], objects=[f"item{i}" for i in range(14)], scene="office")])
+    parts = split_for_extraction(merged, per_source=6)
+    assert [len(p["objects"]) for p in parts] == [6, 6, 2]
+    assert parts[0]["caption"] == "A desk." and parts[0]["ocr_text"] == ["Cisco"] and parts[0]["scene"] == "office"
+    assert all(p["caption"] and p["medium"] == "Video" for p in parts)           # each part says what it is
+    assert parts[1]["caption"] != parts[0]["caption"] and ".." not in perception_to_text(Perception.model_validate(parts[1]))
+    assert [o["label"] for p in parts for o in p["objects"]] == [f"item{i}" for i in range(14)]
+
+
+def test_a_short_or_empty_list_stays_one_memory():
+    assert len(split_for_extraction(merge_perceptions([frame("A desk.", objects=["a", "b"])]))) == 1
+    assert len(split_for_extraction(merge_perceptions([frame("A desk.")]))) == 1
+    assert len(split_for_extraction(merge_perceptions([]))) == 1
+
+
+class ManyObjects(FakeLLM):
+    def __init__(self):
+        super().__init__()
+        self._n = itertools.count()                          # frames are read at the same time: count atomically
+
+    def describe_image(self, image, prompt):
+        n = next(self._n)
+        self.described.append(image)
+        return {"caption": f"Part {n} of a desk", "ocr_text": [], "scene": "desk",
+                "objects": [{"label": f"thing{n}-{i}", "attrs": {}} for i in range(4)]}
+
+
+def test_every_object_of_a_clip_reaches_the_extractor_in_memories_of_at_most_six():
+    c, fake = make(ManyObjects())
+    d = c.post("/capture/preview", json=video_body(6)).json()
+    r = commit(c, d, people=[])
+    assert r.status_code == 200, r.text
+    texts = source_texts(c)
+    assert len(texts) == 4                                   # 24 objects, six to a memory
+    assert all(t.startswith("Video: ") for t in texts)
+    assert all(f"thing{n}-{i}" in " ".join(texts) for n in range(6) for i in range(4))
+    assert all(t.count(";") <= 5 for t in texts)             # at most six objects in each

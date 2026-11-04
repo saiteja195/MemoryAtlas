@@ -86,3 +86,9 @@ export function addAvailability(mode: LlmMode | undefined): { ok: true } | { ok:
 export function whenInputValue(draft: Draft, a: AnswerState): string {
   return (a.when ?? draft.captured_at ?? "").slice(0, 16);
 }
+
+/** The objects of a "Seen" row, split into the ones shown at first and the rest the person can open. */
+export function splitSeen(value: string, limit = 12): { shown: string[]; rest: string[] } {
+  const all = value.split(",").map((s) => s.trim()).filter(Boolean);
+  return { shown: all.slice(0, limit), rest: all.slice(limit) };
+}

@@ -95,6 +95,20 @@ def merge_perceptions(perceptions: list[dict[str, Any]]) -> dict[str, Any]:
             "scene": ", ".join(scenes), "medium": "Video"}
 
 
+def split_for_extraction(merged: dict[str, Any], per_source: int = 6) -> list[dict[str, Any]]:
+    """A merged video description as one or more memories. One extraction reads at most eight facts, so a long list of
+    objects is saved a few at a time: the first memory carries the caption, text and scene, and each later one says
+    it is more of the same clip. Still far fewer extraction calls than one for every frame."""
+    objects = merged["objects"]
+    if len(objects) <= per_source:
+        return [merged]
+    parts = [{**merged, "objects": objects[:per_source]}]
+    for start in range(per_source, len(objects), per_source):
+        parts.append({"caption": "More of the same video clip", "ocr_text": [], "scene": "",
+                      "objects": objects[start:start + per_source], "medium": "Video"})
+    return parts
+
+
 def perception_to_text(p: Perception, place_name: str | None = None) -> str:
     """The text that is stored as the source. Raw pixels are not kept anywhere."""
     parts = []

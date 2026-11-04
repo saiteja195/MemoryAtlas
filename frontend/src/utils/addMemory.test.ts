@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Draft, Question } from "../api/types";
-import { addAvailability, classifyFile, localIso, maxBytes, toCommitBody, unanswered, whenInputValue, type AnswerState } from "./addMemory";
+import { addAvailability, classifyFile, localIso, maxBytes, splitSeen, toCommitBody, unanswered, whenInputValue, type AnswerState } from "./addMemory";
 
 const file = (name: string, type: string) => ({ name, type });
 
@@ -145,5 +145,20 @@ describe("whenInputValue", () => {
   });
   it("is empty when nothing is known", () => {
     expect(whenInputValue(d(null), { people: {} })).toBe("");
+  });
+});
+
+describe("splitSeen", () => {
+  it("shows the first twelve and keeps the rest to open", () => {
+    const value = Array.from({ length: 25 }, (_, i) => `item${i}`).join(", ");
+    const { shown, rest } = splitSeen(value);
+    expect(shown).toHaveLength(12);
+    expect(rest).toHaveLength(13);
+    expect(rest[0]).toBe("item12");
+  });
+  it("has nothing to open for a short list, and copes with empty text", () => {
+    expect(splitSeen("laptop, mouse")).toEqual({ shown: ["laptop", "mouse"], rest: [] });
+    expect(splitSeen("")).toEqual({ shown: [], rest: [] });
+    expect(splitSeen(" , ,")).toEqual({ shown: [], rest: [] });
   });
 });
