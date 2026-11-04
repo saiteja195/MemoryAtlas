@@ -48,8 +48,11 @@ class RecallService:
         key = f"{route}|{as_of}|{norm(question)}" if route else norm(question)
         qhash = hashlib.sha256(key.encode()).hexdigest()
         version = graph_version(self.conn)
+        # Ruling R-G(c): a memory question (coverage, the models' usage) is never cached at all. Even an
+        # abstention or a claim-only answer could outlive new usage, which does not change the graph version.
+        cacheable = route != "memory"
         row = self.conn.execute("SELECT answer_json FROM answer_cache WHERE question_hash=?",
-                                (qhash,)).fetchone()
+                                (qhash,)).fetchone() if cacheable else None
         if row:
             cached = json.loads(row["answer_json"])
             # An answer built from coverage or usage_stats is never reused: usage changes without the
@@ -62,7 +65,7 @@ class RecallService:
         out = ans.as_dict()
         out["citations"] = self._citations(ans.cited_claim_ids)
         out["graph_version"], out["cached"] = version, False
-        if not ans.cited_tools:
+        if cacheable and not ans.cited_tools:
             self.conn.execute("INSERT OR REPLACE INTO answer_cache(question_hash, answer_json,"
                               " claim_ids) VALUES (?,?,?)",
                               (qhash, json.dumps(out), json.dumps(ans.cited_claim_ids)))

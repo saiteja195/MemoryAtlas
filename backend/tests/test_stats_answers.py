@@ -45,6 +45,71 @@ def test_numbers_in_normalises_separators_trailing_zero_and_clock_times():
         {"265", "4", "25", "0.25", "13:20"}
 
 
+def test_a_date_is_one_token_so_its_parts_do_not_feed_the_allowed_set():
+    assert numbers_in("on 2026-10-29") == {"2026-10-29"}
+    assert numbers_in("at 2026-10-29T12:30:00 and 2026-10-29 09:05") == {"2026-10-29", "12:30", "09:05"}
+    assert stats_numbers({"day": "2026-10-29", "note": "The memory covers: 2026-10-28, 2026-10-29."}) == \
+        {"2026-10-28", "2026-10-29"}
+
+
+AFTERNOON = {"time_from": f"{DAY}T12:00:00", "time_to": f"{DAY}T14:00:00"}
+
+
+@pytest.mark.parametrize("pct", ["29", "10"])
+def test_a_percentage_from_the_date_is_retried_then_replaced(full_day, pct):
+    text = f"You covered {pct}% of the window."
+    ans, _ = run(full_day.conn, [tool("coverage", **AFTERNOON), final(text, ["coverage"]), final(text, ["coverage"])],
+                 question="How much of my afternoon is covered?")
+    assert pct in ans.checks[0] and any("fallback" in c for c in ans.checks)
+    assert ans.answer == render_coverage(stats(full_day.conn, "coverage", **AFTERNOON))
+
+
+def test_29_percent_of_the_whole_day_is_retried_too(full_day):
+    ans, _ = run(full_day.conn, [tool("coverage"), final("You covered 29% of your day", ["coverage"]),
+                                 final("You covered 29% of your day", ["coverage"])])
+    assert any("fallback" in c for c in ans.checks)
+
+
+def test_a_reply_that_states_the_date_still_passes(full_day):
+    ans, _ = run(full_day.conn, [tool("coverage"), final("On 2026-10-29, 25% of waking hours is covered.", ["coverage"])])
+    assert ans.status == "answered" and ans.checks == []
+
+
+# -- claim-only replies after a stats tool ran ---------------------------------------------------
+
+def _summary_claim(conn):
+    return stats(conn, "day_summary", **AFTERNOON)["moments"][0]["summary"]["claim_id"]
+
+
+def test_a_claim_only_reply_with_an_invented_percentage_after_coverage_is_replaced(full_day):
+    conn = full_day.conn
+    cid = _summary_claim(conn)
+    text = "You covered 90% of your day."
+    ans, llm = run(conn, [tool("coverage"), tool("day_summary", **AFTERNOON), final(text, cited=[cid]),
+                          final(text, cited=[cid])])
+    assert "90" in llm.recall_payloads[3]["steps_so_far"][-1]["checker"]
+    assert ans.answer == render_coverage(stats(conn, "coverage")) and ans.status == "answered"
+    assert ans.cited_tools == ["coverage"] and ans.cited_claim_ids == []
+    assert any("fallback" in c for c in ans.checks)
+
+
+def test_a_claim_only_reply_quoting_its_claim_passes(full_day):
+    conn = full_day.conn
+    cid = _summary_claim(conn)
+    at = conn.execute("SELECT event_time FROM claims WHERE claim_id=?", (cid,)).fetchone()[0]
+    text = f"Lunch with Alex began at {at[11:16]}; 25% of waking hours is covered."
+    ans, _ = run(conn, [tool("coverage"), tool("day_summary", **AFTERNOON), final(text, cited=[cid])])
+    assert ans.status == "answered" and ans.cited_claim_ids == [cid] and ans.checks == []
+
+
+def test_a_claim_only_reply_without_a_stats_tool_is_unchanged(full_day):
+    conn = full_day.conn
+    cid = _summary_claim(conn)
+    ans, _ = run(conn, [tool("day_summary", **AFTERNOON), final("You had 90 tacos.", cited=[cid])],
+                 question="What happened this afternoon?")
+    assert ans.status == "answered" and ans.checks == [] and ans.cited_tools == []
+
+
 # -- the check -------------------------------------------------------------------------------------
 
 def test_coverage_answer_with_correct_numbers_passes(full_day):
@@ -232,11 +297,41 @@ def test_stats_answer_is_not_cached(full_day):
 def test_a_cached_row_with_cited_tools_is_never_read(full_day):
     conn = full_day.conn
     llm = FakeLLM()
+    q = "What happened this afternoon?"                           # routed, but not a memory question
     llm.recall_replies[:] = [tool("coverage"), final("No record.", status="abstained")]
     svc = RecallService(conn, llm)
-    svc.ask(COVERAGE_Q, as_of=DAY)                                # an abstention is cached as before
+    svc.ask(q, as_of=DAY)                                         # an abstention is cached as before
     assert conn.execute("SELECT COUNT(*) FROM answer_cache").fetchone()[0] == 1
     conn.execute("UPDATE answer_cache SET answer_json = json_set(answer_json, '$.cited_tools', json('[\"coverage\"]'))")
     llm.recall_replies[:] = [tool("coverage"), final("25% is covered.", ["coverage"])]
-    out = svc.ask(COVERAGE_Q, as_of=DAY)
+    out = svc.ask(q, as_of=DAY)
     assert out["cached"] is False and out["answer"] == "25% is covered."
+
+
+def test_memory_questions_are_never_cached(full_day):
+    """Ruling R-G(c): even an abstention or a claim-only answer to a memory question could outlive new usage."""
+    conn = full_day.conn
+    llm = FakeLLM()
+    llm.recall_replies[:] = [final("No record.", status="abstained")] * 2
+    svc = RecallService(conn, llm)
+    first, second = svc.ask(USAGE_Q, as_of=DAY), svc.ask(USAGE_Q, as_of=DAY)
+    assert first["cached"] is False and second["cached"] is False and len(llm.recall_payloads) == 2
+    assert conn.execute("SELECT COUNT(*) FROM answer_cache").fetchone()[0] == 0
+    # a cached row for the same key is not read either
+    import hashlib
+    from app.compiler.resolve import norm
+    key = hashlib.sha256(f"memory|{DAY}|{norm(USAGE_Q)}".encode()).hexdigest()
+    conn.execute("INSERT INTO answer_cache(question_hash, answer_json, claim_ids) VALUES (?,?,?)",
+                 (key, '{"graph_version": "x", "answer": "stale"}', "[]"))
+    conn.execute("UPDATE answer_cache SET answer_json = json_set(answer_json, '$.graph_version', ?)",
+                 (__import__("app.recall.service", fromlist=["graph_version"]).graph_version(conn),))
+    llm.recall_replies[:] = [final("No record.", status="abstained")]
+    assert svc.ask(USAGE_Q, as_of=DAY)["answer"] != "stale" and len(llm.recall_payloads) == 3
+
+
+def test_other_questions_keep_their_cache(full_day):
+    llm = FakeLLM()
+    llm.recall_replies[:] = [final("No record.", status="abstained")]
+    svc = RecallService(full_day.conn, llm)
+    svc.ask("What happened this afternoon?", as_of=DAY)
+    assert svc.ask("What happened this afternoon?", as_of=DAY)["cached"] is True and len(llm.recall_payloads) == 1

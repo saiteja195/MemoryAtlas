@@ -33,7 +33,11 @@ PLACE_RE = re.compile(r"\b(where|left|leave|leaving|still|find|found|located|loc
                       r"whereabouts|sighting|last (?:see|saw|seen))\b", re.I)
 # Numbers in an answer that cites a stats tool: clock times as one token, then digit groups (with
 # thousands separators and decimals). Each is normalised so "4,200" == "4200", "3.0" == "3", "9:05" == "09:05".
+# A date or ISO timestamp is one token too, so its month and day never pass for a percentage or a count;
+# a timestamp also gives its clock time, which is how an answer quotes it.
+DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?(?!\d)")
 CLOCK_RE = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?!\d)")
+NUMBER_PROBLEM = "These numbers do not appear in"
 NUMBER_RE = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
 # The tools whose result may be cited instead of a claim, and the sentence that replaces a twice-failed answer.
 STATS_TEMPLATES = {"coverage": render_coverage, "usage_stats": render_usage}
@@ -135,8 +139,8 @@ class Answer:
 
 def abstain(why: str, tools: RecallTools | None = None, steps: int = 0,
             checks: list[str] | None = None) -> Answer:
-    return Answer("abstained", "I don't have a record that answers that.", [], why,
-                  tools.trace if tools else [], steps, checks or [])
+    return Answer("abstained", "I don't have a record that answers that.", cited_claim_ids=[],
+                  uncertainty_note=why, trace=tools.trace if tools else [], steps=steps, checks=checks or [])
 
 
 class Investigator:
@@ -176,7 +180,10 @@ class Investigator:
             if problem is None:
                 return self._finish(step, tools, step_no, checks)
             checks.append(problem)
-            cited_tools += [t for t in step.cited_tools if t not in cited_tools]
+            # The template backs a failed number check: the tools the reply cited or, for a reply citing only
+            # claims, the stats tools that ran (first called first).
+            basis = step.cited_tools or (list(tools.stats_returned) if problem.startswith(NUMBER_PROBLEM) else [])
+            cited_tools += [t for t in basis if t not in cited_tools]
             if retried:
                 fallback = self._fallback(cited_tools, tools, step_no, checks)
                 if fallback:
@@ -226,13 +233,16 @@ class Investigator:
             if problem:
                 return problem
         if step.cited_tools:
-            return self._check_numbers(step, tools)
-        return None
+            return self._check_numbers(step, tools, step.cited_tools)
+        # Citing only claims does not skip the number check once a stats tool has shown its figures: the
+        # numbers must then come from those results or from the cited claims themselves.
+        ran = [t for t in tools.stats_returned if _usable(tools, t)]
+        return self._check_numbers(step, tools, ran) if ran else None
 
-    def _check_numbers(self, step: Step, tools: RecallTools) -> str | None:
-        """Every cited tool must be a stats tool that returned a usable result in this question, and every
+    def _check_numbers(self, step: Step, tools: RecallTools, cited: list[str]) -> str | None:
+        """Every named tool must be a stats tool that returned a usable result in this question, and every
         number in the answer (and its note) must appear in those results, or in the cited claims."""
-        names = list(dict.fromkeys(step.cited_tools))
+        names = list(dict.fromkeys(cited))
         uncalled = [t for t in names if not _usable(tools, t)]
         if uncalled:
             return (f"These cited tools were not called in this question, returned an error or are not "
@@ -246,7 +256,7 @@ class Investigator:
             allowed |= stats_numbers([r["text"], r["object_value"], r["event_time"]])
         unknown = sorted(numbers_in(f"{step.answer} {step.uncertainty_note}") - allowed)
         if unknown:
-            return (f"These numbers do not appear in the {' or '.join(names)} result: {unknown}. "
+            return (f"{NUMBER_PROBLEM} the {' or '.join(names)} result or the cited claims: {unknown}. "
                     f"Use only the figures the tool returned, as given.")
         return None
 
@@ -257,8 +267,8 @@ class Investigator:
         if name is None:
             return None
         checks.append(f"fallback: the answer failed its check twice, so it was built from the {name} result")
-        return Answer("answered", STATS_TEMPLATES[name](tools.stats_returned[name]), [], "", tools.trace,
-                      steps, checks, [name])
+        return Answer("answered", STATS_TEMPLATES[name](tools.stats_returned[name]), cited_claim_ids=[],
+                      uncertainty_note="", trace=tools.trace, steps=steps, checks=checks, cited_tools=[name])
 
     def _check_claims(self, step: Step, tools: RecallTools, question: str) -> str | None:
         unseen = [c for c in step.cited_claim_ids if c not in tools.returned]
@@ -302,9 +312,11 @@ class Investigator:
         status = step.status or "abstained"
         if status == "abstained":
             return Answer("abstained", step.answer or "I don't have a record that answers that.",
-                          [], note, tools.trace, steps, checks)
-        return Answer(status, step.answer.strip(), cited, note.strip(), tools.trace, steps, checks,
-                      list(dict.fromkeys(step.cited_tools)))
+                          cited_claim_ids=[], uncertainty_note=note, trace=tools.trace, steps=steps,
+                          checks=checks)
+        return Answer(status, step.answer.strip(), cited_claim_ids=cited, uncertainty_note=note.strip(),
+                      trace=tools.trace, steps=steps, checks=checks,
+                      cited_tools=list(dict.fromkeys(step.cited_tools)))
 
 
 def _usable(tools: RecallTools, name: str) -> bool:
@@ -321,8 +333,15 @@ def _norm_number(text: str) -> str:
 
 
 def numbers_in(text: str) -> set[str]:
-    """Clock times ("13:20", "9:05" as "09:05") and digit groups ("4,200" as "4200", "3.0" as "3")."""
-    out = {f"{int(h):02d}:{m}" for h, m in CLOCK_RE.findall(text)}
+    """Dates ("2026-10-29", whole), clock times ("13:20", "9:05" as "09:05") and digit groups ("4,200" as
+    "4200", "3.0" as "3")."""
+    out: set[str] = set()
+    for d, h, m in DATE_RE.findall(text):
+        out.add(d)
+        if h:
+            out.add(f"{h}:{m}")
+    text = DATE_RE.sub(" ", text)
+    out |= {f"{int(h):02d}:{m}" for h, m in CLOCK_RE.findall(text)}
     return out | {_norm_number(n) for n in NUMBER_RE.findall(CLOCK_RE.sub(" ", text))}
 
 
