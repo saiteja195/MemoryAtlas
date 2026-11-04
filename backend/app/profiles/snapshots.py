@@ -11,12 +11,13 @@ def snapshot_path(kind: str) -> str:
     return str(ROOT / "fixtures" / "profiles" / f"{kind}.db")
 
 
-def restore(runtimes: Runtimes, profile: Profile) -> None:
+def restore(runtimes: Runtimes, profile: Profile, kind: str | None = None) -> None:
     """Close the profile's runtime, replace its database with the snapshot and clear its model cache.
+    `kind` names the snapshot; it defaults to the profile's own demo kind.
 
     The copy goes to a temporary name and is renamed into place, so the profile never holds a half-copied
     file. The next `Runtimes.get` opens the restored database on a fresh connection."""
-    kind = profile.demo_kind
+    kind = kind or profile.demo_kind
     if not kind:
         raise ValueError("not a demo profile")
     src = snapshot_path(kind)

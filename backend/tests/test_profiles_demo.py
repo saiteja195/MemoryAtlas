@@ -64,6 +64,37 @@ def test_load_sample_fills_an_empty_profile(tmp_path):
     assert rt.conn.execute("SELECT COUNT(*) FROM claims").fetchone()[0] > 0
 
 
+def test_load_sample_uses_the_staged_snapshot_and_makes_no_model_calls(tmp_path, monkeypatch):
+    """The staged day through a live model takes minutes and ends in a gateway timeout, so the sample is
+    copied from the committed snapshot instead."""
+    snap = build_snapshot(tmp_path, steps=3)
+    monkeypatch.setattr(snapshots, "snapshot_path", lambda kind: snap)
+    llm = FakeLLM()
+    app = make_app(tmp_path, llm)
+    c = new_client(app)
+    signup(c)
+    r = c.post("/demo/load-sample")
+    assert r.status_code == 200 and r.json()["cursor"] == r.json()["total"] > 0
+    assert llm.calls == []
+    assert c.get("/graph").json()["nodes"]
+    assert len(sources(app, pid_of(c))) == 3                 # the snapshot's content, not a replay of the whole day
+    assert c.post("/demo/advance").json()["played"] == []    # nothing left to play: the day is not replayed
+
+
+def test_load_sample_from_a_snapshot_keeps_the_profile_private_and_usable(tmp_path, monkeypatch):
+    snap = build_snapshot(tmp_path)
+    monkeypatch.setattr(snapshots, "snapshot_path", lambda kind: snap)
+    app = make_app(tmp_path)
+    a, b = new_client(app), new_client(app)
+    signup(a, "Alpha One")
+    signup(b, "Beta Two")
+    assert a.post("/demo/load-sample").status_code == 200
+    assert b.get("/graph").json()["nodes"] == []             # B sees none of A's sample
+    assert a.get("/auth/me").json()["profile"]["name"] == "Alpha One"
+    assert a.post("/demo/load-sample").status_code == 409    # still refuses a profile that has memories
+    add_note(a, "Coffee at Blue Door Cafe", "2026-10-29T10:00:00")    # a note can still be added
+
+
 def test_load_sample_refuses_a_profile_with_memories(tmp_path):
     c = new_client(make_app(tmp_path))
     signup(c)

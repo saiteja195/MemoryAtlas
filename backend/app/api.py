@@ -345,6 +345,19 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         if registry is not None:
             if rt.conn.execute("SELECT 1 FROM sources LIMIT 1").fetchone():
                 raise HTTPException(409, "This profile already has memories")
+            profile = current_profile(request, registry)
+            if os.path.isfile(snapshots.snapshot_path("staged")):
+                # Playing the day through a live model takes minutes and outlasts the proxy's timeout, so copy
+                # the committed snapshot in (text only, no model calls), as a demo profile's reset does.
+                with runtimes.exclusive(profile.profile_id):
+                    if runtimes.get(profile.profile_id, profile.name, False).conn.execute(
+                            "SELECT 1 FROM sources LIMIT 1").fetchone():
+                        raise HTTPException(409, "This profile already has memories")
+                    snapshots.restore(runtimes, profile, "staged")
+                    fresh = runtimes.get(profile.profile_id, profile.name, False)
+                    fresh.demo.rekey()
+                    fresh.demo.mark_all_played()
+                return fresh.demo.status()
             rt.demo.reset()
         try:
             rt.demo.advance(50)
