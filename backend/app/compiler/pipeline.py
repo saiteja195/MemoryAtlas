@@ -10,7 +10,7 @@ from .contradiction import contradiction_pass
 from .derive import Deriver
 from .episodes import bind_episode
 from .extract import ExtractedClaim, ExtractionRejected, extract_claims
-from .resolve import EntityResolver
+from .resolve import EntityResolver, norm
 from .store import ClaimWriter
 from .todo_scan import scan_todos
 
@@ -60,9 +60,11 @@ class Compiler:
             return res
         if todo_scan and obs.kind in TODO_SCAN_KINDS:
             # A second, optional pass. It returns [] when the model is unavailable or keeps
-            # replying out of schema, so it never rejects the observation. Identical claims
-            # merge in the store, so a promise both passes found is stored once.
-            extracted = [*extracted, *scan_todos(self.llm, obs, known)]
+            # replying out of schema, so it never rejects the observation. The store only merges
+            # claims whose value matches exactly, so a scanned promise that rewords one the
+            # extraction already returned for the same person is dropped here, in code.
+            scanned = scan_todos(self.llm, obs, known, extracted)
+            extracted = [*extracted, *[c for c in scanned if not _restates(c, extracted)]]
 
         mentioned: dict[str, float] = {}
         subjects: set[str] = set()
@@ -114,6 +116,8 @@ class Compiler:
                                                  obs.source_id, ctx)
             if object_id == subject_id:
                 return None
+        if c.predicate == "requested" and subject_id == self.owner:
+            return None     # the owner is the one asked, never the one asking
         event_time = c.event_time or obs.captured_at
         if obs.kind == "user_confirmation":
             evidence, conf = "user_confirmation", CONFIRMED_CONFIDENCE
@@ -137,6 +141,31 @@ class Compiler:
             confidence=round(conf * DIRECT_CONFIDENCE, 3), episode_id=episode_id,
             text=f"{name} was part of {episode_name}", source_id=obs.source_id)
         return cid
+
+
+_STOP = frozenset("a an the to by on in at of for and or i ll will would me my you your he she "
+                  "they we it is be him her them his their our this that".split())
+
+
+def _tokens(text: str | None) -> frozenset[str]:
+    return frozenset(t for t in norm(text or "").split() if t not in _STOP)
+
+
+def _near(a: str | None, b: str | None) -> bool:
+    """Two promise texts say the same thing: normalised-token Jaccard >= 0.5, or the shorter
+    one's tokens all appear in the longer one."""
+    ta, tb = _tokens(a), _tokens(b)
+    if not ta or not tb:
+        return norm(a or "") == norm(b or "")
+    return len(ta & tb) / len(ta | tb) >= 0.5 or ta <= tb or tb <= ta
+
+
+def _restates(c: ExtractedClaim, found: list[ExtractedClaim]) -> bool:
+    """A scanned `committed_to` that rewords a promise extraction found for the same person."""
+    if c.predicate != "committed_to":
+        return False
+    return any(f.predicate == "committed_to" and norm(f.subject) == norm(c.subject)
+               and _near(f.value, c.value) for f in found)
 
 
 def _object_value(c: ExtractedClaim, object_id: str | None) -> str | None:

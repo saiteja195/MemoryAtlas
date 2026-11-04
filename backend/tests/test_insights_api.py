@@ -137,3 +137,11 @@ def test_insights_for_an_empty_profile(signed):
     body = c.get("/insights").json()
     assert body["day"] is None and body["days"] == [] and body["coverage"] is None
     assert body["usage"]["recorded"] is False and body["usage"]["day"] is None
+
+
+def test_a_todo_scan_counts_as_reading_not_answering():
+    conn = db.connect()
+    call(conn, 1, purpose="todo_scan", memory_day="2026-10-29")
+    u = usage_summary(conn, "2026-10-29")
+    assert u["total"]["reading"] == 1 and u["total"]["answering"] == 0
+    assert u["day"]["reading"] == 1 and u["models"][0]["reading"] == 1

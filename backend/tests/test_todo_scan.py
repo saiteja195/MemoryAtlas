@@ -1,4 +1,6 @@
 """The to-do scan: a second, separate pass that finds promises and requests in what was said."""
+import json
+
 from app import db
 from app.capture.models import RawCapture
 from app.engine import MemoryEngine
@@ -127,3 +129,52 @@ def test_scan_calls_are_metered_as_todo_scan():
     rows = conn.execute("SELECT purpose, memory_day FROM model_calls").fetchall()
     assert ("todo_scan", "2026-10-29") in [tuple(r) for r in rows]
     assert ("read_memory", "2026-10-29") in [tuple(r) for r in rows]
+
+
+FRIDAY = claim("Alex", "committed_to", value="send the proposal by Friday",
+               text="Alex committed to send the proposal by Friday")
+
+
+def test_a_reworded_promise_is_not_stored_twice():
+    conn, llm, engine = world(rules=[("proposal", [FRIDAY])])
+    llm.todo_replies.append({"claims": [claim(
+        "Alex", "committed_to", value="I'll send the proposal Friday",
+        text="Alex promised to send the proposal Friday")]})
+    talk(engine, "I'll send the proposal by Friday.")
+    assert len(claims(conn, "committed_to")) == 1
+
+
+def test_the_scan_is_told_what_extraction_already_found():
+    conn, llm, engine = world(rules=[("proposal", [FRIDAY])])
+    talk(engine, "I'll send the proposal by Friday.")
+    [(_, user)] = scan_calls(llm)
+    assert json.loads(user)["already_found"] == ["Alex committed_to: send the proposal by Friday"]
+
+
+def test_two_different_promises_by_one_person_are_both_stored():
+    conn, llm, engine = world(rules=[("proposal", [FRIDAY])])
+    llm.todo_replies.append({"claims": [claim(
+        "Alex", "committed_to", value="book the meeting room for Tuesday",
+        text="Alex promised to book the meeting room for Tuesday")]})
+    talk(engine, "I'll send the proposal by Friday, and I'll book the meeting room for Tuesday.")
+    assert {r["object_value"] for r in claims(conn, "committed_to")} == {
+        "send the proposal by Friday", "book the meeting room for Tuesday"}
+
+
+def test_a_near_duplicate_by_someone_else_is_kept():
+    conn, llm, engine = world(rules=[("proposal", [FRIDAY])])
+    llm.todo_replies.append({"claims": [claim(
+        "Me", "committed_to", value="send the proposal Friday",
+        text="I promised to send the proposal Friday")]})
+    talk(engine, "I'll send the proposal by Friday, and so will you.")
+    assert {r["subject"] for r in claims(conn, "committed_to")} == {"Alex", "Me"}
+
+
+def test_a_request_made_by_the_owner_is_dropped():
+    conn, llm, engine = world()
+    llm.todo_replies.append({"claims": [claim(
+        "Me", "requested", "Alex", object_type="person", value="send the notes",
+        text="I asked Alex to send the notes")]})
+    [got] = talk(engine, "Could you send me the notes?")
+    assert got.ingest.status == "ingested"
+    assert claims(conn, "requested") == []
