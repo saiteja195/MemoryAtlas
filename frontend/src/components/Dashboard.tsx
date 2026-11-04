@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMasonry } from "../hooks/useMasonry";
 import { api } from "../api/client";
 import type { DemoStatus, Graph, Grant, Health, Insights, Media, Receipt, Todo, TodoState } from "../api/types";
 import { mostMentioned, notSure, summarize } from "../utils/dashboard";
@@ -86,6 +87,8 @@ function Bars({ rows, colorOf }: { rows: { label: string; count: number }[]; col
 }
 
 export function Dashboard(p: Props) {
+  const grid = useRef<HTMLDivElement>(null);
+  useMasonry(grid);
   const s = useMemo(() => summarize(p.graph), [p.graph]);
   const cards = useMemo(() => dayCards(p.graph), [p.graph]);
   const played = p.status?.events.filter((e) => e.played).length ?? 0;
@@ -140,7 +143,7 @@ export function Dashboard(p: Props) {
         <div className={`kpi ${kept === 0 ? "good" : "bad"}`}><span className="kpi-l">Raw media kept</span><b>{formatBytes(kept)}</b><span className="kpi-s">{kept === 0 ? "photos and audio are discarded" : "check the privacy settings"}</span></div>
       </section>
 
-      <div className="dash-grid">
+      <div className="dash-grid" ref={grid}>
         {sampleOpen && (
           <section className="card pad dash-card span-2" aria-labelledby="d-next">
             <h3 id="d-next">Next</h3>
