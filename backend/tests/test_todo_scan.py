@@ -178,3 +178,31 @@ def test_a_request_made_by_the_owner_is_dropped():
     [got] = talk(engine, "Could you send me the notes?")
     assert got.ingest.status == "ingested"
     assert claims(conn, "requested") == []
+
+
+def _scan_promise(value):
+    return {"claims": [claim("Alex", "committed_to", value=value, text=f"Alex promised to {value}")]}
+
+
+def test_promises_with_half_their_words_in_common_are_both_kept():
+    conn, llm, engine = world(rules=[("proposal", [FRIDAY])])
+    llm.todo_replies.append(_scan_promise("send the budget by Friday"))
+    talk(engine, "I'll send the proposal by Friday, and the budget by Friday too.")
+    assert {r["object_value"] for r in claims(conn, "committed_to")} == {
+        "send the proposal by Friday", "send the budget by Friday"}
+
+
+def test_the_same_content_words_are_merged():
+    conn, llm, engine = world(rules=[("proposal", [FRIDAY])])
+    llm.todo_replies.append(_scan_promise("send the proposal Friday"))
+    talk(engine, "I'll send the proposal by Friday.")
+    assert len(claims(conn, "committed_to")) == 1
+
+
+def test_a_one_word_promise_does_not_swallow_a_different_one():
+    short = claim("Alex", "committed_to", value="call", text="Alex committed to call")
+    conn, llm, engine = world(rules=[("proposal", [short])])
+    llm.todo_replies.append(_scan_promise("call the venue about the proposal deposit"))
+    talk(engine, "I'll call. And I'll call the venue about the proposal deposit.")
+    assert {r["object_value"] for r in claims(conn, "committed_to")} == {
+        "call", "call the venue about the proposal deposit"}

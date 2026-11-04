@@ -152,12 +152,15 @@ def _tokens(text: str | None) -> frozenset[str]:
 
 
 def _near(a: str | None, b: str | None) -> bool:
-    """Two promise texts say the same thing: normalised-token Jaccard >= 0.5, or the shorter
-    one's tokens all appear in the longer one."""
+    """Two promise texts say the same thing: more than half of their content words are shared
+    (Jaccard > 0.5), or every content word of the shorter one, when it has at least two, appears
+    in the longer one. Exactly half ("the proposal by Friday" / "the budget by Friday") is two
+    promises, and a one-word promise never swallows a different, longer one."""
     ta, tb = _tokens(a), _tokens(b)
     if not ta or not tb:
         return norm(a or "") == norm(b or "")
-    return len(ta & tb) / len(ta | tb) >= 0.5 or ta <= tb or tb <= ta
+    short, long_ = sorted((ta, tb), key=len)
+    return len(ta & tb) / len(ta | tb) > 0.5 or (len(short) >= 2 and short <= long_)
 
 
 def _restates(c: ExtractedClaim, found: list[ExtractedClaim]) -> bool:
