@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARD, cardLayout, cleanText, fallbackName, fitText } from "./cardText";
+import { CARD, cardLayout, cleanText, displayName, fallbackName, fitText } from "./cardText";
 
 /** A fixed-width measure: every character is 8 px, so the tests do not depend on a canvas or a font. */
 const eight = (s: string) => Array.from(s).length * 8;
@@ -106,5 +106,13 @@ describe("cardLayout", () => {
     const c = cardLayout("Luna Taqueria", "place");
     expect(c.w).toBeGreaterThanOrEqual(CARD.minW);
     expect(c.w).toBeLessThanOrEqual(CARD.maxW);
+  });
+});
+
+describe("displayName", () => {
+  it("is the cleaned name, or a stand-in for its kind when there is none", () => {
+    expect(displayName({ name: "  Blue\nDoor ", type: "place" })).toBe("Blue Door");
+    expect(displayName({ name: "", type: "person" })).toBe("Unnamed person");
+    expect(displayName({ name: undefined as unknown as string, type: "object" })).toBe("Unnamed thing");
   });
 });

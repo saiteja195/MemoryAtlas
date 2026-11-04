@@ -1,7 +1,7 @@
 // Pure functions that turn the backend graph into what the Atlas shows. No DOM, no React, so
 // they can be unit tested against real payloads (see graph.test.ts).
 import type { ElementDefinition } from "cytoscape";
-import { cardLayout, cleanText, measureCard } from "./cardText";
+import { cardLayout, cleanText, displayName, measureCard, textRoom } from "./cardText";
 import type {
   ClaimStatus, EvidenceType, Graph, GraphEdge, GraphNode, Support,
 } from "../api/types";
@@ -242,7 +242,7 @@ function entityElements(view: Graph, opts: ViewOptions): ElementDefinition[] {
     return {
       group: "nodes" as const,
       classes: `entity type-${n.type}${id === OWNER_ID ? " owner" : ""}${card.unnamed ? " unnamed" : ""}`,
-      data: { id, label: card.label, name: card.full, w: card.w, type: n.type },
+      data: { id, label: card.label, name: card.full, w: card.w, tw: textRoom(card.w) + 4, type: n.type },
     };
   });
   const labels = layoutInLanes(view, nodes, facts, edges);
@@ -460,9 +460,10 @@ export function dayCards(view: Graph): DayCard[] {
       const sources = [...new Set(claims.flatMap((c) => c.support.map((s) => sourceLabel(s.kind))))];
       const places = ms.filter((m) => m.type === "place");
       const people = ms.filter((m) => m.type === "person");
-      const where = places[0]?.name;
-      const title = people.length && where ? `${where} with ${people.map((p) => p.name).join(" and ")}`
-        : people.length ? `With ${people.map((p) => p.name).join(" and ")}`
+      const where = places[0] && displayName(places[0]);
+      const who = people.map(displayName).join(" and ");
+      const title = people.length && where ? `${where} with ${who}`
+        : people.length ? `With ${who}`
         : where ? `At ${where}` : "A moment from your day";
       return {
         id: ep.id, time: episodeTimeLabel(ep), title, summary: summary?.value ?? null,

@@ -1,5 +1,7 @@
 import type { GraphNode } from "../api/types";
 import type { DayCard } from "../utils/graph";
+import { displayName } from "../utils/cardText";
+import { TypeIcon } from "./TypeIcon";
 
 type Props = {
   cards: DayCard[];
@@ -8,16 +10,14 @@ type Props = {
   onOpenInMap: (episodeId: string) => void;
 };
 
-const GLYPH: Record<string, string> = { person: "👤", place: "📍", object: "◆", org: "🏢", item: "🏷" };
-
 function Chips({ nodes, label }: { nodes: GraphNode[]; label: string }) {
   if (nodes.length === 0) return null;
   return (
     <li className="chip-row">
       <span className="chip-label">{label}</span>
       {nodes.map((n) => (
-        <span key={n.id} className={`entity-chip t-${n.type}`}>
-          <span aria-hidden="true">{GLYPH[n.type] ?? "•"}</span>{n.name}
+        <span key={n.id} className={`entity-chip t-${n.type}`} title={displayName(n)}>
+          <TypeIcon type={n.type} /><span className="chip-text">{displayName(n)}</span>
         </span>
       ))}
     </li>

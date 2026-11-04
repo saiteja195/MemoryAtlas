@@ -80,18 +80,18 @@ export const GraphView = forwardRef<GraphHandle, Props>(function GraphView(props
       const full = el.data("full") as string | undefined;
       const type = el.data("type") as string | undefined;
       const isEdge = el.group() === "edges";
-      if (isEdge) return { title: String(el.data("label") ?? ""), sub: el.hasClass("link") ? "Same person across moments" : "Fact · click for its source" };
+      if (isEdge) return { title: String(el.data("relation") || el.data("label") || "Related"), sub: el.hasClass("link") ? "Same person across moments" : "Fact · click for its source" };
       if (el.hasClass("episode")) return { title: String(el.data("label") ?? "").split("\n")[0], sub: "Moment · click to open" };
       if (full) return { title: full, sub: "Detail · click for its source" };
-      return { title: String(el.data("label") ?? ""), sub: `${type ?? "Item"} · click to explore` };
+      return { title: String(el.data("name") ?? el.data("label") ?? ""), sub: `${type ?? "Item"} · click to explore` };
     };
     cy.on("mouseover", "node, edge", (evt) => {
       const el = evt.target as cytoscape.SingularElementReturnValue;
       if (box.current) box.current.style.cursor = "pointer";
-      if (!latest.current.highlight) {
-        const near = el.group() === "nodes" ? (el as cytoscape.NodeSingular).closedNeighborhood() : (el as cytoscape.EdgeSingular).connectedNodes().union(el);
-        cy.elements().not(near).addClass("dim");
-      }
+      const near = el.group() === "nodes" ? (el as cytoscape.NodeSingular).closedNeighborhood() : (el as cytoscape.EdgeSingular).connectedNodes().union(el);
+      el.addClass("hover");
+      near.edges().addClass("trace");          // the lines you are pointing at show what they mean
+      if (!latest.current.highlight) cy.elements().not(near).addClass("dim");
       const p = evt.renderedPosition ?? el.renderedPosition();
       setTip({ x: p.x, y: p.y, ...describe(el) });
     });
@@ -101,7 +101,7 @@ export const GraphView = forwardRef<GraphHandle, Props>(function GraphView(props
     });
     cy.on("mouseout", "node, edge", () => {
       if (box.current) box.current.style.cursor = "";
-      cy.elements().removeClass("dim");
+      cy.elements().removeClass("dim hover trace");
       setTip(null);
     });
     cy.on("grab", () => { if (box.current) box.current.style.cursor = "grabbing"; setTip(null); });

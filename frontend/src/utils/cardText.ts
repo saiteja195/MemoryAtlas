@@ -54,6 +54,9 @@ export function fallbackName(type: string): string {
   return type === "person" ? "Unnamed person" : type === "place" || type === "org" ? "Unnamed place" : "Unnamed thing";
 }
 
+/** What to call something in a sentence or a chip: its tidied name, or a stand-in for its kind. */
+export const displayName = (n: { name: string; type: string }): string => cleanText(n.name) || fallbackName(n.type);
+
 /** `text`, cut with an ellipsis if it is wider than `maxPx`. Cuts whole characters, never half an emoji. */
 export function fitText(text: string, maxPx: number, measure: Measure): string {
   if (!text) return "";

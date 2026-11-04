@@ -3,7 +3,7 @@ import full from "./__fixtures__/graph-full.json";
 import after from "./__fixtures__/graph-after-revoke.json";
 import type { Graph, GraphEdge } from "../api/types";
 import { summarize } from "./dashboard";
-import { CARD } from "./cardText";
+import { CARD, textRoom } from "./cardText";
 import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "./suggest";
 import {
   atTime, buildElements, claimIdOfFact, clock, dayCards, describeGraph, factCategory, groupFacts, episodeOptions, factNodeId, factRows,
@@ -347,6 +347,9 @@ describe("cards on the map", () => {
       expect(c.data.w).toBeGreaterThanOrEqual(CARD.minW);
       expect(c.data.w).toBeLessThanOrEqual(CARD.maxW);
       expect(typeof c.data.name).toBe("string");
+      // The renderer's own ellipsis guard: a little wider than the text, still inside the card's padding.
+      expect(c.data.tw).toBeGreaterThan(textRoom(c.data.w as number) - 1);
+      expect(c.data.tw).toBeLessThanOrEqual(textRoom(c.data.w as number) + CARD.pad / 2);
     }
     expect(entity(es, nodeNamed(FULL, "Luna Taqueria").id).data.name).toBe("Luna Taqueria");
   });
@@ -413,6 +416,22 @@ describe("cards on the map", () => {
       const fact = nodes.get(e.data.target as string)!;
       const gap = Math.abs(fact.position!.x - owner.position!.x) - (fact.data.w as number) / 2 - (owner.data.w as number) / 2;
       expect(gap).toBeGreaterThanOrEqual(16);
+    }
+  });
+});
+
+describe("day cards with awkward names", () => {
+  it("never builds a title from blank or untidy names", () => {
+    const g = JSON.parse(JSON.stringify(FULL)) as Graph;
+    g.nodes.find((n) => n.name === "Alex")!.name = "";
+    g.nodes.find((n) => n.name === "Office")!.name = "  Head\n office ";
+    const titles = dayCards(g).map((c) => c.title);
+    expect(titles.some((t) => t.includes("Unnamed person"))).toBe(true);
+    expect(titles.some((t) => t.includes("Head office"))).toBe(true);
+    for (const t of titles) {
+      expect(t).not.toMatch(/ {2}|\n/);
+      expect(t.trim()).toBe(t);
+      expect(t).not.toMatch(/ with $| and $|^With $|^At $/);
     }
   });
 });
