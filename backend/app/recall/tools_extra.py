@@ -18,19 +18,22 @@ confidence. There is no stored "partial" status or partial-support flag, so `unc
 the two things that do exist: `status = 'disputed'` (the evidence conflicts) and `confidence < 0.6`
 (the evidence is weak, including a claim only an inference supports). That is what "partial" maps to.
 """
-import math
 from datetime import datetime
 from functools import partial
 from typing import Any, Callable
 
 from ..insights.coverage import coverage as day_coverage
-from ..insights.coverage import memory_days
+from ..insights.coverage import memory_days, window_gaps
 from ..insights.usage import usage_summary
 from ..todos import list_todos
 from .tools import HIDDEN_PREDICATES, MAX_K, RecallTools
 
 LOW_CONFIDENCE = 0.6
-MIN_GAP_MINUTES = 30          # shorter silences are not worth listing as gaps
+MIN_GAP_MINUTES = 30          # shorter silences are neither listed as gaps nor reported as the longest
+MERGE_SPANS_UNDER = 5         # spans closer than this many minutes are shown as one
+MAX_SPANS = 24                # a busy day has hundreds; more than this would crowd out the headline figures
+MAX_MOMENTS = 12
+MAX_NAMES = 30
 
 
 def fmt_minutes(minutes: int) -> str:
@@ -46,13 +49,13 @@ def _minute_of_day(hhmm: str) -> int:
     return int(h) * 60 + int(m)
 
 
-def _span(start: str, end: str) -> dict[str, Any]:
-    minutes = _minute_of_day(end) - _minute_of_day(start)
-    return {"start": start, "end": end, "minutes": minutes, "duration": fmt_minutes(minutes)}
-
-
 def _hhmm(minute: int) -> str:
     return f"{minute // 60:02d}:{minute % 60:02d}"
+
+
+def _span(start: int, end: int) -> dict[str, Any]:
+    return {"start": _hhmm(start), "end": _hhmm(end), "minutes": end - start,
+            "duration": fmt_minutes(end - start)}
 
 
 # -- day_summary ----------------------------------------------------------------------------------
@@ -73,10 +76,13 @@ def day_summary(tools: RecallTools, time_from: str, time_to: str) -> dict[str, A
             elif e and e["type"] == "place":
                 places.add(e["name"])
     shown = [r for r in rows if r["predicate"] not in (*HIDDEN_PREDICATES, "summary_of")]
-    out: dict[str, Any] = {
-        "window": {"from": time_from, "to": time_to},
-        "moments": moments, "people": sorted(people), "places": sorted(places),
-        "counts": {"moments": len(moments), "claims": len(shown), "people": len(people), "places": len(places)}}
+    counts = {"moments": len(moments), "claims": len(shown), "people": len(people), "places": len(places)}
+    # Headline first and the long lists last: a result past the clip limit is cut from the end.
+    out: dict[str, Any] = {"window": {"from": time_from, "to": time_to}, "counts": counts}
+    out["people"], out["places"] = sorted(people)[:MAX_NAMES], sorted(places)[:MAX_NAMES]
+    if len(moments) > MAX_MOMENTS:
+        out["moments_total"], out["moments_truncated"] = len(moments), True
+    out["moments"] = moments[:MAX_MOMENTS]
     if not moments and not shown:
         hint = tools._outside_memory({"time_from": time_from, "time_to": time_to})
         out["note"] = hint["note"] if hint else "Nothing readable in that window."
@@ -97,13 +103,26 @@ def open_todos(tools: RecallTools) -> list[dict[str, Any]]:
 # -- coverage -------------------------------------------------------------------------------------
 
 def _window(time_from: str | None, time_to: str | None) -> tuple[int, int] | None:
-    """Whole hours around a window that lies inside one day, else None (the default waking hours)."""
-    if not (time_from and time_to) or time_from[:10] != time_to[:10]:
+    """The (first, last) minute of a window on one day; None when no window was given. Raises ValueError
+    for one that crosses midnight, ends before it starts or is empty."""
+    if not (time_from and time_to):
         return None
     a, b = datetime.fromisoformat(time_from), datetime.fromisoformat(time_to)
-    first = a.hour
-    last = b.hour + (1 if (b.minute or b.second) else 0)
-    return (first, min(last, 24)) if last > first else None
+    if a.date() != b.date():
+        raise ValueError("the window runs past one day")
+    if b <= a:
+        raise ValueError("the window is empty or ends before it starts")
+    return a.hour * 60 + a.minute, b.hour * 60 + b.minute + (1 if b.second or b.microsecond else 0)
+
+
+def _merge_near(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    out: list[tuple[int, int]] = []
+    for s, e in sorted(spans):
+        if out and s - out[-1][1] < MERGE_SPANS_UNDER:
+            out[-1] = (out[-1][0], max(out[-1][1], e))
+        else:
+            out.append((s, e))
+    return out
 
 
 def coverage(tools: RecallTools, time_from: str | None = None, time_to: str | None = None) -> dict[str, Any]:
@@ -115,35 +134,45 @@ def coverage(tools: RecallTools, time_from: str | None = None, time_to: str | No
         datetime.fromisoformat(day)
         window = _window(time_from, time_to)
     except ValueError as e:
-        return {"error": f"bad arguments for coverage: {e}"}
-    raw = day_coverage(tools.conn, day, window) if window else day_coverage(tools.conn, day)
-    first, last = raw["window"]
-    spans = [_span(s["start"], s["end"]) for s in raw["spans"]]
-    gaps: list[dict[str, Any]] = []
-    if spans:
-        cursor, w1 = first * 60, last * 60
-        for s in raw["spans"]:
-            lo, hi = _minute_of_day(s["start"]), _minute_of_day(s["end"])
-            if hi < first * 60 or lo > w1:
-                continue
-            if lo > cursor:
-                gaps.append((cursor, lo))
-            cursor = max(cursor, min(hi, w1))
-        if w1 > cursor:
-            gaps.append((cursor, w1))
-        gaps = [_span(_hhmm(a), _hhmm(b)) for a, b in gaps if b - a >= MIN_GAP_MINUTES]
-    longest = raw["longest_gap"]
-    out: dict[str, Any] = {
-        "day": day, "window": [_hhmm(first * 60), _hhmm(last * 60)],
-        "spans": spans, "gaps": gaps,
-        "longest_gap": {**longest, "duration": fmt_minutes(longest["minutes"])} if longest else None,
-        "covered_hours": raw["covered_hours"], "waking_hours": raw["waking_hours"],
-        "share": raw["share"], "share_text": f"{round(raw['share'] * 100)}%",
-        "busiest_hour": raw["busiest_hour"],
-        "busiest_hour_text": None if raw["busiest_hour"] is None else f"{raw['busiest_hour']:02d}:00"}
+        return {"error": f"bad arguments for coverage: {e}. Coverage is for one day at a time: give time_from "
+                         f"and time_to on the same day, time_to after time_from, or omit them."}
+    raw = day_coverage(tools.conn, day)                  # the day's spans do not depend on the window
+    spans = [(_minute_of_day(s["start"]), _minute_of_day(s["end"])) for s in raw["spans"]]
+    day_has_spans = bool(spans)
+    if window:
+        lo, hi = window
+        # a span that only touches the window's edge is not in it; an instant on or inside it is
+        spans = [(max(s, lo), min(e, hi)) for s, e in spans
+                 if (s < hi and e > lo) or (s == e and lo <= s <= hi)]
+        covered = sum(e - s for s, e in spans)
+        window_minutes = hi - lo
+        share = round(covered / window_minutes, 4)
+        hours = [h for h in raw["hours"] if lo // 60 <= h["hour"] < -(-hi // 60)]
+        top = max((h["count"] for h in hours), default=0)
+        busiest = next((h["hour"] for h in hours if h["count"] == top), None) if top else None
+        figures: dict[str, Any] = {"share_basis": "minutes", "share": share,
+                                   "share_text": f"{round(share * 100)}%", "covered_minutes": covered,
+                                   "window_minutes": window_minutes, "window_hours": round(window_minutes / 60, 2)}
+    else:
+        lo, hi = raw["window"][0] * 60, raw["window"][1] * 60
+        busiest = raw["busiest_hour"]
+        # the dashboard's own numbers: waking hours that hold something, out of all waking hours
+        figures = {"share_basis": "hours", "share": raw["share"], "share_text": f"{round(raw['share'] * 100)}%",
+                   "covered_hours": raw["covered_hours"], "window_hours": raw["waking_hours"],
+                   "window_minutes": hi - lo}
+    gaps = [_span(a, b) for a, b in window_gaps(spans, lo, hi) if b - a >= MIN_GAP_MINUTES] \
+        if day_has_spans else []
+    shown = _merge_near(spans)
+    out: dict[str, Any] = {"day": day, "window": [_hhmm(lo), _hhmm(hi)], **figures,
+                           "busiest_hour": busiest,
+                           "busiest_hour_text": None if busiest is None else f"{busiest:02d}:00",
+                           "longest_gap": max(gaps, key=lambda g: g["minutes"]) if gaps else None, "gaps": gaps}
     if not spans:
-        out["note"] = ("No readable memory on that day. The memory covers: " + ", ".join(days) + "."
+        out["note"] = ("No readable memory in that window. The memory covers: " + ", ".join(days) + "."
                        if days else "No readable memory yet.")
+    if len(shown) > MAX_SPANS:      # the long list goes last: a result past the clip limit is cut from the end
+        out["spans_total"], out["spans_truncated"] = len(shown), True
+    out["spans"] = [_span(s, e) for s, e in shown[:MAX_SPANS]]
     tools.stats_returned["coverage"] = out
     return out
 
@@ -151,7 +180,7 @@ def coverage(tools: RecallTools, time_from: str | None = None, time_to: str | No
 # -- usage_stats ----------------------------------------------------------------------------------
 
 def _audio(minutes: float) -> str:
-    return f"{minutes:g} min" if minutes < 60 else fmt_minutes(round(minutes))
+    return f"{round(minutes, 1):g} min" if minutes < 60 else fmt_minutes(round(minutes))
 
 
 def _avg(ms: int) -> str:

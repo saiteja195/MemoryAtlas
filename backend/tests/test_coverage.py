@@ -113,3 +113,15 @@ def test_memory_days_lists_each_day_once(conn):
     add_source(conn, "x", "2026-10-31T10:00:00", grant="g2")
     conn.execute("UPDATE consent_grants SET revoked_at=? WHERE grant_id='g2'", (clock.now_iso(),))
     assert memory_days(conn) == [DAY, "2026-10-30"]
+
+
+def test_window_gaps_agree_with_the_longest_gap(full_day):
+    from app.insights.coverage import window_gaps
+    c = coverage(full_day.conn, DAY)
+    spans = [tuple(int(x) for x in p.split(":")) for s in c["spans"] for p in (s["start"], s["end"])]
+    minutes = [(spans[i][0] * 60 + spans[i][1], spans[i + 1][0] * 60 + spans[i + 1][1])
+               for i in range(0, len(spans), 2)]
+    gaps = window_gaps(minutes, 6 * 60, 22 * 60)
+    a, b = max(gaps, key=lambda g: g[1] - g[0])
+    assert (a, b, b - a) == (13 * 60 + 20, 17 * 60 + 45, c["longest_gap"]["minutes"])
+    assert window_gaps([], 360, 1320) == [(360, 1320)]

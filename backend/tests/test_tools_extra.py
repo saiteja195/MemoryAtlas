@@ -5,10 +5,12 @@ import json
 
 from app.privacy import clock
 from app.privacy.filter import authorized_claim_ids
-from app.recall.investigator import CLAIM_ID_RE, Investigator
+from app.recall.investigator import CLAIM_ID_RE, RESULT_CHARS, Investigator, _clip
 from app.recall.tools import MAX_K, RecallTools
+from app.recall.tools_extra import MAX_MOMENTS, MAX_SPANS, _audio
 
 from .fakes import FakeLLM
+from .test_coverage import add_source
 
 DAY = "2026-10-29"
 ORIGINAL = {"search_claims", "find_entity", "timeline", "last_seen", "episodes", "neighbors", "provenance"}
@@ -30,7 +32,7 @@ def add_grant(conn, grant, grantor="me"):
 
 
 def add_claim(conn, cid, grant, *, predicate="committed_to", subject="me", obj=None, value=None, at=f"{DAY}T10:00:00",
-              status="active", confidence=0.9, text=None):
+              status="active", confidence=0.9, text=None, episode=None):
     """A claim justified by its own source under its own grant, so revoking the grant forgets it."""
     if not conn.execute("SELECT 1 FROM consent_grants WHERE grant_id=?", (grant,)).fetchone():
         add_grant(conn, grant)
@@ -38,9 +40,9 @@ def add_claim(conn, cid, grant, *, predicate="committed_to", subject="me", obj=N
     conn.execute("INSERT INTO sources(source_id, kind, grant_id, captured_at, ingested_at, content_hash)"
                  " VALUES (?,?,?,?,?,?)", (src, "user_confirmation", grant, at, at, src))
     conn.execute("INSERT INTO claims(claim_id, subject_id, predicate, object_id, object_value, event_time,"
-                 " evidence_type, confidence, status, text, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                 " evidence_type, confidence, status, text, created_at, episode_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                  (cid, subject, predicate, obj, value, at, "direct_observation", confidence, status,
-                  text or f"{cid} text", at))
+                  text or f"{cid} text", at, episode))
     conn.execute("INSERT INTO justifications(justification_id, claim_id, kind, source_id) VALUES (?,?,?,?)",
                  (f"j-{cid}", cid, "source", src))
     conn.commit()
@@ -87,6 +89,23 @@ def test_day_summary_of_one_window(full_day):
     assert out["places"] == ["Luna Taqueria", "Office", "taco place"]
     assert out["counts"]["moments"] == 1
     assert "note" not in out
+
+
+def test_a_large_window_is_capped_with_the_counts_first(conn):
+    conn.execute("INSERT INTO entities(entity_id, type, name, attrs) VALUES ('me','person','Me','{}')")
+    for i in range(MAX_MOMENTS + 3):
+        t = f"{DAY}T{8 + i:02d}:00:00"
+        conn.execute("INSERT INTO entities(entity_id, type, name, attrs) VALUES (?,?,?,?)",
+                     (f"episode:{i:02d}", "episode", f"Episode {8 + i:02d}:00", json.dumps({"start": t, "end": t})))
+        add_claim(conn, f"m{i:02d}", f"gm{i}", predicate="part_of_episode", at=t, episode=f"episode:{i:02d}")
+    tools = ext(conn)
+    out = tools.run("day_summary", {"time_from": f"{DAY}T00:00:00", "time_to": f"{DAY}T23:59:59"})
+    assert list(out)[:2] == ["window", "counts"]
+    assert out["counts"]["moments"] == MAX_MOMENTS + 3 and out["moments_total"] == MAX_MOMENTS + 3
+    assert out["moments_truncated"] is True and len(out["moments"]) == MAX_MOMENTS
+    assert out["moments"][0]["name"] == "Episode 08:00"
+    small = tools.run("day_summary", {"time_from": f"{DAY}T00:00:00", "time_to": f"{DAY}T09:30:00"})
+    assert "moments_total" not in small and len(small["moments"]) == 2
 
 
 def test_unknown_window_returns_empty_not_error(full_day):
@@ -161,8 +180,9 @@ def test_coverage_of_the_staged_day(full_day):
         {"start": "13:20", "end": "17:45", "minutes": 265, "duration": "4 h 25 min"},
         {"start": "17:45", "end": "22:00", "minutes": 255, "duration": "4 h 15 min"}]
     assert out["spans"][2] == {"start": "12:30", "end": "13:15", "minutes": 45, "duration": "45 min"}
-    assert out["covered_hours"] == 4 and out["waking_hours"] == 16
-    assert out["share"] == 0.25 and out["share_text"] == "25%"
+    assert out["covered_hours"] == 4 and out["window_hours"] == 16 and "waking_hours" not in out
+    assert out["share"] == 0.25 and out["share_text"] == "25%" and out["share_basis"] == "hours"
+    assert out["longest_gap"] == max(out["gaps"], key=lambda g: g["minutes"])      # one list, one floor
     assert out["busiest_hour"] == 12 and out["busiest_hour_text"] == "12:00"
     assert tools.returned == set()                            # a stats tool shows no claim
     assert tools.stats_returned["coverage"] is out            # the raw result, kept for checking numbers
@@ -174,7 +194,65 @@ def test_coverage_of_a_window_on_the_day(full_day):
     assert out["longest_gap"] == {"start": "13:20", "end": "14:00", "minutes": 40, "duration": "40 min"}
     assert out["gaps"] == [{"start": "12:00", "end": "12:30", "minutes": 30, "duration": "30 min"},
                            {"start": "13:20", "end": "14:00", "minutes": 40, "duration": "40 min"}]
-    assert out["covered_hours"] == 2 and out["waking_hours"] == 2
+    # minutes covered out of the window's minutes: 12:30-13:15 is 45 of 120, not "2 of 2 hours"
+    assert out["share_basis"] == "minutes" and out["covered_minutes"] == 45 and out["window_minutes"] == 120
+    assert out["window_hours"] == 2 and out["share"] == 0.375 and out["share_text"] == "38%"
+    assert "covered_hours" not in out and "waking_hours" not in out
+    assert out["busiest_hour"] == 12
+    # nothing outside the window (09:10 and 17:45 are on the day, not in the window)
+    assert out["spans"] == [{"start": "12:30", "end": "13:15", "minutes": 45, "duration": "45 min"},
+                            {"start": "13:20", "end": "13:20", "minutes": 0, "duration": "0 min"}]
+    assert all("12:00" <= s["start"] <= s["end"] <= "14:00" for s in out["spans"])
+
+
+def test_coverage_window_clips_a_span_that_runs_across_its_edge(full_day):
+    out = ext(full_day.conn).run("coverage", {"time_from": f"{DAY}T13:00:00", "time_to": f"{DAY}T13:30:00"})
+    assert out["spans"][0] == {"start": "13:00", "end": "13:15", "minutes": 15, "duration": "15 min"}
+    assert out["covered_minutes"] == 15 and out["window_minutes"] == 30 and out["share_text"] == "50%"
+
+
+def test_coverage_window_outside_the_days_spans_is_one_gap(full_day):
+    out = ext(full_day.conn).run("coverage", {"time_from": f"{DAY}T19:00:00", "time_to": f"{DAY}T21:00:00"})
+    assert out["spans"] == [] and out["covered_minutes"] == 0 and out["share"] == 0
+    assert out["longest_gap"] == {"start": "19:00", "end": "21:00", "minutes": 120, "duration": "2 h"}
+
+
+def test_coverage_refuses_a_window_that_is_not_inside_one_day(full_day):
+    tools = ext(full_day.conn)
+    for lo, hi in ((f"{DAY}T22:00:00", "2026-10-30T02:00:00"),       # crosses midnight
+                   (f"{DAY}T00:00:00", "2026-10-31T00:00:00"),       # more than one day
+                   (f"{DAY}T14:00:00", f"{DAY}T12:00:00"),           # ends before it starts
+                   (f"{DAY}T12:00:00", f"{DAY}T12:00:00")):          # empty
+        out = tools.run("coverage", {"time_from": lo, "time_to": hi})
+        assert "one day" in out["error"] and "spans" not in out, (lo, hi)
+    assert tools.stats_returned == {}
+    assert "error" in tools.run("coverage", {"time_from": "yesterday"})
+
+
+def test_a_busy_day_keeps_its_headline_figures_under_the_clip_limit(conn):
+    # 130 photos seven minutes apart (130 separate spans), then 300 more two minutes apart (merged by the tool)
+    for i in range(130):
+        t = 6 * 60 + i * 7
+        add_source(conn, f"s{i}", f"{DAY}T{t // 60:02d}:{t % 60:02d}:00")
+    out = ext(conn).run("coverage", {})
+    assert out["spans_total"] == 130 and out["spans_truncated"] is True and len(out["spans"]) == MAX_SPANS
+    text = json.dumps(out)
+    assert len(text) < RESULT_CHARS and _clip(out) is out                 # not cut, still valid JSON
+    assert list(out)[:6] == ["day", "window", "share_basis", "share", "share_text", "covered_hours"]
+    assert out["longest_gap"] is not None or out["gaps"] == []
+    assert list(out).index("spans") == len(out) - 1                       # the long list goes last
+    for i in range(300):
+        t = 60 + i * 2
+        add_source(conn, f"d{i}", f"{DAY}T{t // 60:02d}:{t % 60:02d}:00")
+    assert len(json.dumps(ext(conn).run("coverage", {}))) < RESULT_CHARS
+
+
+def test_nearby_spans_are_shown_as_one(conn):
+    for i, minute in enumerate((0, 3, 6, 20)):          # 09:00, 09:03, 09:06 run together; 09:20 stands apart
+        add_source(conn, f"n{i}", f"{DAY}T09:{minute:02d}:00")
+    out = ext(conn).run("coverage", {})
+    assert [(s["start"], s["end"]) for s in out["spans"]] == [("09:00", "09:06"), ("09:20", "09:20")]
+    assert "spans_total" not in out
 
 
 def test_coverage_forgets_a_withdrawn_source(full_day):
@@ -219,6 +297,11 @@ def test_usage_stats_has_raw_and_formatted_figures(full_day):
     assert tools.run("usage_stats", {})["day"] is None        # no day asked: totals only
 
 
+def test_audio_is_rounded_to_one_decimal():
+    assert _audio(1.33333) == "1.3 min" and _audio(0) == "0 min" and _audio(2.0) == "2 min"
+    assert _audio(59.96) == "60 min" and _audio(125.4) == "2 h 5 min"
+
+
 def test_usage_stats_before_anything_was_recorded(full_day):
     out = ext(full_day.conn).run("usage_stats", {})
     assert out["recorded"] is False and out["total"]["calls"] == 0 and out["models"] == []
@@ -261,6 +344,13 @@ def test_forgotten_claims_never_appear(full_day):
               confidence=0.2, text="Alex muttered a secret remark")
     add_claim(conn, "u-gone2", "gu", predicate="said", value="disputed remark", at=f"{DAY}T12:55:00",
               status="disputed", text="Alex made a disputed remark")
+    # a person only a withdrawn source names, who is also a participant in a moment of his own
+    conn.execute("INSERT INTO entities(entity_id, type, name, attrs) VALUES ('person:zed','person','Zed','{}')")
+    t = f"{DAY}T13:30:00"
+    conn.execute("INSERT INTO entities(entity_id, type, name, attrs) VALUES ('episode:zed','episode','Episode 13:30',?)",
+                 (json.dumps({"start": t, "end": t}),))
+    add_claim(conn, "z-met", "gz", predicate="part_of_episode", subject="person:zed", at=t, episode="episode:zed")
+    add_claim(conn, "z-claim", "gz", predicate="met_with", subject="person:zed", obj="me", at=t, text="Zed met me")
     window = {"time_from": f"{DAY}T12:00:00", "time_to": f"{DAY}T14:00:00"}
 
     def snapshot():
@@ -272,6 +362,9 @@ def test_forgotten_claims_never_appear(full_day):
     assert "t-gone" in json.dumps(before["open_todos"])
     assert {"u-gone", "u-gone2"} <= {c["claim_id"] for c in before["uncertain_claims"]}
     assert "Alex said to try the taco place" in json.dumps(before["day_summary"])
+    assert "Zed" in before["day_summary"]["people"]
+    assert any("Zed" in m["participants"] for m in before["day_summary"]["moments"])
+    revoke(conn, "gz")
     revoke(conn, "gt")
     revoke(conn, "gu")
     conn.execute("UPDATE consent_grants SET revoked_at=? WHERE grantor='alex'", (clock.now_iso(),))
@@ -286,6 +379,10 @@ def test_forgotten_claims_never_appear(full_day):
             assert word not in text, (name, word)
     assert after["open_todos"] == []
     assert "taco place" not in after["day_summary"]["places"]      # only the withdrawn talk named it
+    assert "Zed" not in after["day_summary"]["people"]
+    assert not any("Zed" in m["participants"] or m["name"] == "Episode 13:30"
+                   for m in after["day_summary"]["moments"])
+    assert "Zed" not in json.dumps(after["day_summary"])
     assert after["tools"].returned <= ok
 
 

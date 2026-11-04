@@ -82,7 +82,7 @@ Date context:
 More tools:
  day_summary(time_from, time_to)     moments, people, places and counts for a window
  open_todos()                        open promises the user made and requests made of the user
- coverage(time_from?, time_to?)      the spans the memory covers and the gaps
+ coverage(time_from?, time_to?)      the spans the memory covers and the gaps, within one day
  usage_stats(day?)                   how much the models read and answered (counts only)
  uncertain_claims()                  disputed, partial and low-confidence claims
 - If a tool is unknown, do not guess: finish with status "abstained" and say you have no record."""

@@ -61,6 +61,23 @@ def _merge(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return merged
 
 
+def window_gaps(spans: list[tuple[int, int]], w0: int, w1: int) -> list[tuple[int, int]]:
+    """Every silence, as (start, end) minutes of the day, between the covered spans inside [w0, w1]:
+    the leading and trailing edges included, no matter how short. (`coverage` keeps its own, older
+    computation of the longest one; both give the same answer.)"""
+    gaps, cursor = [], w0
+    for s, e in sorted(spans):
+        if e < w0 or s > w1:
+            continue
+        s, e = max(s, w0), min(e, w1)
+        if s > cursor:
+            gaps.append((cursor, s))
+        cursor = max(cursor, e)
+    if w1 > cursor:
+        gaps.append((cursor, w1))
+    return gaps
+
+
 def coverage(conn: sqlite3.Connection, day: str, window: tuple[int, int] = (6, 22)) -> dict:
     first, last = window
     midnight = datetime.fromisoformat(day)
