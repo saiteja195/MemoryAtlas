@@ -23,6 +23,11 @@ describe("progressText", () => {
     const later = progressText(job({ calls_started: 2, calls_done: 1, working_s: 5, elapsed_s: 24 }));
     expect(later.detail).toBe("Step 2 · 5 s · 24 s so far");
   });
+  it("treats a second apart from rounding as the same wait", () => {
+    expect(progressText(job({ calls_started: 1, working_s: 3.4, elapsed_s: 3.6 })).detail).toBe("Step 1 · 3 s");
+    expect(progressText(job({ calls_started: 1, working_s: 3.4, elapsed_s: 4.4 })).detail).toBe("Step 1 · 3 s");
+    expect(progressText(job({ calls_started: 2, calls_done: 1, working_s: 3, elapsed_s: 30 })).detail).toBe("Step 2 · 3 s · 30 s so far");
+  });
   it("says what is happening between two model calls", () => {
     expect(progressText(job({ calls_started: 1, calls_done: 1, elapsed_s: 15 })).title).toBe("Saving what Muse found…");
   });
