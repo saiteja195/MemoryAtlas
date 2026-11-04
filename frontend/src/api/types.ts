@@ -132,7 +132,7 @@ export type Receipt = {
   grant_id: string;
   grantor: string;
   /** Why the grant ended: the person withdrew it, or it lapsed. Older receipts have no reason. */
-  reason?: "withdrawn" | "expired";
+  reason?: "withdrawn" | "expired" | "deleted";
   created_at: string;
   already_revoked: boolean;
   removed: {
@@ -206,6 +206,7 @@ export type Draft = {
 };
 
 export type PreviewBody = {
+  tracking?: TrackBody;
   kind: Draft["kind"];
   data_b64?: string;
   frames_b64?: string[];
@@ -228,17 +229,20 @@ export type Answers = {
 };
 
 /** A save running in the background, as `GET /capture/commit/jobs/{id}` reports it. */
-export type SaveJob = {
+export type ProcessingJob<T = Record<string, unknown>> = {
+  kind?: "preview" | "save" | "track" | "answer" | "correction";
   job_id: string;
-  state: "running" | "done" | "error";
+  state: "queued" | "running" | "done" | "error";
   elapsed_s: number;
   /** Model calls started and finished so far, and how long the current one has been running. */
   calls_started: number;
   calls_done: number;
   working_s: number;
-  result: (CommitResult & Partial<TrackResult>) | null;
+  result: T | null;
   error: { status: number; message: string } | null;
 };
+
+export type SaveJob = ProcessingJob<CommitResult & Partial<TrackResult>>;
 
 /** One object looked for in a video, and the stretches of the clip where it was visible. */
 export type TrackedObject = {
@@ -250,6 +254,7 @@ export type TrackBody = {
 };
 
 export type CommitResult = {
+  tracking?: Partial<TrackResult> & { state: "done" | "error"; message?: string };
   session_id: string;
   results: { status: string; reason: string | null; source_id: string | null; claims: number; compile_rejected: unknown }[];
   grants: { person: string; grant_id: string; revocation_token: string }[];

@@ -4,8 +4,12 @@ import { personName, sessionLabel } from "./Badges";
 type Props = {
   grants: Grant[];
   onSimulate: (grantId: string) => void;
+  /** The owner withdraws their own consent (no code needed). */
+  onWithdraw: (grantId: string) => void;
   onExpire: (grantId: string) => void;
   onReceipt: (receiptId: string) => void;
+  /** What the app is busy doing, when it is ("Letting the consent expire"). */
+  busy?: string | null;
 };
 
 /** "until 3:30 PM", or "until 3:30 PM tomorrow" when it is not today. */
@@ -15,7 +19,7 @@ function until(iso: string): string {
   return d.toDateString() === new Date().toDateString() ? `until ${time}` : `until ${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
 }
 
-export function ConsentPanel({ grants, onSimulate, onExpire, onReceipt }: Props) {
+export function ConsentPanel({ grants, onSimulate, onWithdraw, onExpire, onReceipt, busy }: Props) {
   return (
     <>
       <p className="small muted">
@@ -23,6 +27,12 @@ export function ConsentPanel({ grants, onSimulate, onExpire, onReceipt }: Props)
         only on that agreement and keeps the ones other sources still support. A consent can also have an end time; when
         it passes, the same removal happens by itself.
       </p>
+      {busy && /expire|forget|withdraw/i.test(busy) && (
+        <div className="save-progress" role="status" aria-live="polite">
+          <strong>{busy}…</strong>
+          <span className="small muted">Removing what rested on it, then checking nothing leaks. This can take a minute or two.</span>
+        </div>
+      )}
       {grants.length === 0 && <p className="muted small">No consent has been given yet. Play the day to start.</p>}
       <ul style={{ display: "grid", gap: 10 }}>
         {grants.map((g) => (
@@ -38,14 +48,16 @@ export function ConsentPanel({ grants, onSimulate, onExpire, onReceipt }: Props)
                 g.receipt_id && <button type="button" className="btn small" onClick={() => onReceipt(g.receipt_id!)}>View the forgetting receipt</button>
               ) : (
                 <>
-                  <button type="button" className="btn small danger" onClick={() => onSimulate(g.grant_id)}>
+                  <button type="button" className="btn small danger" onClick={() => (g.grantor === "me" ? onWithdraw(g.grant_id) : onSimulate(g.grant_id))}>
                     {g.grantor === "me" ? "Withdraw my consent…" : `${personName(g.grantor)} withdraws…`}
                   </button>
                   <button type="button" className="btn small ghost" onClick={() => onExpire(g.grant_id)}
                           title="Demo: skip ahead to the moment this consent runs out">Let it expire now (demo)</button>
+                  {g.grantor !== "me" && (
                   <a className="btn small" href={`?as=device&grant=${encodeURIComponent(g.grant_id)}`} target="_blank" rel="noopener">
-                    Open on {g.grantor === "me" ? "my" : `${personName(g.grantor)}'s`} phone (new tab)
+                    Open on {personName(g.grantor)}'s phone (new tab)
                   </a>
+                  )}
                 </>
               )}
             </div>

@@ -1,6 +1,6 @@
 import { youifyDeep } from "../utils/voice";
 import type {
-  Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, SaveJob, Todo, TodoState, TrackBody,
+  ProcessingJob, Answer, Answers, ChatMessage, CommitResult, DemoStatus, Draft, Goal, Graph, Grant, Health, Insights, Me, Media, PreviewBody, Provenance, Receipt, SaveJob, Todo, TodoState, TrackBody,
 } from "./types";
 
 /** An API failure with the server's own explanation, so the UI can say something useful. */
@@ -50,7 +50,33 @@ const post = <T,>(path: string, body?: unknown, opts?: Options) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   }, opts);
 
+/** Polling is presentation only: once accepted, the job no longer depends on this browser. */
+export async function waitForJob<T>(jobId: string): Promise<T> {
+  const end = Date.now() + 15 * 60_000;
+  let failures = 0;
+  while (Date.now() < end) {
+    let job: ProcessingJob<T>;
+    try {
+      job = await call<ProcessingJob<T>>(`/jobs/${encodeURIComponent(jobId)}`);
+      failures = 0;
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 401 || e.status === 404)) throw e;
+      if (++failures > 4) throw e;
+      await new Promise((r) => setTimeout(r, 1500));
+      continue;
+    }
+    if (job.state === "done" && job.result !== null) return job.result;
+    if (job.state === "error") throw new ApiError(job.error?.status ?? 500, job.error?.message ?? "Processing failed.");
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  throw new Error("Processing is still running. Check Background activity for the outcome.");
+}
+
 export const api = {
+  jobs: () => call<ProcessingJob[]>("/jobs"),
+  job: <T,>(id: string) => call<ProcessingJob<T>>(`/jobs/${encodeURIComponent(id)}`),
+  dismissJob: (id: string) => call<void>(`/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  startPreview: (body: PreviewBody) => post<{ job_id: string }>("/capture/preview/start", body),
   health: () => call<Health>("/health"),
   /** Who is signed in. 401 means nobody; that is not an error for the app, so it never triggers onUnauthorized. */
   me: () => call<Me>("/auth/me", undefined, { session: false }),
@@ -84,7 +110,8 @@ export const api = {
   reset: () => post<DemoStatus>("/demo/reset"),
   /** `asOf` (YYYY-MM-DD) is the day "today" means; the server defaults to the latest day with memories. */
   ask: (question: string, asOf?: string | null) =>
-    post<Answer>("/recall/ask", asOf ? { question, as_of: asOf } : { question }),
+    post<{ job_id: string }>("/recall/ask/start", asOf ? { question, as_of: asOf } : { question })
+      .then(({ job_id }) => waitForJob<Answer>(job_id)),
   /** The saved conversation, oldest first. */
   chat: () => call<ChatMessage[]>("/chat"),
   todos: (state: TodoState | "all" = "open") => call<Todo[]>(`/todos?state=${state}`),
@@ -101,8 +128,14 @@ export const api = {
   expire: (grantId: string) =>
     post<{ expired: { grant_id: string; receipt_id: string }[] }>(`/demo/grants/${encodeURIComponent(grantId)}/expire`),
   correct: (claimId: string, body: { text?: string; retract?: boolean; at?: string }) =>
-    post<{ corrected: string; replacement: string | null; also_superseded: string[] }>(
-      `/claims/${encodeURIComponent(claimId)}/correct`, body),
+    post<{ job_id: string }>(`/claims/${encodeURIComponent(claimId)}/correct/start`, body)
+      .then(({ job_id }) => waitForJob<{ corrected: string; replacement: string | null; also_superseded: string[] }>(job_id)),
+  /** The owner deletes one saved memory (all parts of a video) and what rests only on it. */
+  deleteMemory: (sourceId: string, redTeam = true) =>
+    post<Receipt>(`/memories/${encodeURIComponent(sourceId)}/delete?red_team=${redTeam}`),
+  /** The signed-in owner withdraws their own consent: no code needed. */
+  withdraw: (grantId: string, redTeam = true) =>
+    post<Receipt>(`/consent/grants/${encodeURIComponent(grantId)}/withdraw?red_team=${redTeam}`),
   revoke: (grantId: string, token: string, redTeam = true) =>
     post<Receipt>(`/consent/grants/${encodeURIComponent(grantId)}/revoke?red_team=${redTeam}`, { token }),
 };

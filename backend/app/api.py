@@ -24,7 +24,7 @@ from .llm.metered import usage_purpose
 from .privacy import clock
 from .privacy.consent import active_grant, create_grant
 from .privacy.export import export_memories
-from .privacy.revocation import BadToken, UnknownGrant
+from .privacy.revocation import BadToken, NotYourConsent, UnknownGrant, UnknownMemory
 from .profiles.registry import Registry
 from .profiles.limits import Budget, RateLimiter
 from .profiles.routes import client_ip, make_router
@@ -60,17 +60,6 @@ TodoFilter = Literal["open", "done", "dismissed", "all"]
 
 class TodoBody(BaseModel):
     state: Literal["open", "done", "dismissed"]
-
-
-class PreviewBody(BaseModel):
-    kind: Literal["frame", "audio", "note", "video", "photos"]
-    data_b64: str | None = None                 # frame: the image. audio: the WAV
-    frames_b64: list[str] = Field(default_factory=list)       # video: 1 to 8 JPEG frames. photos: 1 to 8 photos
-    photo_times: list[str | None] = Field(default_factory=list)   # photos: each file's own time, naive ISO, or none
-    frame_offsets_ms: list[int] = Field(default_factory=list)
-    audio_b64: str | None = None                # video: the audio track as WAV
-    text: str | None = None
-    file_modified_at: str | None = None         # local time of the file, naive ISO
 
 
 class CommitBody(BaseModel):
@@ -110,6 +99,19 @@ class TrackBody(BaseModel):
         if any(o < 0 for o in v) or v != sorted(v):
             raise ValueError("offsets_ms must be increasing, from the start of the clip")
         return v
+
+
+class PreviewBody(BaseModel):
+    tracking: TrackBody | None = None
+    kind: Literal["frame", "audio", "note", "video", "photos"]
+    data_b64: str | None = None                 # frame: the image. audio: the WAV
+    frames_b64: list[str] = Field(default_factory=list)       # video: 1 to 8 JPEG frames. photos: 1 to 8 photos
+    photo_times: list[str | None] = Field(default_factory=list)   # photos: each file's own time, naive ISO, or none
+    frame_offsets_ms: list[int] = Field(default_factory=list)
+    audio_b64: str | None = None                # video: the audio track as WAV
+    text: str | None = None
+    file_modified_at: str | None = None         # local time of the file, naive ISO
+
 
 
 class AskBody(BaseModel):
@@ -182,11 +184,18 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             rt = runtimes.get("local", "Local", True)
         else:
             rt = resolve_runtime(request, registry, runtimes)
-        rt.sweep()
+        if rt.sweep():                      # a consent lapsed: nothing derived from it may linger in a job or a draft
+            forget_copies(rt)
         return rt
 
     app.state.budget = Budget()
     jobs = app.state.jobs = JobBoard()
+
+    def forget_copies(rt: ProfileRuntime) -> None:
+        """Memories were forgotten, so every stored copy of a result (finished answers, previews, saves in flight)
+        and every unsaved draft goes too; a job still running publishes nothing."""
+        jobs.invalidate(rt.profile_id)
+        rt.drafts.clear()
 
     def spend(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> None:
         """Every route that calls the model costs the owner money; count it against the profile and the address."""
@@ -264,17 +273,45 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         """Withdraw consent: forget everything only this grant supported. The token is the
         proof that the person who consented is the one asking."""
         try:
-            return rt.revoker.revoke(grant_id, body.token, run_red_team=red_team)
+            result = rt.revoker.revoke(grant_id, body.token, run_red_team=red_team)
+            forget_copies(rt)
+            return result
         except UnknownGrant:
             raise HTTPException(404, "unknown grant") from None
         except BadToken:
             raise HTTPException(403, "wrong revocation token") from None
+
+    @app.post("/consent/grants/{grant_id}/withdraw")
+    def withdraw_own(grant_id: str, red_team: bool = True, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        """The owner withdraws their own consent: forget everything only this grant supported. No code is needed,
+        because being signed in to the profile proves it is the owner. Someone else's consent needs their code."""
+        try:
+            result = rt.revoker.revoke_own(grant_id, run_red_team=red_team)
+            forget_copies(rt)
+            return result
+        except UnknownGrant:
+            raise HTTPException(404, "unknown grant") from None
+        except NotYourConsent:
+            raise HTTPException(403, "This consent belongs to someone else. Use their withdrawal code.") from None
+
+    @app.post("/memories/{source_id}/delete")
+    def delete_memory(source_id: str, red_team: bool = True, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        """The owner deletes one saved memory (all parts of a video together) and everything that rests only on it.
+        The day's consent stays; the receipt proves nothing of it is left."""
+        try:
+            result = rt.revoker.delete_memory(source_id, run_red_team=red_team)
+            forget_copies(rt)
+            return result
+        except UnknownMemory:
+            raise HTTPException(404, "unknown memory") from None
 
     @app.post("/consent/expire-due")
     def expire_due(rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Forget what rested on grants that have lapsed. The API does this by itself before each request;
         call this from a scheduler to do it on time even when nobody is using the app."""
         receipts = rt.sweep()
+        if receipts:
+            forget_copies(rt)
         return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/receipts/{receipt_id}")
@@ -295,11 +332,57 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(409, "Adding memories needs live mode (a model key); this app is in "
                                      f"{rt.llm.mode} mode.")
 
+    def run_tracking(rt: ProfileRuntime, body: TrackBody, frames: list[bytes], *, create: bool = True) -> dict:
+        day = body.clip_start[:10]
+        with usage_purpose("read_memory", day):
+            objects = follow_objects(rt.llm, frames, body.offsets_ms, body.phrases)
+        found = [o for o in objects if o["found"]]
+        grants: list[dict] = []
+        if found:
+            session = f"upload-{day}"
+            owner = rt.engine.gateway.owner
+            if not active_grant(rt.conn, owner, session):
+                if not create:
+                    raise HTTPException(409, "Consent changed before tracking finished; no tracking memory was stored.")
+                gid, token = create_grant(rt.conn, rt.settings.revocation_secret, owner, session)
+                grants.append({"person": owner, "grant_id": gid, "revocation_token": token})
+            with usage_purpose("read_memory", day):
+                rt.engine.ingest(RawCapture(kind="frame", session_id=session, captured_at=body.clip_start,
+                                            perception=perception_for(objects)))
+        return {"objects": objects, "stored": bool(found), "grants": grants}
+
+    def finish_commit(rt: ProfileRuntime, draft, decided) -> dict:
+        """Own the complete save -> optional tracking workflow, even after the browser closes."""
+        try:
+            result = commit_draft(rt.conn, rt.engine, rt.settings.revocation_secret, draft, decided)
+            if draft._tracking and not decided.declined and any(r["status"] == "ingested" for r in result["results"]):
+                try:
+                    body = TrackBody.model_validate({**draft._tracking, "clip_start": decided.captured_at})
+                    frames = [base64.b64decode(f, validate=True) for f in body.frames_b64]
+                    result["tracking"] = {"state": "done", **run_tracking(rt, body, frames, create=False)}
+                except Exception:
+                    # Saving succeeded: an optional tracking failure must never turn it into a failed save.
+                    result["tracking"] = {"state": "error", "message": "Memory saved; object tracking could not finish."}
+            return result
+        finally:
+            draft._tracking = None
+
     @app.post("/capture/preview", dependencies=[Depends(spend)])
     def capture_preview(body: PreviewBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         """Read an upload with Muse and return what it understood and what it still needs to
         ask. Stores nothing; the commit step does that."""
         require_live(rt)
+        if body.tracking:
+            if body.kind != "video" or len(body.tracking.frames_b64) != len(body.tracking.offsets_ms):
+                raise HTTPException(422, "Tracking needs video frames with matching offsets")
+            if not track_limit.allow(rt.profile_id):
+                raise HTTPException(429, "Too many tracking requests. Try again later.")
+            try:
+                if any(not (data := base64.b64decode(f, validate=True)) or len(data) > MAX_FRAME_BYTES
+                       for f in body.tracking.frames_b64):
+                    raise ValueError()
+            except ValueError:
+                raise HTTPException(422, "Tracking frames must be base64 images under 2 MB") from None
         try:
             draft = build_preview(
                 rt.llm, body.kind, data_b64=body.data_b64, frames_b64=body.frames_b64,
@@ -313,7 +396,35 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(415, str(e)) from None
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
+        draft._tracking = body.tracking.model_dump() if body.tracking else None
         return rt.drafts.put(draft).model_dump()
+
+    @app.post("/capture/preview/start", status_code=202, dependencies=[Depends(spend)])
+    def preview_start(body: PreviewBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        require_live(rt)
+        try:
+            job = jobs.start(rt.profile_id, lambda: capture_preview(body, rt), kind="preview", lane="preview")
+        except Busy:
+            raise HTTPException(409, "Already processing a preview, or the server is busy. Try again shortly.") from None
+        return {"job_id": job.job_id}
+
+    @app.get("/jobs")
+    def job_list(rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
+        return jobs.list(rt.profile_id)
+
+    @app.get("/jobs/{job_id}")
+    def job_status(job_id: str, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        job = jobs.get(rt.profile_id, job_id)
+        if job is None:
+            raise HTTPException(404, "Processing job expired or unknown")
+        return jobs.status(job)
+
+    @app.delete("/jobs/{job_id}", status_code=204)
+    def dismiss_job(job_id: str, rt: ProfileRuntime = Depends(get_runtime)):
+        job = jobs.get(rt.profile_id, job_id)
+        if job and job.state in ("queued", "running"):
+            raise HTTPException(409, "Processing is still running")
+        jobs.dismiss(rt.profile_id, job_id)
 
     def take_confirmed_draft(rt: ProfileRuntime, body: CommitBody):
         """Check a confirmed draft and take it (from here on a second call gets 404). Consent is decided here,
@@ -331,6 +442,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             rt.drafts.take(body.draft_id)
         except KeyError:
             raise HTTPException(404, "draft expired or unknown") from None
+        jobs.consume_preview(rt.profile_id, body.draft_id)
         return draft, decided
 
     @app.post("/capture/commit", dependencies=[Depends(spend)])
@@ -338,7 +450,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         """Store a confirmed draft and wait for it (kept for scripts; the page uses /capture/commit/start)."""
         draft, decided = take_confirmed_draft(rt, body)
         try:
-            return commit_draft(rt.conn, rt.engine, rt.settings.revocation_secret, draft, decided)
+            return finish_commit(rt, draft, decided)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
@@ -350,8 +462,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
             raise HTTPException(409, "A memory is already being saved. Wait for it to finish.")
         draft, decided = take_confirmed_draft(rt, body)
         try:
-            job = jobs.start(rt.profile_id, lambda: commit_draft(
-                rt.conn, rt.engine, rt.settings.revocation_secret, draft, decided))
+            job = jobs.start(rt.profile_id, lambda: finish_commit(rt, draft, decided))
         except Busy:
             rt.drafts.put(draft)                     # lost the race for the one running slot: keep the draft
             raise HTTPException(409, "A memory is already being saved. Wait for it to finish.") from None
@@ -385,23 +496,8 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         if not track_limit.allow(rt.profile_id):
             raise HTTPException(429, "You have tracked a lot of videos. Try again in a little while.",
                                 headers={"Retry-After": str(int(track_limit.retry_after(rt.profile_id)) + 1)})
-        day = body.clip_start[:10]
-
         def work() -> dict:
-            with usage_purpose("read_memory", day):
-                objects = follow_objects(rt.llm, frames, body.offsets_ms, body.phrases)
-            found = [o for o in objects if o["found"]]
-            grants: list[dict] = []
-            if found:
-                session = f"upload-{day}"
-                owner = rt.engine.gateway.owner
-                if not active_grant(rt.conn, owner, session):
-                    gid, token = create_grant(rt.conn, rt.settings.revocation_secret, owner, session)
-                    grants.append({"person": owner, "grant_id": gid, "revocation_token": token})
-                with usage_purpose("read_memory", day):
-                    rt.engine.ingest(RawCapture(kind="frame", session_id=session, captured_at=body.clip_start,
-                                                perception=perception_for(objects)))
-            return {"objects": objects, "stored": bool(found), "grants": grants}
+            return run_tracking(rt, body, frames)
 
         try:
             job = jobs.start(rt.profile_id, work)
@@ -439,6 +535,14 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
+    @app.post("/recall/ask/start", status_code=202, dependencies=[Depends(spend)])
+    def ask_start(body: AskBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        try:
+            job = jobs.start(rt.profile_id, lambda: rt.recall.ask(body.question, body.as_of), kind="answer", lane="answer")
+        except Busy:
+            raise HTTPException(409, "An answer is already being prepared, or the server is busy.") from None
+        return {"job_id": job.job_id}
+
     @app.get("/chat")
     def chat(rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
         """The conversation so far, so the assistant shows the same thread after a reload and on every page."""
@@ -462,6 +566,19 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 
+    @app.post("/claims/{claim_id}/correct/start", status_code=202, dependencies=[Depends(spend)])
+    def correct_start(claim_id: str, body: CorrectBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        def work():
+            try:
+                return correct_claim(rt.engine, claim_id, body.text, body.retract, body.at)
+            except CorrectionError as e:
+                raise HTTPException(e.code, e.message) from None
+        try:
+            job = jobs.start(rt.profile_id, work, kind="correction")
+        except Busy:
+            raise HTTPException(409, "A memory is already being changed, or the server is busy.") from None
+        return {"job_id": job.job_id}
+
     @app.get("/demo/grants")
     def demo_grants(rt: ProfileRuntime = Depends(get_runtime)) -> list[dict]:
         """DEMO ONLY: the revocation tokens a real person would hold on their own device, so
@@ -481,6 +598,8 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
                             (clock.iso(clock.now() - timedelta(seconds=1)), grant_id))
             rt.conn.commit()
         receipts = rt.sweep()
+        if receipts:
+            forget_copies(rt)
         return {"expired": [{"grant_id": r["grant_id"], "receipt_id": r["receipt_id"]} for r in receipts]}
 
     @app.get("/demo/status")
@@ -489,6 +608,10 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
 
     @app.post("/demo/reset")
     def demo_reset(request: Request, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
+        if jobs.busy(rt.profile_id, lane=None):
+            raise HTTPException(409, "Wait for background processing to finish before resetting.")
+        jobs.invalidate(rt.profile_id)
+        rt.drafts.clear()
         if registry is None:
             rt.demo.reset()
             return rt.demo.status()
