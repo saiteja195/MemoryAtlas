@@ -50,6 +50,9 @@ class ProfileRuntime:
                 return []
 
     def close(self) -> None:
+        flush = getattr(self.llm, "flush", None)
+        if flush:
+            flush()                      # usage rows still held back go out before the connection closes
         try:
             self.conn.close()
         except sqlite3.Error:

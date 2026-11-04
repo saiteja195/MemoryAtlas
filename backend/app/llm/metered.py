@@ -134,7 +134,7 @@ class MeteredLLM:
         A file database gets a short-lived connection of its own (WAL), so committing the usage
         row never commits, or waits behind, another handler's half-done work on the shared request
         connection. If that write cannot proceed right away (a request is mid-transaction), the
-        row waits in memory and goes out with the next one. An in-memory database (tests) has no
+        row waits in memory and goes out with the next one (or with `flush()`). An in-memory database (tests) has no
         second connection to open, so the shared one is used under a lock, rolled back on failure.
         """
         path = self._db_file()
@@ -153,6 +153,11 @@ class MeteredLLM:
         with self._lock:
             if row is not None:
                 self._pending.append(row)
+            if self._conn.in_transaction:
+                # A request is mid-transaction: the side connection would only wait and fail. Hold the
+                # row; `flush()` (or the next call outside a transaction) writes it.
+                del self._pending[:-_MAX_PENDING]
+                return
             batch = list(self._pending)
         if not batch:
             return

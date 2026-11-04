@@ -192,7 +192,7 @@ def red_team(conn: sqlite3.Connection, llm: LLMClient | None, questions: list[st
     if llm is None or not questions:
         return ProbeResult(6, "Red team: adversarial questions leak nothing", SKIPPED,
                            {"reason": "no model client or no questions configured"})
-    inv, leaks, answered = Investigator(conn, llm), 0, []
+    inv, leaks, answered = Investigator(conn, llm, purpose="other"), 0, []   # not user questions
     try:
         for q in questions:
             a = inv.ask(q)

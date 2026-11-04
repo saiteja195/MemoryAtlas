@@ -28,12 +28,14 @@ class MemoryEngine:
 
     def ingest(self, cap: RawCapture) -> list[Ingested]:
         out = []
-        with usage_purpose("read_memory", cap.captured_at[:10]):
-            for res in self.gateway.ingest(cap):
-                compiled = self.compiler.compile(res.observation) if res.observation else None
-                out.append(Ingested(res, compiled))
-        # The work above is committed, so usage rows held back while it was mid-transaction can go out.
-        flush = getattr(self.llm, "flush", None)
-        if flush:
-            flush()
+        try:
+            with usage_purpose("read_memory", cap.captured_at[:10]):
+                for res in self.gateway.ingest(cap):
+                    compiled = self.compiler.compile(res.observation) if res.observation else None
+                    out.append(Ingested(res, compiled))
+        finally:
+            # Usage rows are held back while the request is mid-transaction; this is where they go out.
+            flush = getattr(self.llm, "flush", None)
+            if flush:
+                flush()
         return out

@@ -105,11 +105,11 @@ def abstain(why: str, tools: RecallTools | None = None, steps: int = 0,
 
 
 class Investigator:
-    def __init__(self, conn: sqlite3.Connection, llm: LLMClient):
-        self.conn, self.llm = conn, llm
+    def __init__(self, conn: sqlite3.Connection, llm: LLMClient, purpose: str = "answer"):
+        self.conn, self.llm, self.purpose = conn, llm, purpose
 
     def ask(self, question: str) -> Answer:
-        with usage_purpose("answer"):
+        with usage_purpose(self.purpose):
             return self._ask(question)
 
     def _ask(self, question: str) -> Answer:
