@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, Graph } from "../api/types";
-import { buildSuggestions, dayChip, isLauncherShortcut, turnsFromHistory } from "./assistant";
+import { buildSuggestions, dayChip, isLauncherShortcut, mergeHistory, turnsFromHistory, type Turn } from "./assistant";
 
 const node = (id: string, type: string, name: string) => ({ id, type, name, attrs: null });
 const GRAPH = {
@@ -109,5 +109,32 @@ describe("conversation helpers", () => {
     expect(isLauncherShortcut(e("k"))).toBe(false);
     expect(isLauncherShortcut(e("k", { ctrlKey: true, shiftKey: true }))).toBe(false);
     expect(isLauncherShortcut(e("j", { metaKey: true }))).toBe(false);
+  });
+});
+
+describe("mergeHistory", () => {
+  const turn = (id: number, question: string, over: Partial<Turn> = {}): Turn => ({ id, question, ...over });
+
+  it("takes the saved conversation as the truth, so redacted answers replace the old ones", () => {
+    const local = [turn(2, "Q2", { answer: { answer: "old answer" } as never }), turn(1, "Q1")];
+    const saved = [turn(2, "Q2", { answer: { answer: "[removed: this relied on information that was forgotten]" } as never }), turn(1, "Q1")];
+    expect(mergeHistory(local, saved)[0].answer?.answer).toMatch(/removed/);
+  });
+
+  it("keeps a question that failed and was never saved, newest first", () => {
+    const failed = turn(5, "Unsaved?", { error: { text: "down", notRecorded: false } });
+    const merged = mergeHistory([failed, turn(1, "Q1")], [turn(1, "Q1")]);
+    expect(merged.map((t) => t.question)).toEqual(["Unsaved?", "Q1"]);
+  });
+
+  it("never gives two turns the same id, so the thread's keys stay unique", () => {
+    const failed = turn(1, "Unsaved?", { error: { text: "down", notRecorded: true } });
+    const merged = mergeHistory([failed], [turn(1, "Saved 1"), turn(2, "Saved 2")]);
+    expect(new Set(merged.map((t) => t.id)).size).toBe(merged.length);
+    expect(new Set(mergeHistory(merged, [turn(1, "Saved 1")]).map((t) => t.id)).size).toBe(2);
+  });
+
+  it("copes with nothing on either side", () => {
+    expect(mergeHistory([], [])).toEqual([]);
   });
 });

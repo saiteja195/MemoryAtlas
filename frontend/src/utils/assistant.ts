@@ -129,3 +129,12 @@ export function dayChip(messageDay: string | null | undefined, selectedDay: stri
 export function isLauncherShortcut(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }): boolean {
   return e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
 }
+
+/**
+ * The conversation after it was read from the server again (forgetting redacts saved answers): the saved turns are the
+ * truth, and a question that failed and was never saved stays in front, newest first.
+ */
+export function mergeHistory(local: readonly Turn[], saved: readonly Turn[]): Turn[] {
+  // Saved turns are numbered 1, 2, ...; a kept unsaved one takes the negative of its id, so no two ever share a key.
+  return [...local.filter((t) => t.error !== undefined).map((t) => ({ ...t, id: -Math.abs(t.id) })), ...saved];
+}

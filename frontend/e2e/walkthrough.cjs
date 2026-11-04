@@ -134,6 +134,10 @@ async function audit(page, label) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
   check((await page.locator("dialog[open]:has-text('Forgetting receipt')").count()) === 0, "Esc closes the receipt");
+  // The open assistant must not keep showing answers the forgetting just redacted.
+  await openAssistant(page);
+  await page.waitForSelector('.assistant .qa .a:has-text("removed")');
+  check(true, "the assistant's earlier answer is now redacted, without a reload");
   await phone.close();
 
   // After forgetting.

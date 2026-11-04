@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api/client";
 import type { Answer } from "../api/types";
-import { turnsFromHistory, type Turn } from "../utils/assistant";
+import { mergeHistory, turnsFromHistory, type Turn } from "../utils/assistant";
 
 type Options = {
   /** Called with every answer that arrives, so the page can show what it cited. */
   onAnswer?: (a: Answer) => void;
+  /** Changes when the memories changed (a forgetting, a new memory): the saved conversation is read again then. */
+  dataKey?: number;
 };
 
 /**
@@ -22,6 +24,8 @@ export function useAssistant(day: string | null, options: Options = {}) {
   const opts = useRef(options);
   opts.current = options;
 
+  // Read the saved conversation when this mounts and whenever the memories change: forgetting redacts answers on the
+  // server, so the thread on screen must not keep showing what was removed.
   useEffect(() => {
     let live = true;
     api.chat()
@@ -29,12 +33,12 @@ export function useAssistant(day: string | null, options: Options = {}) {
         if (!live) return;
         const history = turnsFromHistory(messages);
         next.current = Math.max(next.current, history.length);
-        setTurns((now) => [...now, ...history]);
+        setTurns((now) => mergeHistory(now, history));
       })
       .catch(() => undefined)               // no history is not an error: the thread just starts empty
       .finally(() => { if (live) setLoaded(true); });
     return () => { live = false; };
-  }, []);
+  }, [options.dataKey]);
 
   const ask = useCallback(async (question: string) => {
     const id = ++next.current;

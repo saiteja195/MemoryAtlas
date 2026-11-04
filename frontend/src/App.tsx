@@ -209,6 +209,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
 
   // --- actions ----------------------------------------------------------------------------------
   const assistant = useAssistant(dayState.day, {
+    dataKey: atlas.dataKey,
     onAnswer: (a) => {
       setSelection(null);
       setScrubAt(null);
