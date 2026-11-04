@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { Answer, LlmMode } from "../api/types";
-import { clock } from "../utils/graph";
+import type { LlmMode } from "../api/types";
 import { followUps, oldestFirst, PHASES, phaseAt } from "../utils/chat";
 import type { Turn } from "../utils/assistant";
 import { prefersReducedMotion } from "../utils/theme";
-import { EvidenceChip } from "./Badges";
+import { Thread } from "./Thread";
 import { AFTER_GROUPS, BEFORE_GROUPS, isKnown, suggest } from "../utils/suggest";
+import type { Suggestions } from "../utils/assistant";
 
 /** One question with its answer: the thread is a list of these, newest first. */
 export type QA = Turn;
@@ -15,18 +15,16 @@ type Props = {
   asking: boolean;
   forgotten: boolean;
   mode: LlmMode | undefined;
+  /** Prompts built from the person's own memories (live mode). Replay mode keeps the recorded questions. */
+  suggestions: Suggestions;
+  selectedDay: string | null;
+  loaded: boolean;
   onAsk: (q: string) => void;
   onCite: (claimId: string) => void;
   onWhy: (claimIds: string[]) => void;
 };
 
-const STATUS = {
-  answered: { text: "Answered", cls: "ok", mark: "✓" },
-  partial: { text: "Partly answered", cls: "warn", mark: "◐" },
-  abstained: { text: "No record", cls: "", mark: "∅" },
-} as const;
-
-export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }: Props) {
+export function AskPanel({ qas, asking, forgotten, mode, suggestions, selectedDay, loaded, onAsk, onCite, onWhy }: Props) {
   const [q, setQ] = useState("");
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -39,8 +37,14 @@ export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }:
   // In replay mode a free-form question probably has no recording: offer the nearest ones while typing.
   const near = replay && typed.length >= 3 && !isKnown(typed, groups) ? suggest(typed, groups) : [];
   const last = qas[0];
-  const next = !asking && last?.answer ? followUps(qas.map((x) => x.question), groups) : [];
-  const starters = groups.flatMap((g) => g.prompts).slice(0, 4);
+  // Live: prompts built from this person's own memories. Replay: only the recorded questions can be answered.
+  const live = !replay;
+  const shown: typeof BEFORE_GROUPS = live
+    ? suggestions.groups.map((g) => ({ title: g.title, hint: "", prompts: g.prompts }))
+    : groups;
+  const next = !asking && last?.answer ? followUps(qas.map((x) => x.question), shown) : [];
+  const starters = shown.flatMap((g) => g.prompts).slice(0, 4);
+  const nothingYet = live && suggestions.empty !== null;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -68,36 +72,25 @@ export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }:
   return (
     <div className="chat">
       <div className="thread chat-thread" ref={thread} role="log" aria-label="Conversation" aria-live="off" tabIndex={0}>
-        {turns.length === 0 && !asking && (
+        {turns.length === 0 && !asking && !loaded && <p className="muted small" role="status">Loading your conversation…</p>}
+        {turns.length === 0 && !asking && loaded && (
           <div className="chat-empty">
-            <h3>What do you want to understand?</h3>
-            <p className="muted small">Ask anything about your day, in your own words. Each answer shows the memories it rests on.</p>
-            <div className="examples starters">
-              {starters.map((s) => <button type="button" key={s} disabled={asking} onClick={() => onAsk(s)}>{s}</button>)}
-            </div>
+            <h3>{nothingYet ? suggestions.empty : "What do you want to understand?"}</h3>
+            <p className="muted small">
+              {nothingYet
+                ? "Add a photo, a voice note or a few words, and the questions you can ask will appear here."
+                : "Ask anything about your day, in your own words. Each answer shows the memories it rests on."}
+            </p>
+            {!nothingYet && (
+              <div className="examples starters">
+                {starters.map((s) => <button type="button" key={s} disabled={asking} onClick={() => onAsk(s)}>{s}</button>)}
+              </div>
+            )}
           </div>
         )}
 
-        {turns.map((qa) => (
-          <article className={`qa ${qa.answer?.status ?? ""}`} key={qa.id} aria-label={`Question: ${qa.question}`}>
-            <p className="q bubble me">{qa.question}</p>
-            {qa.error && qa.error.notRecorded && (
-              <NotRecorded question={qa.question} groups={groups} disabled={asking} onAsk={onAsk} />
-            )}
-            {qa.error && !qa.error.notRecorded && <div className="notice error" role="alert">{qa.error.text}</div>}
-            {qa.answer && <Answered a={qa.answer} onCite={onCite} onWhy={onWhy} />}
-          </article>
-        ))}
-
-        {asking && (
-          <ol className="steps" role="status" aria-label="Looking through your memories">
-            {PHASES.map((label, i) => (
-              <li key={label} className={i < phase ? "done" : i === phase ? "now" : ""}>
-                <span aria-hidden="true">{i < phase ? "✓" : i === phase ? "…" : "·"}</span> {label}
-              </li>
-            ))}
-          </ol>
-        )}
+        <Thread turns={turns} asking={asking} phase={phase} groups={groups} selectedDay={selectedDay}
+                onAsk={onAsk} onCite={onCite} onWhy={onWhy} />
 
         {next.length > 0 && (
           <div className="examples follow" role="group" aria-label="Suggested next questions">
@@ -136,12 +129,12 @@ export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }:
         </p>
       )}
 
-      <details className="more-prompts" open={examplesOpen} onToggle={(e) => setExamplesOpen(e.currentTarget.open)}>
+      {shown.length > 0 && <details className="more-prompts" open={examplesOpen} onToggle={(e) => setExamplesOpen(e.currentTarget.open)}>
         <summary>Example questions</summary>
         <div className="prompt-groups" role="group" aria-label="Example questions">
-          {groups.map((g) => (
+          {shown.map((g) => (
             <section key={g.title} className="prompt-group">
-              <p className="prompt-title"><strong>{g.title}</strong> <span className="muted small">{g.hint}</span></p>
+              <p className="prompt-title"><strong>{g.title}</strong> {g.hint ? <span className="muted small">{g.hint}</span> : null}</p>
               <div className="examples">
                 {g.prompts.map((ex) => (
                   <button type="button" key={ex} disabled={asking} onClick={() => onAsk(ex)}>{ex}</button>
@@ -150,58 +143,7 @@ export function AskPanel({ qas, asking, forgotten, mode, onAsk, onCite, onWhy }:
             </section>
           ))}
         </div>
-      </details>
-    </div>
-  );
-}
-
-function Answered({ a, onCite, onWhy }: { a: Answer; onCite: (id: string) => void; onWhy: (ids: string[]) => void }) {
-  const s = STATUS[a.status];
-  return (
-    <div className="bubble bot">
-      <div className="row">
-        <span className={`chip ${s.cls}`}><span aria-hidden="true">{s.mark}</span> {s.text}</span>
-        {a.checks.length > 0 && <span className="chip" title={a.checks.join(" ")}>Checked and corrected</span>}
-      </div>
-      <p className="a">{a.answer}</p>
-      {a.uncertainty_note && <p className="small muted">{a.uncertainty_note}</p>}
-      {a.citations.length > 0 && (
-        <div className="cites">
-          <p className="small muted">Based on</p>
-          {a.citations.map((c) => (
-            <button type="button" className="cite" key={c.claim_id} onClick={() => onCite(c.claim_id)}
-                    aria-label={`Show on the graph: ${c.text}`}>
-              <span className="t">{c.text}{c.when ? <span className="muted"> · {clock(c.when)}</span> : null}</span>
-              <EvidenceChip evidence={c.evidence} />
-            </button>
-          ))}
-          <div className="row">
-            <button type="button" className="btn small" onClick={() => onWhy(a.cited_claim_ids)}>Why? Show the evidence</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Replay mode could not answer. Say why in plain words and put the nearest answerable questions one tap away. */
-function NotRecorded({ question, groups, disabled, onAsk }: {
-  question: string; groups: typeof BEFORE_GROUPS; disabled: boolean; onAsk: (q: string) => void;
-}) {
-  const close = suggest(question, groups);
-  const fallback = groups[0].prompts.slice(0, 2);
-  const options = close.length ? close : fallback;
-  return (
-    <div className="not-recorded bubble bot" role="status">
-      <p><strong>No recording for that question.</strong></p>
-      <p className="small muted">
-        Replay mode only answers questions that were recorded, and recordings depend on how far the day has played.
-        Nothing is wrong with your memory.
-      </p>
-      <p className="small muted">{close.length ? "Closest questions that do have an answer:" : "Try one of these instead:"}</p>
-      <div className="examples">
-        {options.map((o) => <button type="button" key={o} disabled={disabled} onClick={() => onAsk(o)}>{o}</button>)}
-      </div>
+      </details>}
     </div>
   );
 }

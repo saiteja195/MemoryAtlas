@@ -10,7 +10,8 @@ import {
   pathElementIds, relatedFactClaims, type FactMode, type Selection, type ViewMode,
 } from "./utils/graph";
 import { readPalette, watchColorScheme, type Palette } from "./utils/theme";
-import { AskPanel, type QA } from "./components/AskPanel";
+import { Assistant } from "./components/Assistant";
+import { buildSuggestions } from "./utils/assistant";
 import { ConsentDevice } from "./components/ConsentDevice";
 import { ConsentPanel } from "./components/ConsentPanel";
 import { AddMemory } from "./components/AddMemory";
@@ -84,8 +85,8 @@ function Gate() {
   return <Atlas key={profile.profile_id} me={session.me} refreshMe={session.refresh} signOut={session.signOut} />;
 }
 
-type Tab = "ask" | "facts" | "consent";
-const TABS: { id: Tab; label: string }[] = [{ id: "ask", label: "Ask" }, { id: "facts", label: "Facts" }, { id: "consent", label: "Consent" }];
+type Tab = "facts" | "consent";
+const TABS: { id: Tab; label: string }[] = [{ id: "facts", label: "Facts" }, { id: "consent", label: "Consent" }];
 
 type AtlasProps = { me: Me; refreshMe: () => Promise<void>; signOut: () => Promise<void> };
 
@@ -107,7 +108,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   const [selection, setSelection] = useState<Selection>(null);
   const [focus, setFocus] = useState<string[] | null>(null);
   const [evidence, setEvidence] = useState<string[] | null>(null);
-  const [tab, setTab] = useState<Tab>("ask");
+  const [tab, setTab] = useState<Tab>("facts");
   const [simulate, setSimulate] = useState<string | null>(null);
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -215,9 +216,14 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
     },
   });
   const ask = useCallback(async (question: string) => {
-    setTab("ask");
+    assistant.setOpen(true);
     await assistant.ask(question);
-  }, [assistant.ask]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [assistant.ask, assistant.setOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const suggestions = useMemo(() => buildSuggestions({
+    graph: atlas.graph, goals: me.auth ? me.profile.goals : [], todosOpen: dayState.insights?.todos_open ?? 0,
+    selection, hasMemories: atlas.graph.nodes.some((n) => n.type !== "episode"),
+    gap: dayState.insights?.coverage?.longest_gap ?? null,
+  }), [atlas.graph, me, dayState.insights, selection]);
 
   const cite = (claimId: string) => {
     setMode("entities");
@@ -271,7 +277,7 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
             onPlayNext={() => void atlas.advance(1)} onPlayAll={() => void atlas.advance(50)}
             onOpenAtlas={() => setPage("atlas")}
             onOpenMoment={(id) => { setPage("atlas"); openEpisode(id); }}
-            onAsk={(q) => { setPage("atlas"); void ask(q); }}
+            onAsk={(q) => void ask(q)}
             onConsent={() => { setPage("atlas"); setTab("consent"); }}
             onReceipt={(id) => void openReceipt(id)}
             onLive={(id) => void atlas.uploadLive(id)} onReset={() => void reset()} canReset={canReset}
@@ -364,12 +370,8 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
           />
         </main>
 
-        <aside className="side" aria-label="Ask and consent">
+        <aside className="side" aria-label="Facts and consent">
           <TabBar tab={tab} onTab={setTab} />
-          <div role="tabpanel" id="panel-ask" aria-labelledby="tab-ask" hidden={tab !== "ask"} tabIndex={0}>
-            <AskPanel qas={assistant.turns} asking={assistant.asking} forgotten={forgotten} mode={atlas.health?.llm_mode}
-                      onAsk={(q) => void ask(q)} onCite={cite} onWhy={why} />
-          </div>
           <div role="tabpanel" id="panel-facts" aria-labelledby="tab-facts" hidden={tab !== "facts"} tabIndex={0}>
             <FactsPanel view={view} selectedClaim={selection?.kind === "claim" ? selection.id : null} onSelect={cite} />
           </div>
@@ -384,6 +386,8 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
         <Settings open={settings} me={me} onClose={() => setSettings(false)} onChanged={refreshMe}
                   onResetDemo={reset} onSignedOut={() => void signOut()} />
       )}
+      <Assistant assistant={assistant} suggestions={suggestions} selectedDay={dayState.day}
+                 mode={atlas.health?.llm_mode} forgotten={forgotten} onCite={cite} onWhy={why} />
       <AddMemory open={adding} mode={atlas.health?.llm_mode} onClose={() => setAdding(false)} onSaved={() => void atlas.refresh()} />
       <HowItWorks open={help} onClose={() => setHelp(false)} />
       <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />

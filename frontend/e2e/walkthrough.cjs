@@ -21,7 +21,15 @@ let failures = 0;
 const check = (ok, what) => { console.log(`${ok ? "PASS" : "FAIL"}  ${what}`); if (!ok) failures++; };
 
 // The example questions sit in a collapsed section under the chat; open it, then return the group.
+/** The assistant is a launcher in the corner: open it if it is not already open. */
+async function openAssistant(page) {
+  const panel = page.getByRole("dialog", { name: "Ask your memory" });
+  if (!(await panel.isVisible())) await page.getByRole("button", { name: /Ask your memory/ }).click();
+  await panel.waitFor();
+}
+
 async function examples(page) {
+  await openAssistant(page);
   const d = page.locator("details.more-prompts");
   if (!(await d.evaluate((el) => el.open))) await d.locator("summary").click();
   return page.getByRole("group", { name: "Example questions" });
@@ -51,7 +59,7 @@ async function audit(page, label) {
 
   await page.request.post(`${BASE}/api/demo/reset`);
   await page.goto(BASE);
-  await page.waitForSelector("text=Replay mode");
+  await page.waitForSelector(".assistant-launch");
   await page.getByRole("button", { name: "Atlas", exact: true }).click(); // the app opens on the Dashboard
   check(await page.locator("text=Raw media kept: 0 B").isVisible(), "header shows the model mode and 'Raw media kept: 0 B'");
 
@@ -64,7 +72,8 @@ async function audit(page, label) {
   await audit(page, "map view");
 
   // Act 2: a question no single source can answer, with its evidence.
-  await page.locator(".examples button").first().click();
+  await openAssistant(page);
+  await page.locator(".assistant .examples button").first().click();
   await page.waitForSelector('.qa .a:has-text("Luna Taqueria")');
   check(true, "restaurant question answered: Luna Taqueria");
   check((await page.locator(".qa .chip", { hasText: "Answered" }).count()) === 1, "answer is marked 'Answered'");
@@ -128,7 +137,7 @@ async function audit(page, label) {
   await phone.close();
 
   // After forgetting.
-  await page.getByRole("tab", { name: "Ask" }).click();
+  await openAssistant(page);
   await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a');
   check(/no record/i.test(await page.locator(".qa:has-text('What did Alex promise me?') .a").innerText()), "'What did Alex promise me?' now answers that there is no record");
@@ -153,13 +162,13 @@ async function audit(page, label) {
   // (the forgetting run above changed the graph that the recording assumes).
   await page.request.post(`${BASE}/api/demo/reset`);
   await page.reload();
-  await page.waitForSelector("text=Replay mode");
+  await page.waitForSelector(".assistant-launch");
   await page.getByRole("button", { name: "Atlas", exact: true }).click();
   await page.getByRole("button", { name: "Play the day", exact: true }).click();
   await page.waitForSelector("text=Day played");
   await page.getByRole("button", { name: /Upload live photo/ }).click();
   await page.waitForSelector(".event:not(.future) >> text=17:45");
-  await page.getByRole("tab", { name: "Ask" }).click();
+  await openAssistant(page);
   await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a:has-text("Friday")');
   check(true, "before the correction: 'What did Alex promise me?' answers Friday");
@@ -180,7 +189,7 @@ async function audit(page, label) {
   // recorded forgetting run serves it, but only on the graph it was recorded against.
   await page.request.post(`${BASE}/api/demo/reset`);
   await page.reload();
-  await page.waitForSelector("text=Replay mode");
+  await page.waitForSelector(".assistant-launch");
   await page.getByRole("button", { name: "Atlas", exact: true }).click();
   await page.getByRole("button", { name: "Play the day", exact: true }).click();
   await page.waitForSelector("text=Day played");
@@ -198,7 +207,7 @@ async function audit(page, label) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
   check(await alexCard.locator(".chip", { hasText: "Expired" }).isVisible(), "Alex's grant now shows as Expired");
-  await page.getByRole("tab", { name: "Ask" }).click();
+  await openAssistant(page);
   await (await examples(page)).getByRole("button", { name: "What did Alex promise me?" }).click();
   await page.waitForSelector('.qa:has-text("What did Alex promise me?") .a');
   check(/no record/i.test(await page.locator(".qa .a").last().innerText()), "after the expiry, 'What did Alex promise me?' says there is no record");
