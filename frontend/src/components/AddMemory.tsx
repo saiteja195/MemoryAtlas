@@ -54,6 +54,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const [grants, setGrants] = useState<CommitResult["grants"]>([]);
   const [hover, setHover] = useState(false);
   const [job, setJob] = useState<SaveJob | null>(null);
+  const progressBox = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const reset = () => {
@@ -128,6 +129,11 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
       setStep("review");
     }
   };
+
+  // The review form is long: when saving starts, bring what Muse is doing into view.
+  useEffect(() => {
+    if (step === "saving") progressBox.current?.scrollIntoView({ block: "nearest" });
+  }, [step]);
 
   const open_ = draft ? unanswered(draft, answers) : [];
   const declined = Object.values(answers.people).some((p) => p.consented === false);
@@ -218,7 +224,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
           {error && <div className="notice error" role="alert">{error}</div>}
 
           {step === "saving" && (
-            <div className="save-progress" role="status" aria-live="polite">
+            <div className="save-progress" role="status" aria-live="polite" ref={progressBox}>
               <strong>{progressText(job).title}</strong>
               {progressText(job).detail && <span className="small muted">{progressText(job).detail}</span>}
             </div>
