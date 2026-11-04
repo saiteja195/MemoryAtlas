@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Draft, Question } from "../api/types";
-import { addAvailability, classifyFile, localIso, maxBytes, splitSeen, toCommitBody, unanswered, whenInputValue, type AnswerState } from "./addMemory";
+import {
+  addAvailability, classifyFile, localIso, maxBytes, MAX_PHOTOS, MAX_PHOTOS_BYTES, planAdd, splitSeen, toCommitBody, unanswered,
+  whenInputValue, type AnswerState, type Picked,
+} from "./addMemory";
 
 const file = (name: string, type: string) => ({ name, type });
 
@@ -160,5 +163,73 @@ describe("splitSeen", () => {
     expect(splitSeen("laptop, mouse")).toEqual({ shown: ["laptop", "mouse"], rest: [] });
     expect(splitSeen("")).toEqual({ shown: [], rest: [] });
     expect(splitSeen(" , ,")).toEqual({ shown: [], rest: [] });
+  });
+});
+
+describe("planAdd", () => {
+  const f = (name: string, type: string, bytes = 100, lastModified = 1000) => new File([new Uint8Array(bytes)], name, { type, lastModified });
+  const photo = (n: number) => f(`p${n}.jpg`, "image/jpeg", 100, 1000 + n);
+  const names = (r: { sources: Picked[] }) => r.sources.map((p) => p.name);
+
+  it("holds several photos together, in the order they were added", () => {
+    const first = planAdd([], [photo(1), photo(2)]);
+    const more = planAdd(first.sources, [photo(3)]);
+    expect(names(more)).toEqual(["p1.jpg", "p2.jpg", "p3.jpg"]);
+    expect(more.error).toBeNull();
+  });
+  it("keeps each photo's own file time", () => {
+    expect(planAdd([], [photo(1)]).sources[0]).toMatchObject({ kind: "frame", modifiedAt: 1001 });
+  });
+  it("ignores the same file picked twice", () => {
+    const one = planAdd([], [photo(1)]);
+    expect(names(planAdd(one.sources, [photo(1), photo(2)]))).toEqual(["p1.jpg", "p2.jpg"]);
+  });
+  it("keeps eight photos and says the rest were left out", () => {
+    const r = planAdd([], Array.from({ length: 10 }, (_, i) => photo(i)));
+    expect(r.sources).toHaveLength(MAX_PHOTOS);
+    expect(r.error).toMatch(/up to 8 photos/);
+    expect(planAdd(r.sources, [photo(99)]).sources).toHaveLength(MAX_PHOTOS);
+  });
+  it("stops before the photos together weigh too much", () => {
+    const big = (n: number) => f(`big${n}.jpg`, "image/jpeg", 9.5 * 1048576, n);
+    const r = planAdd([], Array.from({ length: 7 }, (_, i) => big(i)));
+    expect(r.sources.length).toBeLessThan(7);
+    expect(r.sources.reduce((n, p) => n + p.blob.size, 0)).toBeLessThanOrEqual(MAX_PHOTOS_BYTES);
+    expect(r.error).toMatch(/together/);
+  });
+  it("skips a photo that is too large on its own and keeps the rest", () => {
+    const r = planAdd([], [photo(1), f("huge.jpg", "image/jpeg", 11 * 1048576), photo(2)]);
+    expect(names(r)).toEqual(["p1.jpg", "p2.jpg"]);
+    expect(r.error).toMatch(/huge\.jpg.*limit/);
+  });
+  it("skips a file that is not supported and says so", () => {
+    const r = planAdd([], [photo(1), f("x.heic", "image/heic")]);
+    expect(names(r)).toEqual(["p1.jpg"]);
+    expect(r.error).toMatch(/JPEG or PNG/);
+  });
+  it("keeps a voice recording or video on its own, replacing the one before", () => {
+    const voice = planAdd([], [f("a.wav", "audio/wav")]);
+    expect(voice.sources[0].kind).toBe("audio");
+    const video = planAdd(voice.sources, [f("v.mp4", "video/mp4")]);
+    expect(names(video)).toEqual(["v.mp4"]);
+  });
+  it("replaces a recording with photos, as a single file always did", () => {
+    const voice = planAdd([], [f("a.wav", "audio/wav")]);
+    expect(names(planAdd(voice.sources, [photo(1), photo(2)]))).toEqual(["p1.jpg", "p2.jpg"]);
+  });
+  it("never drops photos silently to add a recording or video", () => {
+    const photos = planAdd([], [photo(1), photo(2)]);
+    const r = planAdd(photos.sources, [f("a.wav", "audio/wav")]);
+    expect(names(r)).toEqual(["p1.jpg", "p2.jpg"]);
+    expect(r.error).toMatch(/Remove the photos first/);
+  });
+  it("refuses photos mixed with a recording in one drop", () => {
+    const r = planAdd([], [photo(1), f("a.wav", "audio/wav")]);
+    expect(r.sources).toEqual([]);
+    expect(r.error).toMatch(/photos together, or one voice recording or one video/);
+  });
+  it("changes nothing when nothing was chosen", () => {
+    const one = planAdd([], [photo(1)]);
+    expect(planAdd(one.sources, [])).toEqual({ sources: one.sources, error: null });
   });
 });

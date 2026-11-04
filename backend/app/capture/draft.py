@@ -54,7 +54,7 @@ class Draft(BaseModel):
     # Optional SAM frames live only in this temporary RAM draft, never API output or SQLite.
     _tracking: dict | None = PrivateAttr(default=None)
     draft_id: str = ""
-    kind: Literal["frame", "audio", "note", "video"]
+    kind: Literal["frame", "audio", "note", "video", "photos"]
     fields: list[DraftField]
     questions: list[Question]
     captured_at: str | None = None
@@ -130,7 +130,7 @@ def build_draft(kind: str, *, perceptions: list[dict] | None = None,
 
     # where (images only)
     place_name = None
-    if kind in ("frame", "video"):
+    if kind in ("frame", "video", "photos"):
         place_name = _first_ocr(perceptions)
         if place_name:
             fields.append(DraftField(key="where", value=place_name, source="image", confidence="check"))
@@ -143,8 +143,9 @@ def build_draft(kind: str, *, perceptions: list[dict] | None = None,
                                       prompt="What is this place called?"))
 
     # doing
-    if kind in ("frame", "video"):
-        caption = (merge_perceptions(perceptions)["caption"] if kind == "video" else _first_caption(perceptions))
+    if kind in ("frame", "video", "photos"):
+        caption = (merge_perceptions(perceptions)["caption"] if kind in ("video", "photos")
+                   else _first_caption(perceptions))
         if caption:
             fields.append(DraftField(key="doing", value=caption, source="image", confidence="sure"))
         seen = _seen(perceptions)
@@ -155,7 +156,10 @@ def build_draft(kind: str, *, perceptions: list[dict] | None = None,
 
     # people
     speakers = sorted({str(t["speaker"]) for t in (turns or []) if t.get("speaker")})
-    visible = min(max((_visible_people(p) for p in perceptions), default=0), _MAX_VISIBLE)
+    # Frames of one clip show the same scene, so the most people in any one of them is the count. Separate photos can
+    # show different people, so they add up: asking about one too many is cheap, storing someone who never agreed is not.
+    counts_ = [_visible_people(p) for p in perceptions]
+    visible = min(sum(counts_) if kind == "photos" else max(counts_, default=0), _MAX_VISIBLE)
     if len(speakers) >= 2:
         fields.append(DraftField(key="people", value="Speakers " + ", ".join(speakers),
                                  source="voice", confidence="ask"))

@@ -145,8 +145,8 @@ seconds, and a `model API retry` warning each time the model API had to be retri
 returns a job id; `GET /capture/commit/jobs/{id}` reports `running`, `done` (with the result) or `error`. The old
 `POST /capture/commit` still waits for the result.
 
-- **What you can add:** a photo (JPEG or PNG), a voice recording, a video, or a typed note. You can drop or pick a
-  file, or capture one with the device: **Take photo**, **Record voice**, **Record video**. Voice is limited to
+- **What you can add:** photos (JPEG or PNG, up to eight at once), a voice recording, a video, or a typed note. You
+  can drop or pick files, or capture one with the device: **Take photo**, **Record voice**, **Record video**. Voice is limited to
   10 minutes and video to 60 seconds when recorded in the page.
 - **What happens:** Muse reads it and the page shows what it found (when, where, what is happening, who), each
   marked *Sure*, *Check* or *Ask*, with where it came from (photo metadata, the file's date, the image, the audio).
@@ -158,7 +158,14 @@ returns a job id; `GET /capture/commit/jobs/{id}` reports `running`, `done` (wit
   keep it. To withdraw later, call `POST /consent/grants/<grant id>/revoke` with `{"token": "<code>"}`.
   A photo's time comes from its metadata when it has any; otherwise it is the file's date, marked *Check*, and you
   can change it before saving.
-- **Video** is split in your browser into up to four frames plus its audio track; each frame goes to Muse vision
+- **Several photos** go in as one memory. Pick or drop up to eight (together under 60 MB); each shows as a small
+  picture with its own **Remove** button, and **Take photo** adds to the list. Each photo is one Muse read, run at
+  the same time, so a set takes about as long as one photo. The review shows the objects from all of them in one
+  **Seen** row, and **When** is the earliest photo's time (its metadata, else its file date). Anyone visible in
+  any photo is asked about, so the questions add up across photos (at most three). A long list of objects is saved
+  in several parts, as for a video, so saving takes a little longer. A voice recording or video cannot be added to
+  photos: remove them first.
+- **Video** is split in your browser into up to eight frames plus its audio track; each frame goes to Muse vision
   and the audio to Voice Transcribe. Audio is converted to mono 16-bit WAV in the browser, because that is what
   the speech service accepts. The original photo, audio or video is never stored (**Raw media kept** stays 0 B).
 - **Camera and microphone** permission is asked only when you press a capture button, and the camera is

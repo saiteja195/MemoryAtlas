@@ -124,9 +124,11 @@ def commit(conn: sqlite3.Connection, engine: MemoryEngine, secret: str, draft: D
     caps: list[RawCapture] = []
     if draft.kind == "note":
         caps.append(RawCapture(kind="note", session_id=session, captured_at=p.captured_at, text=draft.text))
-    if draft.kind == "video" and draft.perceptions:
-        # The frames' findings merged, so saving costs a few extraction calls for the whole clip, not one a frame.
-        for part in split_for_extraction(merge_perceptions(draft.perceptions)):
+    if draft.kind in ("video", "photos") and draft.perceptions:
+        # The frames' (or photos') findings merged into one memory, so saving costs a few extraction calls for the whole
+        # clip or set, not one each.
+        merged = merge_perceptions(draft.perceptions, "Video" if draft.kind == "video" else "Photo")
+        for part in split_for_extraction(merged):
             caps.append(RawCapture(kind="frame", session_id=session, captured_at=p.captured_at, lat=draft.lat,
                                    lon=draft.lon, perception=part, place_name=p.place_name))
     else:

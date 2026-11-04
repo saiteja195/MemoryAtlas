@@ -116,13 +116,23 @@ class RevocationEngine:
         if row is None:
             raise UnknownMemory(source_id)
         ids = [source_id]
-        if row["kind"] == "frame_observation" and (row["text"] or "").startswith("Video: "):
-            ids = [r["source_id"] for r in self.conn.execute(
-                "SELECT source_id FROM sources WHERE status='active' AND kind='frame_observation' AND session_id IS ?"
-                " AND captured_at=? AND text LIKE 'Video: %' ORDER BY source_id",
-                (row["session_id"], row["captured_at"]))]
+        text = row["text"] or ""
+        if row["kind"] == "frame_observation" and text.startswith("Video: "):
+            ids = self._same_upload(row, "Video: ")
+        elif row["kind"] == "frame_observation" and text.startswith("Photo: "):
+            # A set of photos with many objects is saved in several parts: a first part, then parts that say "More from
+            # the same photos". If this upload has such parts they all go together; a lone photo goes by itself.
+            if self._same_upload(row, "Photo: More from the same photos"):
+                ids = self._same_upload(row, "Photo: ")
         pseudo = {"grant_id": f"memory-{source_id}", "grantor": self.owner, "revoked_at": None}
         return self._end(pseudo, "deleted", run_red_team, only_sources=ids)
+
+    def _same_upload(self, row: sqlite3.Row, prefix: str) -> list[str]:
+        """Active memories saved in the same upload as `row`: the same day's session and the same time, with text that
+        starts with `prefix`."""
+        return [r["source_id"] for r in self.conn.execute(
+            "SELECT source_id FROM sources WHERE status='active' AND kind='frame_observation' AND session_id IS ?"
+            " AND captured_at=? AND text LIKE ? ORDER BY source_id", (row["session_id"], row["captured_at"], prefix + "%"))]
 
     def due(self) -> list[str]:
         """Grants whose consent has lapsed and whose data has not been purged yet."""

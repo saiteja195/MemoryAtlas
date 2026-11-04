@@ -25,6 +25,53 @@ export function maxBytes(kind: FileKind): number {
   return { frame: 10, audio: 32, video: 200 }[kind] * 1024 * 1024;
 }
 
+/** Photos saved together as one memory, and the most they may weigh in total (the web server takes 100 MB once encoded). */
+export const MAX_PHOTOS = 8;
+export const MAX_PHOTOS_BYTES = 60 * 1024 * 1024;
+
+/** Something the person added: a photo, a voice recording or a video. */
+export type Picked = { kind: FileKind; blob: Blob; name: string; modifiedAt: number };
+type FileLike = { name: string; type: string; size: number; lastModified: number };
+
+const same = (a: Picked, b: Picked) => a.name === b.name && a.blob.size === b.blob.size && a.modifiedAt === b.modifiedAt;
+const mb = (n: number) => `${Math.round(n / 1048576)} MB`;
+
+/**
+ * What the file list holds after the person adds `files`. Up to {MAX_PHOTOS} photos can go together as one memory; a voice
+ * recording or a video goes on its own. Photos already added are never dropped silently: adding a recording or video to them
+ * is refused with the reason, while a lone recording or video is simply replaced, as before.
+ */
+export function planAdd(current: Picked[], files: (FileLike & Blob)[]): { sources: Picked[]; error: string | null } {
+  if (files.length === 0) return { sources: current, error: null };
+  const picked: Picked[] = [];
+  let error: string | null = null;
+  for (const f of files) {
+    const c = classifyFile(f);
+    if ("unsupported" in c) { error ??= c.unsupported; continue; }
+    if (f.size > maxBytes(c.kind)) { error ??= `${f.name} is ${mb(f.size)}, over the ${mb(maxBytes(c.kind))} limit.`; continue; }
+    picked.push({ kind: c.kind, blob: f, name: f.name, modifiedAt: f.lastModified || 0 });
+  }
+  if (picked.length === 0) return { sources: current, error };
+  const photos = picked.filter((p) => p.kind === "frame");
+  if (photos.length < picked.length) {
+    if (picked.length > 1) return { sources: current, error: "Add photos together, or one voice recording or one video on its own." };
+    if (current.some((c) => c.kind === "frame")) {
+      return { sources: current, error: "A voice recording or video can't go with photos. Remove the photos first, or save them and add this next." };
+    }
+    return { sources: picked, error };                      // a lone recording or video replaces the one before it
+  }
+  const kept = current.every((c) => c.kind === "frame") ? [...current] : [];
+  let weight = kept.reduce((n, p) => n + p.blob.size, 0);
+  for (const p of photos) {
+    if (kept.some((k) => same(k, p))) continue;               // the same file picked twice
+    if (kept.length >= MAX_PHOTOS) { error = `You can add up to ${MAX_PHOTOS} photos at once. The rest were left out.`; break; }
+    if (weight + p.blob.size > MAX_PHOTOS_BYTES) { error = `Those photos would be over ${mb(MAX_PHOTOS_BYTES)} together. The rest were left out.`; break; }
+    kept.push(p);
+    weight += p.blob.size;
+  }
+  return { sources: kept, error };
+}
+
 export type AnswerState = {
   when?: string;
   /** undefined: not answered. null: the suggested place was accepted. string: a place the person typed. */

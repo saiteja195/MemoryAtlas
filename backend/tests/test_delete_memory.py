@@ -70,3 +70,19 @@ def test_the_same_words_can_be_added_again_later_after_deleting_them():
     c.post(f"/memories/{sid}/delete")
     again = save_note(c, "Lunch with Alex near the office", day="2026-11-05")     # deleting is not a ban on the words
     assert again != sid and status(c, again) == "active"
+
+
+def test_a_set_of_photos_is_deleted_whole_and_other_photos_stay():
+    """A set of photos with many objects is saved in several parts; deleting it must not leave a part behind."""
+    c, _ = make(ManyObjects())
+    body = {"kind": "photos", "frames_b64": [b64(png()) for _ in range(6)], "photo_times": ["2026-11-04T10:00:00"] * 6}
+    assert commit(c, c.post("/capture/preview", json=body).json(), people=[]).status_code == 200
+    other = {"kind": "frame", "data_b64": b64(png()), "file_modified_at": "2026-11-03T09:00:00"}
+    assert commit(c, c.post("/capture/preview", json=other).json(), people=[]).status_code == 200
+    parts = [r[0] for r in conn(c).execute(
+        "SELECT source_id FROM sources WHERE text LIKE 'Photo:%' AND captured_at='2026-11-04T10:00:00'")]
+    single = conn(c).execute("SELECT source_id FROM sources WHERE captured_at LIKE '2026-11-03%'").fetchone()[0]
+    assert len(parts) == 4 and single not in parts
+    r = c.post(f"/memories/{parts[3]}/delete?red_team=false")                # asked through the last part
+    assert r.status_code == 200 and r.json()["removed"]["sources_blanked"] == 4
+    assert all(status(c, i) == "revoked" for i in parts) and status(c, single) == "active"
