@@ -101,6 +101,8 @@ More tools:
   a claim: name that tool in "cited_tools" and copy its figures as given ("13:20", "4 h 25 min",
   "25%", "4,200"). Do not work out any other number. When share_basis is "hours" the share is of
   waking hours; when it is "minutes" it is of the window asked about.
+- Write dates as YYYY-MM-DD and times as HH:MM. Do not number list items: a prose date such as
+  "October 29" or a list number is a figure no tool returned and fails the number check.
  {"action":"final","status":"answered|partial|abstained","answer":"...",
   "cited_claim_ids":["clm-..."],"cited_tools":["coverage"],"uncertainty_note":"..."}"""
 
