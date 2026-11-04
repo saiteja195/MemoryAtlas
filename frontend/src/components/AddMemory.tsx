@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "r
 import { api, ApiError } from "../api/client";
 import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question, SaveJob, TrackResult } from "../api/types";
 import {
-  addAvailability, classifyFile, localIso, maxBytes, toCommitBody, unanswered, whenInputValue,
+  addAvailability, classifyFile, localIso, maxBytes, splitSeen, toCommitBody, unanswered, whenInputValue,
   type AnswerState, type FileKind,
 } from "../utils/addMemory";
 import { extractVideo, toBase64, toWav16k } from "../utils/media";
@@ -246,7 +246,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
               <li key={`${f.key}${i}`}>
                 <span className="k">{FIELD_LABEL[f.key]}</span>
                 <span className="v">
-                  {f.value ?? <span className="muted">Not found</span>}
+                  {f.value === null ? <span className="muted">Not found</span> : f.key === "seen" ? <SeenList value={f.value} /> : f.value}
                   {f.source && <span className="small muted"> · {SOURCE_WORD[f.source] ?? f.source}</span>}
                 </span>
                 <span className={`chip ${BADGE[f.confidence].cls}`}>{BADGE[f.confidence].text}</span>
@@ -313,6 +313,25 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** The objects Muse saw: the first few, and a button that opens the rest so nothing found is hidden. */
+function SeenList({ value }: { value: string }) {
+  const [all, setAll] = useState(false);
+  const { shown, rest } = splitSeen(value);
+  return (
+    <>
+      {(all ? [...shown, ...rest] : shown).join(", ")}
+      {rest.length > 0 && (
+        <>
+          {" "}
+          <button type="button" className="link-btn" aria-expanded={all} onClick={() => setAll(!all)}>
+            {all ? "Show fewer" : `+${rest.length} more`}
+          </button>
+        </>
+      )}
+    </>
   );
 }
 

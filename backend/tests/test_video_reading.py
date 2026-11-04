@@ -49,10 +49,11 @@ def test_the_draft_lists_what_was_seen_and_describes_the_whole_clip():
     assert "laptop" in fields["doing"].value and "notebook" in fields["doing"].value
 
 
-def test_a_long_list_of_objects_is_cut_short_on_the_review_screen():
-    d = build_draft("frame", perceptions=[frame("x", objects=[f"item{i}" for i in range(20)])], frame_offsets_ms=[0])
+def test_every_object_is_sent_for_the_review_screen_and_commas_are_kept_out_of_labels():
+    d = build_draft("frame", perceptions=[frame("x", objects=[f"item{i}" for i in range(20)] + ["cup, red"])],
+                    frame_offsets_ms=[0])
     seen = next(f for f in d.fields if f.key == "seen").value
-    assert seen.startswith("item0, item1") and seen.endswith("(+8 more)")
+    assert seen.split(", ") == [f"item{i}" for i in range(20)] + ["cup  red"] and "more" not in seen
 
 
 def test_no_objects_means_no_seen_row():

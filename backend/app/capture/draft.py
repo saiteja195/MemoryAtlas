@@ -29,7 +29,6 @@ _PERSON_WORDS = (
 )
 _PERSON_RE = re.compile(r"\b(?:" + "|".join(_PERSON_WORDS) + r")\b", re.IGNORECASE)
 _MAX_VISIBLE = 3
-_MAX_SEEN = 12
 # Text printed on these is a title, a brand or a label, not the name of the place the person is in.
 _PRINTED_ON = re.compile(r"\b(?:book|books|magazine|notebook|mouse ?pad|bottle|can|box|package|packaging|sticker|poster|"
                          r"laptop|keyboard|monitor|screen|shirt)\b", re.IGNORECASE)
@@ -95,12 +94,10 @@ def _first_ocr(perceptions: list[dict]) -> str | None:
 
 
 def _seen(perceptions: list[dict]) -> str | None:
-    """The objects Muse noticed, once each, for the review screen. The same list is saved with the memory."""
-    labels = [o["label"] for o in merge_perceptions(perceptions)["objects"]]
-    if not labels:
-        return None
-    more = len(labels) - _MAX_SEEN
-    return ", ".join(labels[:_MAX_SEEN]) + (f" (+{more} more)" if more > 0 else "")
+    """Every object Muse noticed, once each, for the review screen (the page shortens a long list and lets the person
+    open it). The same list is saved with the memory."""
+    labels = [o["label"].replace(",", " ") for o in merge_perceptions(perceptions)["objects"]]
+    return ", ".join(labels) or None
 
 
 def _first_caption(perceptions: list[dict]) -> str | None:
