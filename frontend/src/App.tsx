@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { api, ApiError } from "./api/client";
-import type { LlmMode } from "./api/types";
+import type { Draft, LlmMode } from "./api/types";
 import { AnnouncerProvider, useAnnounce } from "./hooks/announce";
 import { useAtlas } from "./hooks/useAtlas";
 import { useSession } from "./hooks/useSession";
@@ -10,6 +10,8 @@ import {
   pathElementIds, relatedFactClaims, type FactMode, type Selection, type ViewMode,
 } from "./utils/graph";
 import { readPalette, watchColorScheme, type Palette } from "./utils/theme";
+import { BackgroundActivity } from "./components/BackgroundActivity";
+import { useMemoryJobs } from "./hooks/useMemoryJobs";
 import { Assistant } from "./components/Assistant";
 import { buildSuggestions } from "./utils/assistant";
 import { ConsentDevice } from "./components/ConsentDevice";
@@ -111,9 +113,12 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
   const [evidence, setEvidence] = useState<string[] | null>(null);
   const [tab, setTab] = useState<Tab>("facts");
   const [simulate, setSimulate] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; kind: string; text: string; busy: boolean; error: string | null } | null>(null);
   const [withdrawing, setWithdrawing] = useState<{ grantId: string; busy: boolean; error: string | null } | null>(null);
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState<Draft | null>(null);
+  const memoryJobs = useMemoryJobs(() => { void atlas.refresh(); });
   const [page, setPage] = useState<Page>("dashboard");
   const theme = useTheme();
   // One day and one conversation for every page: the dashboard, the Atlas and the assistant read these.
@@ -397,10 +402,37 @@ function Atlas({ me, refreshMe, signOut }: AtlasProps) {
       )}
       <Assistant assistant={assistant} suggestions={suggestions} selectedDay={dayState.day}
                  mode={atlas.health?.llm_mode} forgotten={forgotten} onCite={cite} onWhy={why} />
-      <AddMemory open={adding} mode={atlas.health?.llm_mode} onClose={() => setAdding(false)} onSaved={() => void atlas.refresh()} />
+      <BackgroundActivity jobs={memoryJobs.jobs} error={memoryJobs.error}
+        onReview={(draft) => { setResumeDraft(draft); setAdding(true); }} onDismiss={memoryJobs.dismiss} />
+      <AddMemory open={adding} mode={atlas.health?.llm_mode}
+        resumeDraft={resumeDraft} onQueued={() => void memoryJobs.refresh()}
+        onClose={() => { setAdding(false); setResumeDraft(null); }} onSaved={() => void atlas.refresh()} />
       <HowItWorks open={help} onClose={() => setHelp(false)} />
-      <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} />
+      <EvidenceDrawer claimIds={evidence} onClose={() => setEvidence(null)} onDelete={(s) => setDeleting({ ...s, busy: false, error: null })} />
       <ReceiptDialog receipt={atlas.receipt} onClose={atlas.closeReceipt} />
+      <Dialog open={deleting !== null} onClose={() => { if (!deleting?.busy) setDeleting(null); }} title="Delete this memory?" initialFocus="[data-autofocus]">
+        {deleting && (
+          <div className="add-step">
+            <blockquote className="small muted">{deleting.text.length > 240 ? `${deleting.text.slice(0, 240)}…` : deleting.text}</blockquote>
+            <p>
+              MemoryAtlas will forget this memory and every fact that rested only on it, and keep the ones other memories still support.
+              {deleting.text.startsWith("Video: ") ? " A video is deleted whole." : ""}
+              {deleting.kind === "transcript_segment" ? " This is one spoken line of a recording; the other lines stay." : ""}
+              {" "}You will get a receipt that proves it. Checking can take a minute or two.
+            </p>
+            {deleting.error && <p className="notice error" role="alert">{deleting.error}</p>}
+            {deleting.busy && <progress aria-label="Forgetting and checking" />}
+            <div className="add-actions">
+              <button type="button" className="btn ghost" disabled={deleting.busy} onClick={() => setDeleting(null)}>Cancel</button>
+              <button type="button" className="btn danger" data-autofocus disabled={deleting.busy} onClick={async () => {
+                setDeleting({ ...deleting, busy: true, error: null });
+                try { await atlas.deleteMemory(deleting.id); setDeleting(null); setEvidence(null); }
+                catch (e) { setDeleting({ ...deleting, busy: false, error: e instanceof Error ? e.message : String(e) }); }
+              }}>{deleting.busy ? "Forgetting…" : "Delete and forget"}</button>
+            </div>
+          </div>
+        )}
+      </Dialog>
       <Dialog open={withdrawing !== null} onClose={() => { if (!withdrawing?.busy) setWithdrawing(null); }} title="Withdraw your consent?" initialFocus="[data-autofocus]">
         {withdrawing && (
           <div className="add-step">

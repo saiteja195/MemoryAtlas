@@ -49,6 +49,10 @@ class UnknownGrant(LookupError):
     pass
 
 
+class UnknownMemory(LookupError):
+    """No active saved memory has that id."""
+
+
 class NotYourConsent(PermissionError):
     """Only the owner's own consent can be withdrawn without a code."""
 
@@ -104,6 +108,22 @@ class RevocationEngine:
             raise NotYourConsent(grant_id)
         return self._end(grant, "withdrawn", run_red_team)
 
+    def delete_memory(self, source_id: str, run_red_team: bool = True) -> dict[str, Any]:
+        """The owner deletes one saved memory, with everything that rests only on it, by the same purge and checks as a
+        withdrawal, but the consent stays. A video was saved in several parts, so all of its parts go together."""
+        row = self.conn.execute("SELECT source_id, kind, session_id, captured_at, text FROM sources"
+                                " WHERE source_id=? AND status='active'", (source_id,)).fetchone()
+        if row is None:
+            raise UnknownMemory(source_id)
+        ids = [source_id]
+        if row["kind"] == "frame_observation" and (row["text"] or "").startswith("Video: "):
+            ids = [r["source_id"] for r in self.conn.execute(
+                "SELECT source_id FROM sources WHERE status='active' AND kind='frame_observation' AND session_id IS ?"
+                " AND captured_at=? AND text LIKE 'Video: %' ORDER BY source_id",
+                (row["session_id"], row["captured_at"]))]
+        pseudo = {"grant_id": f"memory-{source_id}", "grantor": self.owner, "revoked_at": None}
+        return self._end(pseudo, "deleted", run_red_team, only_sources=ids)
+
     def due(self) -> list[str]:
         """Grants whose consent has lapsed and whose data has not been purged yet."""
         return [r["grant_id"] for r in self.conn.execute(
@@ -120,7 +140,8 @@ class RevocationEngine:
             out.append(self._end(grant, "expired", run_red_team))
         return out
 
-    def _end(self, grant: sqlite3.Row, reason: str, run_red_team: bool) -> dict[str, Any]:
+    def _end(self, grant: Any, reason: str, run_red_team: bool,
+             only_sources: list[str] | None = None) -> dict[str, Any]:
         grant_id = grant["grant_id"]
         if grant["revoked_at"]:                      # idempotent: same receipt, nothing changes
             row = self.conn.execute("SELECT report_json FROM forgetting_receipts WHERE grant_id=?"
@@ -128,7 +149,7 @@ class RevocationEngine:
             if row:
                 return {**self._hydrate(json.loads(row["report_json"])), "already_revoked": True}
         try:
-            plan = self._purge(grant, reason)
+            plan = self._purge(grant, reason, only_sources)
         except Exception:
             self.conn.rollback()
             raise
@@ -181,7 +202,8 @@ class RevocationEngine:
 
     # -- the transaction ---------------------------------------------------------------------
 
-    def _purge(self, grant: sqlite3.Row, reason: str = "withdrawn") -> dict[str, Any]:
+    def _purge(self, grant: Any, reason: str = "withdrawn",
+               only_sources: list[str] | None = None) -> dict[str, Any]:
         c = self.conn
         gid = grant["grant_id"]
         now = datetime.now(timezone.utc).isoformat()
@@ -191,14 +213,22 @@ class RevocationEngine:
         # each participant (the gateway only records audio when ALL of them agreed), so when one
         # participant withdraws, no one's half of that recording may stay. A grant that was never
         # part of a recording cannot remove it, whatever session id it names.
-        revoked = c.execute(
-            "SELECT s.source_id, s.kind, s.text, s.content_hash FROM sources s WHERE s.status='active'"
-            " AND (s.grant_id=? OR EXISTS (SELECT 1 FROM source_consents k WHERE k.source_id = s.source_id"
-            " AND k.grant_id=?))", (gid, gid)).fetchall()
+        if only_sources is not None:
+            # Deleting chosen memories: only those sources go, and the consent stays as it is.
+            marks = ",".join("?" * len(only_sources))
+            revoked = c.execute(
+                "SELECT s.source_id, s.kind, s.text, s.content_hash FROM sources s WHERE s.status='active'"
+                f" AND s.source_id IN ({marks})", only_sources).fetchall()
+        else:
+            revoked = c.execute(
+                "SELECT s.source_id, s.kind, s.text, s.content_hash FROM sources s WHERE s.status='active'"
+                " AND (s.grant_id=? OR EXISTS (SELECT 1 FROM source_consents k WHERE k.source_id = s.source_id"
+                " AND k.grant_id=?))", (gid, gid)).fetchall()
         revoked_ids = [r["source_id"] for r in revoked]
         removed_texts = [r["text"] for r in revoked if r["text"]]
 
-        c.execute("UPDATE consent_grants SET revoked_at=?, ended_reason=? WHERE grant_id=?", (now, reason, gid))
+        if only_sources is None:
+            c.execute("UPDATE consent_grants SET revoked_at=?, ended_reason=? WHERE grant_id=?", (now, reason, gid))
         _delete_in(c, "UPDATE sources SET status='revoked' WHERE source_id IN ({})", revoked_ids)
 
         # -- who dies, who survives and what each survivor lost ------------------------------
@@ -272,9 +302,10 @@ class RevocationEngine:
         # -- blank the revoked sources, block re-ingest -------------------------------------
         _delete_in(c, "UPDATE sources SET text=NULL, lat=NULL, lon=NULL, session_id=NULL"
                       " WHERE source_id IN ({})", revoked_ids)
-        for r in revoked:
-            c.execute("INSERT OR IGNORE INTO blocked_hashes(content_hash, reason) VALUES (?,?)",
-                      (r["content_hash"], f"revoked:{gid}"))
+        if only_sources is None:              # a withdrawal blocks the same words coming back; a deletion does not
+            for r in revoked:
+                c.execute("INSERT OR IGNORE INTO blocked_hashes(content_hash, reason) VALUES (?,?)",
+                          (r["content_hash"], f"revoked:{gid}"))
 
         # -- metadata only a removed source supplied: episode time and place, a fact's timestamp --
         moved = self._recompute_episodes()

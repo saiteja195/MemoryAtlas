@@ -142,9 +142,18 @@ export function useAtlas() {
     return r;
   }, [presentReceipt, refresh]);
 
+  /** The owner deletes one saved memory, and what rests only on it. */
+  const deleteMemory = useCallback(async (sourceId: string): Promise<Receipt> => {
+    const r = await api.deleteMemory(sourceId);
+    shown.current?.add(r.receipt_id);
+    await refresh();
+    presentReceipt(r);
+    return r;
+  }, [presentReceipt, refresh]);
+
   return {
     health, status, media, graph, dataKey, grants, busy, notice, setNotice, offline, loaded,
     receipt, closeReceipt: () => setReceipt(null), openReceipt: (r: Receipt) => setReceipt(r),
-    pulse, refresh, advance, uploadLive, correct, expire, reset, revoke, withdraw,
+    pulse, refresh, advance, uploadLive, correct, expire, reset, revoke, withdraw, deleteMemory,
   };
 }

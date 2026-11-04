@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { api, ApiError } from "../api/client";
-import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question, SaveJob, TrackResult } from "../api/types";
+import type { CommitResult, Draft, DraftField, LlmMode, PreviewBody, Question, SaveJob } from "../api/types";
 import {
   addAvailability, classifyFile, localIso, maxBytes, splitSeen, toCommitBody, unanswered, whenInputValue,
   type AnswerState, type FileKind,
 } from "../utils/addMemory";
 import { extractVideo, toBase64, toWav16k } from "../utils/media";
-import { pollJob, progressText } from "../utils/saveJob";
-import { FRAMES, parsePhrases, trackCost, trackLines } from "../utils/tracking";
+import { progressText } from "../utils/saveJob";
+import { FRAMES, parsePhrases, trackCost } from "../utils/tracking";
 import { CaptureButtons, type Captured } from "./CaptureButtons";
 import { Dialog } from "./Dialog";
 
 type Source = { kind: FileKind; blob: Blob; name: string; modifiedAt: number };
 type Step = "add" | "reading" | "review" | "saving" | "saved";
 
-type Props = { open: boolean; mode: LlmMode | undefined; onClose: () => void; onSaved: () => void };
+type Props = { open: boolean; mode: LlmMode | undefined; onClose: () => void; onSaved: () => void; resumeDraft?: Draft | null; onQueued?: () => void };
 
 const KIND_WORD: Record<FileKind, string> = { frame: "Photo", audio: "Voice", video: "Video" };
 const FIELD_LABEL: Record<DraftField["key"], string> = { when: "When", where: "Where", doing: "Doing", seen: "Seen", people: "People" };
@@ -43,7 +43,7 @@ function outcomeText(r: CommitResult): { text: string; saved: boolean } {
   return { saved: false, text: `Nothing was saved${why ? `: ${why}` : ""}.` };
 }
 
-export function AddMemory({ open, mode, onClose, onSaved }: Props) {
+export function AddMemory({ open, mode, onClose, onSaved, resumeDraft, onQueued }: Props) {
   const [source, setSource] = useState<Source | null>(null);
   const [note, setNote] = useState("");
   const [step, setStep] = useState<Step>("add");
@@ -71,6 +71,11 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
   const wantedError = "error" in wanted ? wanted.error : null;
   const wantedPhrases = "phrases" in wanted ? wanted.phrases : [];
   useEffect(() => { if (!open) reset(); }, [open]);
+  useEffect(() => {
+    if (open && resumeDraft) {
+      setDraft(resumeDraft); setAnswers({ people: {} }); setPlaceChoice(null); setError(null); setStep("review");
+    }
+  }, [open, resumeDraft]);
 
   const take = (file: File) => {
     const c = classifyFile(file);
@@ -109,10 +114,17 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
       } else {
         body = { kind: "note", text: note.trim(), file_modified_at: localIso(Date.now()) };
       }
-      setDraft(await api.previewCapture(body));
-      setAnswers({ people: {} });
-      setPlaceChoice(null);
-      setStep("review");
+      if (source?.kind === "video" && wantedPhrases.length) {
+        // Transfer tracking frames before acceptance: the server, not this dialog, owns the next step.
+        const v = await extractVideo(source.blob, FRAMES, false);
+        body.tracking = {
+          frames_b64: await Promise.all(v.frames.map(toBase64)), offsets_ms: v.offsetsMs,
+          phrases: wantedPhrases, clip_start: body.file_modified_at ?? localIso(Date.now()), duration_ms: v.durationMs,
+        };
+      }
+      await api.startPreview(body);
+      onQueued?.();
+      onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStep("add");
@@ -126,36 +138,12 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
     setJob(null);
     try {
       // Saving runs in the background (a slow model must not hold a request open): start it, then watch it.
-      const { job_id } = await api.startCommit(toCommitBody(draft, answers));
-      const result = await pollJob(() => api.commitJob(job_id), setJob);
-      const r = outcomeText(result);
-      setGrants(result.grants);
-      setOutcome(r);
-      setStep("saved");
-      if (r.saved) onSaved();
-      if (r.saved && source?.kind === "video" && wantedPhrases.length) {
-        void followObjects(source.blob, wantedPhrases, answers.when ?? draft.captured_at ?? localIso(Date.now()));
-      }
+      await api.startCommit(toCommitBody(draft, answers));
+      onQueued?.();
+      onClose();
     } catch (e) {
       setError(e instanceof ApiError || e instanceof Error ? e.message : String(e));
       setStep("review");
-    }
-  };
-
-  // After the video is saved, look for the named objects in a few frames. A failure here never undoes the save.
-  const followObjects = async (blob: Blob, phrases: string[], clipStart: string) => {
-    setTrack({ state: "running", lines: [] });
-    try {
-      const v = await extractVideo(blob, FRAMES, false);
-      const { job_id } = await api.startTrack({
-        frames_b64: await Promise.all(v.frames.map(toBase64)), offsets_ms: v.offsetsMs, phrases,
-        clip_start: clipStart, duration_ms: v.durationMs,
-      });
-      const result = (await pollJob(() => api.commitJob(job_id), () => {})) as unknown as TrackResult;
-      setTrack({ state: "done", lines: trackLines(result.objects) });
-      if (result.stored) onSaved();
-    } catch (e) {
-      setTrack({ state: "error", lines: [], message: e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -234,6 +222,7 @@ export function AddMemory({ open, mode, onClose, onSaved }: Props) {
               {step === "reading" ? "Reading…" : "Analyze with Muse"}
             </button>
           </div>
+          <p className="small muted">After upload, reading continues in Background activity. Keep this browser tab open until the upload is accepted.</p>
           <p className="small muted">Muse reads it and turns it into text. The photo, audio or video itself is not kept, and nothing is saved until you press Save.</p>
         </div>
       )}
@@ -336,7 +325,7 @@ function SeenList({ value }: { value: string }) {
 }
 
 /** Each consent record made by this upload, with the code that withdraws it. Shown once; the server keeps only a hash. */
-function WithdrawCodes({ grants }: { grants: CommitResult["grants"] }) {
+export function WithdrawCodes({ grants }: { grants: CommitResult["grants"] }) {
   const copy = (text: string) => { try { void navigator.clipboard?.writeText(text); } catch { /* the code is on screen */ } };
   return (
     <div className="add-codes">

@@ -9,7 +9,7 @@ import time
 import uuid
 from typing import Callable, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from ..compiler.perceive import merge_perceptions
 from .media_info import ExifInfo
@@ -51,6 +51,8 @@ class Question(BaseModel):
 
 
 class Draft(BaseModel):
+    # Optional SAM frames live only in this temporary RAM draft, never API output or SQLite.
+    _tracking: dict | None = PrivateAttr(default=None)
     draft_id: str = ""
     kind: Literal["frame", "audio", "note", "video"]
     fields: list[DraftField]
@@ -183,6 +185,9 @@ class DraftStore:
     def __init__(self, ttl_seconds: float = 900, clock: Callable[[], float] = time.monotonic):
         self._ttl, self._clock = ttl_seconds, clock
         self._drafts: dict[str, tuple[float, Draft]] = {}
+
+    def clear(self) -> None:
+        self._drafts.clear()
 
     def put(self, draft: Draft) -> Draft:
         self._expire()
