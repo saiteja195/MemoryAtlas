@@ -50,44 +50,65 @@ export function AuthGate({ onSignedIn, unreachable }: Props) {
   return (
     <main className="auth">
       <div className="auth-card">
-        <p className="eyebrow">MemoryAtlas</p>
-        <h1 className="auth-title">Remember your day. Ask it anything. Forget on command.</h1>
-        <p className="lede">Every profile is private: you see only your own memories.</p>
+        <aside className="auth-hero">
+          <p className="eyebrow">MemoryAtlas</p>
+          <h1 className="auth-title">Remember your day. Ask it anything. Forget on command.</h1>
+          <ul className="auth-points">
+            <li><span aria-hidden="true">🔒</span><div><strong>Private by design</strong>You see only your own memories.</div></li>
+            <li><span aria-hidden="true">✨</span><div><strong>Muse does the filing</strong>Add a photo, voice note or text. It asks only what it is unsure of.</div></li>
+            <li><span aria-hidden="true">🗑️</span><div><strong>Forget on command</strong>Delete any memory, or your whole profile, at any time.</div></li>
+          </ul>
+        </aside>
 
-        <div className="seg auth-tabs" role="tablist" aria-label="Sign in or create a profile">
-          <button type="button" role="tab" id="tab-signin" aria-selected={!signup} aria-controls="auth-panel" onClick={() => pick("signin")}>Sign in</button>
-          <button type="button" role="tab" id="tab-signup" aria-selected={signup} aria-controls="auth-panel" onClick={() => pick("signup")}>Create profile</button>
-        </div>
+        <section className="auth-panel">
+          <div className="auth-tabs" role="tablist" aria-label="Sign in or create a profile">
+            <button type="button" role="tab" id="tab-signin" aria-selected={!signup} aria-controls="auth-panel" onClick={() => pick("signin")}>Sign in</button>
+            <button type="button" role="tab" id="tab-signup" aria-selected={signup} aria-controls="auth-panel" onClick={() => pick("signup")}>Create profile</button>
+          </div>
 
-        <form id="auth-panel" role="tabpanel" aria-labelledby={signup ? "tab-signup" : "tab-signin"} className="auth-form" onSubmit={submit} noValidate>
-          <label className="auth-field">
-            <span>Name</span>
-            <input type="text" name="name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="username"
-                   autoCapitalize="words" spellCheck={false} maxLength={80} required />
-          </label>
-          <label className="auth-field">
-            <span>Passcode</span>
-            <input type={show ? "text" : "password"} name="passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)}
-                   autoComplete={signup ? "new-password" : "current-password"} maxLength={300} required
-                   aria-describedby={signup ? "auth-hint" : undefined} />
-          </label>
-          <label className="auth-show">
-            <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Show passcode
-          </label>
-          {signup && (
-            <p id="auth-hint" className="small muted">
-              At least 6 characters. There is no passcode reset: if you forget it, you will need a new profile.
-            </p>
-          )}
-          {(error || unreachable) && <div className="notice error" role="alert">{error ?? unreachable}</div>}
-          <button type="submit" className="btn primary large" disabled={busy}>
-            {busy ? "One moment…" : signup ? "Create profile" : "Sign in"}
-          </button>
-        </form>
+          <div className="auth-head">
+            <h2>{signup ? "Create your profile" : "Welcome back"}</h2>
+            <p className="muted">{signup ? "Pick a name and a passcode. It takes under a minute." : "Sign in with your name and passcode."}</p>
+          </div>
 
-        <p className="small muted auth-foot">
-          Reviewing this project? The demo profiles and their passcodes are listed in the README.
-        </p>
+          <form id="auth-panel" role="tabpanel" aria-labelledby={signup ? "tab-signup" : "tab-signin"} className="auth-form" onSubmit={submit} noValidate>
+            <div className="auth-field">
+              <label htmlFor="auth-name">Name</label>
+              <input id="auth-name" type="text" name="name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="username"
+                     autoCapitalize="words" spellCheck={false} maxLength={80} placeholder="e.g. Alex" required />
+            </div>
+            <div className="auth-field">
+              <label htmlFor="auth-passcode">Passcode</label>
+              <div className="auth-pass">
+                <input id="auth-passcode" type={show ? "text" : "password"} name="passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)}
+                       autoComplete={signup ? "new-password" : "current-password"} maxLength={300} required
+                       placeholder={signup ? "At least 6 characters" : "Your passcode"}
+                       aria-describedby={signup ? "auth-hint" : undefined} />
+                <button type="button" className="auth-eye" onClick={() => setShow(!show)} aria-pressed={show}
+                        aria-label={show ? "Hide passcode" : "Show passcode"}>{show ? "Hide" : "Show"}</button>
+              </div>
+            </div>
+            {signup && (
+              <p id="auth-hint" className="small muted">
+                There is no passcode reset: if you forget it, you will need a new profile.
+              </p>
+            )}
+            {(error || unreachable) && <div className="notice error" role="alert">{error ?? unreachable}</div>}
+            <button type="submit" className="btn primary large" disabled={busy}>
+              {busy ? "One moment…" : signup ? "Create profile" : "Sign in"}
+            </button>
+          </form>
+
+          <p className="small muted auth-switch">
+            {signup ? "Already have a profile? " : "New here? "}
+            <button type="button" className="auth-link" onClick={() => pick(signup ? "signin" : "signup")}>
+              {signup ? "Sign in instead" : "Create a free profile"}
+            </button>
+          </p>
+          <p className="small muted auth-foot">
+            Reviewing this project? The demo profiles and their passcodes are listed in the README.
+          </p>
+        </section>
       </div>
     </main>
   );
