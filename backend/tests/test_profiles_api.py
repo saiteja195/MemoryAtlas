@@ -271,14 +271,14 @@ def test_isolation(tmp_path):
                   json={"token": grant["revocation_token"]}).status_code == 404
     assert b.post("/capture/commit", json={"draft_id": draft_for_b, "answers": {}}).status_code == 404
     b_rt = app.state.runtimes.get(b_id, "Profile Bbb", False)
-    b_rt.llm.recall_replies[:] = [
+    b_rt.llm._inner.recall_replies[:] = [
         {"action": "tool", "tool": "search_claims", "args": {"query": "coffee"}},
         {"action": "final", "status": "abstained", "answer": "I have no memory of that.",
          "cited_claim_ids": [], "uncertainty_note": ""}]
     asked = b.post("/recall/ask", json={"question": "Where did I have coffee?"})
     assert asked.status_code == 200
     assert "secret-marker-aaa" not in asked.text and "Blue Door" not in asked.text
-    assert b_rt.llm.recall_payloads and all("Blue Door" not in str(p) for p in b_rt.llm.recall_payloads)
+    assert b_rt.llm._inner.recall_payloads and all("Blue Door" not in str(p) for p in b_rt.llm._inner.recall_payloads)
 
     assert a.get(f"/claims/{claim_id}/provenance").status_code == 200       # A is untouched
     assert a.post("/capture/commit", json={"draft_id": draft_for_b, "answers": {}}).status_code == 200

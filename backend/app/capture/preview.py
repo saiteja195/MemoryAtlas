@@ -5,6 +5,7 @@ from datetime import datetime
 
 from ..compiler.perceive import perceive_frame
 from ..llm.base import LLMClient
+from ..llm.metered import usage_purpose
 from .draft import Draft, build_draft
 from .media_info import MediaError, check_image, check_wav, read_exif
 
@@ -43,6 +44,11 @@ def local_iso(value: str | None) -> str | None:
         return None
 
 
+def _day(iso: str | None) -> str | None:
+    """The memory day (YYYY-MM-DD) of a capture time, when it is known."""
+    return iso[:10] if iso else None
+
+
 def build_preview(llm: LLMClient, kind: str, *, data_b64: str | None = None,
                   frames_b64: list[str] | None = None, frame_offsets_ms: list[int] | None = None,
                   audio_b64: str | None = None, text: str | None = None,
@@ -59,7 +65,8 @@ def build_preview(llm: LLMClient, kind: str, *, data_b64: str | None = None,
         image = _decode(data_b64, MAX_IMAGE_BYTES, "the image")
         check_image(image)
         exif = read_exif(image)
-        perception = perceive_frame(llm, image).model_dump()
+        with usage_purpose("read_memory", _day(exif.taken_at or when)):
+            perception = perceive_frame(llm, image).model_dump()
         del image
         return build_draft("frame", perceptions=[perception], frame_offsets_ms=[0], exif=exif,
                            file_modified_at=when)
@@ -67,7 +74,8 @@ def build_preview(llm: LLMClient, kind: str, *, data_b64: str | None = None,
     if kind == "audio":
         audio = _decode(data_b64, MAX_AUDIO_BYTES, "the audio")
         check_wav(audio)
-        turns = llm.transcribe(audio, None)
+        with usage_purpose("read_memory", _day(when)):
+            turns = llm.transcribe(audio, None)
         del audio
         return build_draft("audio", turns=turns, file_modified_at=when)
 
@@ -81,8 +89,9 @@ def build_preview(llm: LLMClient, kind: str, *, data_b64: str | None = None,
         audio = _decode(audio_b64, MAX_AUDIO_BYTES, "the audio") if audio_b64 else None
         if audio is not None:
             check_wav(audio)
-        perceptions = [perceive_frame(llm, image).model_dump() for image in images]
-        turns = llm.transcribe(audio, None) if audio is not None else None
+        with usage_purpose("read_memory", _day(when)):
+            perceptions = [perceive_frame(llm, image).model_dump() for image in images]
+            turns = llm.transcribe(audio, None) if audio is not None else None
         del images, audio
         return build_draft("video", perceptions=perceptions, frame_offsets_ms=list(offsets),
                            turns=turns, file_modified_at=when)

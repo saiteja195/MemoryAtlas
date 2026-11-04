@@ -120,7 +120,15 @@ class MeteredLLM:
             return None
         return None
 
-    def _write(self, row: tuple) -> None:
+    def flush(self) -> None:
+        """Write any rows that were held back while a request was mid-transaction. Call it once the
+        request's own work is committed; it never raises."""
+        try:
+            self._write(None)
+        except Exception as e:  # noqa: BLE001
+            log.warning("could not flush model call log: %s", type(e).__name__)
+
+    def _write(self, row: tuple | None) -> None:
         """Store one row without touching the request's own transaction.
 
         A file database gets a short-lived connection of its own (WAL), so committing the usage
@@ -131,6 +139,8 @@ class MeteredLLM:
         """
         path = self._db_file()
         if path is None:
+            if row is None:
+                return
             with self._lock:
                 try:
                     self._conn.execute(_INSERT, row)
@@ -141,8 +151,11 @@ class MeteredLLM:
                     raise
             return
         with self._lock:
-            self._pending.append(row)
+            if row is not None:
+                self._pending.append(row)
             batch = list(self._pending)
+        if not batch:
+            return
         try:
             side = sqlite3.connect(path, timeout=_BUSY_TIMEOUT_S)
             try:

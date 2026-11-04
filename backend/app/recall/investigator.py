@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, ValidationError
 
 from ..llm.base import LLMClient, LLMUnavailable
+from ..llm.metered import usage_purpose
 from ..privacy.filter import HISTORY, authorized_claim_ids
 from .tools import RecallTools
 
@@ -108,6 +109,10 @@ class Investigator:
         self.conn, self.llm = conn, llm
 
     def ask(self, question: str) -> Answer:
+        with usage_purpose("answer"):
+            return self._ask(question)
+
+    def _ask(self, question: str) -> Answer:
         tools = RecallTools(self.conn)
         pad: list[dict[str, Any]] = []
         checks: list[str] = []

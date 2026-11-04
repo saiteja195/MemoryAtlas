@@ -15,6 +15,7 @@ from ..demo_acts import load_acts
 from ..engine import MemoryEngine
 from ..llm.base import LLMClient
 from ..llm.factory import build_client
+from ..llm.metered import MeteredLLM
 from ..privacy.revocation import RevocationEngine
 from ..recall.service import RecallService
 
@@ -126,7 +127,7 @@ class Runtimes:
             s = replace(self.settings, db_path=os.path.join(d, "memoryatlas.db"),
                         runtime_cache_dir=os.path.join(d, "llmcache"))
         conn = db.connect(s.db_path)
-        llm = self.llm or build_client(s)
+        llm = MeteredLLM(self.llm or build_client(s), conn, {"text": s.llm_model, "asr": s.asr_model})
         adapter = MockDayAdapter(s.demo_script)
         engine = MemoryEngine(conn, llm, adapter.owner, adapter.names)
         demo = DemoRunner(engine, adapter, s.revocation_secret, seed=seed_demo)

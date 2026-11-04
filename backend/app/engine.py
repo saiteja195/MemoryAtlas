@@ -6,6 +6,7 @@ from .capture.gateway import Gateway
 from .capture.models import IngestResult, RawCapture
 from .compiler.pipeline import CompileResult, Compiler
 from .llm.base import LLMClient
+from .llm.metered import usage_purpose
 
 
 @dataclass
@@ -27,7 +28,12 @@ class MemoryEngine:
 
     def ingest(self, cap: RawCapture) -> list[Ingested]:
         out = []
-        for res in self.gateway.ingest(cap):
-            compiled = self.compiler.compile(res.observation) if res.observation else None
-            out.append(Ingested(res, compiled))
+        with usage_purpose("read_memory", cap.captured_at[:10]):
+            for res in self.gateway.ingest(cap):
+                compiled = self.compiler.compile(res.observation) if res.observation else None
+                out.append(Ingested(res, compiled))
+        # The work above is committed, so usage rows held back while it was mid-transaction can go out.
+        flush = getattr(self.llm, "flush", None)
+        if flush:
+            flush()
         return out
