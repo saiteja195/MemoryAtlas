@@ -10,6 +10,7 @@ import contextvars
 import json
 import logging
 import sqlite3
+import threading
 import time
 import uuid
 from typing import Any, Iterator
@@ -46,9 +47,18 @@ def _result_words(result: Any) -> int:
         return 0
 
 
+_INSERT = ("INSERT OR IGNORE INTO model_calls (call_id, at, model, kind, purpose, memory_day, "
+           "served_from, duration_ms, ok, images, words_in, words_out, audio_ms, "
+           "tokens_in, tokens_out) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+_BUSY_TIMEOUT_S = 0.1     # a usage row never makes a request wait long
+_MAX_PENDING = 500
+
+
 class MeteredLLM:
     def __init__(self, inner: LLMClient, conn: sqlite3.Connection, models: dict[str, str]):
         self._inner, self._conn, self._models = inner, conn, models
+        self._lock = threading.Lock()
+        self._pending: list[tuple] = []     # rows waiting for the database to be free
 
     @property
     def mode(self) -> str:
@@ -79,33 +89,74 @@ class MeteredLLM:
         finally:
             elapsed = int((time.perf_counter() - started) * 1000)
             try:
-                self._record(kind, elapsed, ok, result, words_in, images)
+                self._write(self._row(kind, elapsed, ok, result, words_in, images))
             except Exception as e:  # noqa: BLE001  metering must never fail a model call
                 log.warning("could not log model call: %s", type(e).__name__)
 
-    def _record(self, kind: str, duration_ms: int, ok: int, result: Any,
-                words_in: int, images: int) -> None:
+    def _row(self, kind: str, duration_ms: int, ok: int, result: Any,
+             words_in: int, images: int) -> tuple:
+        # Read the per-call labels first, on this thread, before anything else can overwrite them.
         purpose, memory_day = _purpose.get()
         served = getattr(self._inner, "last_served", "live")
+        usage = self._usage(served) if ok else None
         if kind == "asr":
             turns = result or []
             words_out = sum(_words(t.get("text")) for t in turns)
             audio_ms = max((int(t.get("end_ms") or 0) for t in turns), default=0)
         else:
             words_out, audio_ms = _result_words(result), 0
-        usage = self._usage(served) if ok else None
         model = self._models["asr" if kind == "asr" else "text"]
+        return (uuid.uuid4().hex, clock.now_iso(), model, kind, purpose, memory_day, served,
+                duration_ms, ok, images, words_in, words_out, audio_ms,
+                usage["tokens_in"] if usage else None, usage["tokens_out"] if usage else None)
+
+    def _db_file(self) -> str | None:
+        """The database file behind the request connection, or None for an in-memory database."""
         try:
-            self._conn.execute(
-                "INSERT INTO model_calls (call_id, at, model, kind, purpose, memory_day, "
-                "served_from, duration_ms, ok, images, words_in, words_out, audio_ms, "
-                "tokens_in, tokens_out) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (uuid.uuid4().hex, clock.now_iso(), model, kind, purpose, memory_day, served,
-                 duration_ms, ok, images, words_in, words_out, audio_ms,
-                 usage["tokens_in"] if usage else None, usage["tokens_out"] if usage else None))
-            self._conn.commit()
+            for row in self._conn.execute("PRAGMA database_list"):
+                if row[1] == "main":
+                    return row[2] or None
+        except Exception:  # noqa: BLE001  not a real connection: use it as it is
+            return None
+        return None
+
+    def _write(self, row: tuple) -> None:
+        """Store one row without touching the request's own transaction.
+
+        A file database gets a short-lived connection of its own (WAL), so committing the usage
+        row never commits, or waits behind, another handler's half-done work on the shared request
+        connection. If that write cannot proceed right away (a request is mid-transaction), the
+        row waits in memory and goes out with the next one. An in-memory database (tests) has no
+        second connection to open, so the shared one is used under a lock, rolled back on failure.
+        """
+        path = self._db_file()
+        if path is None:
+            with self._lock:
+                try:
+                    self._conn.execute(_INSERT, row)
+                    self._conn.commit()
+                except Exception:
+                    with contextlib.suppress(Exception):
+                        self._conn.rollback()
+                    raise
+            return
+        with self._lock:
+            self._pending.append(row)
+            batch = list(self._pending)
+        try:
+            side = sqlite3.connect(path, timeout=_BUSY_TIMEOUT_S)
+            try:
+                with side:
+                    side.executemany(_INSERT, batch)
+            finally:
+                side.close()
         except sqlite3.Error as e:
-            log.warning("could not log model call: %s", type(e).__name__)
+            with self._lock:
+                del self._pending[:-_MAX_PENDING]
+            log.warning("model call log busy, will retry: %s", type(e).__name__)
+            return
+        with self._lock:
+            self._pending[:] = [r for r in self._pending if r not in batch]
 
     def _usage(self, served: str) -> dict[str, int] | None:
         """Token counts reported by the live API for the call just made (none for a cache hit)."""

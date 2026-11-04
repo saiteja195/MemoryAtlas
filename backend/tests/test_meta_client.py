@@ -156,3 +156,33 @@ def test_meta_client_usage_is_reset_and_tolerates_junk():
     state["body"] = {**responses_body("{}"), "usage": "weird"}
     c.complete_json("s", "u", {})
     assert c.last_usage is None
+
+
+def test_last_usage_is_per_thread_on_a_shared_client():
+    import threading
+    started, release = threading.Event(), threading.Event()
+
+    def handler(req):
+        if b"slow" in req.content:
+            started.set()
+            assert release.wait(5)
+            usage = {"input_tokens": 100, "output_tokens": 200}
+        else:
+            usage = {"input_tokens": 1, "output_tokens": 2}
+        return httpx.Response(200, json={**responses_body("{}"), "usage": usage})
+
+    c = client(handler)
+    seen = {}
+
+    def slow():
+        c.complete_json("s", "slow", {})
+        seen["slow"] = c.last_usage
+
+    t = threading.Thread(target=slow)
+    t.start()
+    assert started.wait(5)
+    c.complete_json("s", "fast", {})
+    release.set()
+    t.join(5)
+    assert seen["slow"] == {"tokens_in": 100, "tokens_out": 200}
+    assert c.last_usage == {"tokens_in": 1, "tokens_out": 2}

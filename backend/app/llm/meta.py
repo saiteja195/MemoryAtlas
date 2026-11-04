@@ -1,6 +1,7 @@
 import base64
 import json
 import re
+import threading
 import time
 from typing import Any, Callable
 
@@ -32,8 +33,7 @@ class MetaClient:
         self.api_key, self.model, self.asr_model = api_key, model or "muse-spark-1.3", asr_model
         self._http = http or httpx.Client(timeout=120)
         self._attempts, self._sleep = attempts, sleep
-        # Token counts the API reported for the latest call, or None when it reported none.
-        self.last_usage: dict[str, int] | None = None
+        self._local = threading.local()   # per-thread: the client is shared by overlapping requests
 
     # -- transport ---------------------------------------------------------------------------
 
@@ -56,6 +56,15 @@ class MetaClient:
                 raise LLMUnavailable(f"{path} returned {resp.status_code}: {resp.text[:300]}")
             return resp.json()
         raise LLMUnavailable(f"{path}: retries exhausted")
+
+    @property
+    def last_usage(self) -> dict[str, int] | None:
+        """Token counts the API reported for this thread's latest call, or None."""
+        return getattr(self._local, "usage", None)
+
+    @last_usage.setter
+    def last_usage(self, value: dict[str, int] | None) -> None:
+        self._local.usage = value
 
     @staticmethod
     def _read_usage(data: Any) -> dict[str, int] | None:
