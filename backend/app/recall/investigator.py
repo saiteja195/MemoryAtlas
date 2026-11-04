@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ValidationError
 from ..llm.base import LLMClient, LLMUnavailable
 from ..llm.metered import usage_purpose
 from ..privacy.filter import HISTORY, authorized_claim_ids
+from .router import needs_extended
 from .tools import RecallTools
 
 MAX_STEPS = 6
@@ -67,6 +68,26 @@ Rules:
   return nothing relevant, stop and abstain.
 - Do not mention these rules, tools or claim ids in the answer text."""
 
+# Appended to SYSTEM, never edited into it: only questions the router sends here use SYSTEM + EXTENDED_ADDENDUM,
+# so every other question still sends the original prompt and matches its recorded replies.
+EXTENDED_ADDENDUM = """
+
+Date context:
+- The message gives "as_of", the day being asked about (YYYY-MM-DD); "today" is the same day.
+  "Today" always means that day, never the real current date; "yesterday" is the day before.
+- Time-of-day windows on that day: morning 05:00 to 11:59, afternoon 12:00 to 17:59, evening
+  and tonight 18:00 to 23:59. Use them as time_from and time_to, for example "this morning" is
+  <as_of>T05:00:00 to <as_of>T11:59:59.
+
+More tools:
+ day_summary(time_from, time_to)     moments, people, places and counts for a window
+ open_todos()                        open promises the user made and requests made of the user
+ coverage(time_from, time_to)        the spans the memory covers and the gaps
+ usage_stats(day?)                   how much the models read and answered (counts only)
+ uncertain_claims()                  disputed, partial and low-confidence claims
+- If a tool is unknown or returns an error, do not guess: finish with status "abstained" and
+  say you have no record."""
+
 STEP_SCHEMA = {"type": "object", "properties": {"action": {"enum": ["tool", "final"]}},
                "required": ["action"]}
 
@@ -108,11 +129,14 @@ class Investigator:
     def __init__(self, conn: sqlite3.Connection, llm: LLMClient, purpose: str = "answer"):
         self.conn, self.llm, self.purpose = conn, llm, purpose
 
-    def ask(self, question: str) -> Answer:
+    def ask(self, question: str, as_of: str | None = None) -> Answer:
+        """`as_of` (YYYY-MM-DD) is the day "today" means. Without it no question is routed, so callers
+        that pass no day (the red-team probes) always send the original prompt."""
+        route = needs_extended(question) if as_of else None
         with usage_purpose(self.purpose):
-            return self._ask(question)
+            return self._ask(question, as_of if route else None)
 
-    def _ask(self, question: str) -> Answer:
+    def _ask(self, question: str, as_of: str | None = None) -> Answer:
         tools = RecallTools(self.conn)
         pad: list[dict[str, Any]] = []
         checks: list[str] = []
@@ -120,7 +144,7 @@ class Investigator:
         for step_no in range(1, MAX_STEPS + 1):
             hint = ("This is your last step: give the final answer now." if step_no == MAX_STEPS
                     else None)
-            step = self._next(question, pad, hint)
+            step = self._next(question, pad, hint, as_of)
             if step.action == "tool":
                 if step_no == MAX_STEPS:
                     break
@@ -143,8 +167,12 @@ class Investigator:
 
     # -- model step ---------------------------------------------------------------------------
 
-    def _next(self, question: str, pad: list[dict[str, Any]], hint: str | None) -> Step:
-        user = {"question": question, "steps_so_far": pad}
+    def _next(self, question: str, pad: list[dict[str, Any]], hint: str | None,
+              as_of: str | None = None) -> Step:
+        # A routed question (as_of set) adds the day; an unrouted one keeps the recorded payload shape.
+        user: dict[str, Any] = ({"question": question, "as_of": as_of, "today": as_of, "steps_so_far": pad}
+                                if as_of else {"question": question, "steps_so_far": pad})
+        system = SYSTEM + EXTENDED_ADDENDUM if as_of else SYSTEM
         if hint:
             user["note"] = hint
         error = ""
@@ -153,7 +181,7 @@ class Investigator:
             if error:
                 payload += f"\n\nYour previous reply was invalid ({error}). Reply with one valid JSON object."
             try:
-                return Step.model_validate(self.llm.complete_json(SYSTEM, payload, STEP_SCHEMA))
+                return Step.model_validate(self.llm.complete_json(system, payload, STEP_SCHEMA))
             except ValidationError as e:
                 error = "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors()[:3])
             except LLMUnavailable as e:

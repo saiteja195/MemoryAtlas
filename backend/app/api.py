@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .capture.audit import media_bytes_on_disk
 from .capture.commit import Answers, CommitError, commit as commit_draft, plan as plan_commit
@@ -76,6 +76,14 @@ class CommitBody(BaseModel):
 
 class AskBody(BaseModel):
     question: str = Field(min_length=3, max_length=500)
+    as_of: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")   # the day "today" means
+
+    @field_validator("as_of")
+    @classmethod
+    def _real_day(cls, v: str | None) -> str | None:
+        if v is not None:
+            date.fromisoformat(v)          # 2026-10-32 is not a day: a ValueError becomes a 422
+        return v
 
 
 class RevokeBody(BaseModel):
@@ -315,7 +323,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     @app.post("/recall/ask", dependencies=[Depends(spend)])
     def ask(body: AskBody, rt: ProfileRuntime = Depends(get_runtime)) -> dict:
         try:
-            return rt.recall.ask(body.question)
+            return rt.recall.ask(body.question, body.as_of)
         except LLMUnavailable as e:
             raise HTTPException(503, str(e)) from e
 

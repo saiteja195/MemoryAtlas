@@ -6,10 +6,12 @@ import uuid
 from typing import Any
 
 from ..compiler.resolve import norm
+from ..insights.coverage import memory_days
 from ..llm.base import LLMClient
 from ..privacy import clock
 from ..privacy.filter import authorized_claim_ids
 from .investigator import Answer, Investigator
+from .router import needs_extended
 from .tools import RecallTools
 
 
@@ -34,8 +36,17 @@ class RecallService:
         self.conn, self.llm = conn, llm
         self.investigator = Investigator(conn, llm)
 
-    def ask(self, question: str) -> dict[str, Any]:
-        qhash = hashlib.sha256(norm(question).encode()).hexdigest()
+    def ask(self, question: str, as_of: str | None = None) -> dict[str, Any]:
+        """`as_of` (YYYY-MM-DD) is the day "today" means; it defaults to the latest day with memories
+        (None when there are none, and then no question is routed)."""
+        if as_of is None:
+            days = memory_days(self.conn)
+            as_of = days[-1] if days else None
+        route = needs_extended(question) if as_of else None
+        # Unrouted: the original key, so the day does not matter. Routed: the day is part of the
+        # question, so the same words on two days are two cache entries.
+        key = f"{route}|{as_of}|{norm(question)}" if route else norm(question)
+        qhash = hashlib.sha256(key.encode()).hexdigest()
         version = graph_version(self.conn)
         row = self.conn.execute("SELECT answer_json FROM answer_cache WHERE question_hash=?",
                                 (qhash,)).fetchone()
@@ -45,7 +56,7 @@ class RecallService:
                 cached["cached"] = True
                 self._log(question, cached)
                 return cached
-        ans: Answer = self.investigator.ask(question)
+        ans: Answer = self.investigator.ask(question, as_of)
         out = ans.as_dict()
         out["citations"] = self._citations(ans.cited_claim_ids)
         out["graph_version"], out["cached"] = version, False
